@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>The Mythic Chronicles: The Emerald Realm</title>
+  <link rel="stylesheet" href="css/style.css" />
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+    }
+  }
+  </script>
+</head>
+<body>
+  <canvas id="gameCanvas"></canvas>
+
+  <!-- LOADING SCREEN -->
+  <div id="loadingScreen">
+    <div class="loading-content">
+      <div class="loading-emblem">✦</div>
+      <h1 class="loading-title">THE MYTHIC CHRONICLES</h1>
+      <h2 class="loading-subtitle">The Emerald Realm</h2>
+      <div class="loading-bar-container">
+        <div class="loading-bar" id="loadingBar"></div>
+      </div>
+      <p class="loading-text" id="loadingText">Awakening the ancient realm...</p>
+    </div>
+  </div>
+
+  <!-- INTRO / MAIN MENU OVERLAY -->
+  <div id="mainMenu" class="hidden">
+    <div class="menu-background-vignette"></div>
+    <div class="menu-content">
+      <div class="menu-title-container">
+        <div class="menu-emblem">⚜</div>
+        <h1 class="menu-title">THE MYTHIC CHRONICLES</h1>
+        <h2 class="menu-subtitle">The Emerald Realm</h2>
+        <div class="menu-divider"></div>
+      </div>
+      <nav class="menu-nav">
+        <button class="menu-btn" id="btnNewGame">⚔ New Journey</button>
+        <button class="menu-btn" id="btnContinue">📜 Continue Quest</button>
+        <button class="menu-btn" id="btnSettings">⚙ Settings</button>
+        <button class="menu-btn" id="btnCredits">✦ Lore & Credits</button>
+      </nav>
+      <p class="menu-version">v1.0 — Emerald Edition</p>
+    </div>
+  </div>
+
+  <!-- HUD (in-game overlay) -->
+  <div id="hud" class="hidden">
+    <!-- Top-left: Player stats -->
+    <div class="hud-stats">
+      <div class="stat-block">
+        <span class="stat-label">VITALITY</span>
+        <div class="stat-bar-bg">
+          <div class="stat-bar health-bar" id="healthBar"></div>
+        </div>
+        <span class="stat-value" id="healthText">100 / 100</span>
+      </div>
+      <div class="stat-block">
+        <span class="stat-label">ARCANE</span>
+        <div class="stat-bar-bg">
+          <div class="stat-bar mana-bar" id="manaBar"></div>
+        </div>
+        <span class="stat-value" id="manaText">100 / 100</span>
+      </div>
+      <div class="stat-block xp-block">
+        <span class="stat-label">GLORY  LV.<span id="playerLevel">1</span></span>
+        <div class="stat-bar-bg">
+          <div class="stat-bar xp-bar" id="xpBar"></div>
+        </div>
+        <span class="stat-value" id="xpText">0 / 200</span>
+      </div>
+    </div>
+
+    <!-- Bottom-center: Spell bar -->
+    <div class="spell-bar">
+      <div class="spell-slot" id="spell-Q" title="Pyroclast [Q]">
+        <div class="spell-icon fire">🔥</div>
+        <span class="spell-key">Q</span>
+        <div class="spell-cooldown" id="cd-Q"></div>
+      </div>
+      <div class="spell-slot" id="spell-E" title="Galestrike [E]">
+        <div class="spell-icon lightning">⚡</div>
+        <span class="spell-key">E</span>
+        <div class="spell-cooldown" id="cd-E"></div>
+      </div>
+      <div class="spell-slot" id="spell-R" title="Verdant Mend [R]">
+        <div class="spell-icon nature">🌿</div>
+        <span class="spell-key">R</span>
+        <div class="spell-cooldown" id="cd-R"></div>
+      </div>
+      <div class="spell-slot" id="spell-T" title="Arcane Aegis [T]">
+        <div class="spell-icon shield">🛡</div>
+        <span class="spell-key">T</span>
+        <div class="spell-cooldown" id="cd-T"></div>
+      </div>
+      <div class="spell-slot ultimate" id="spell-G" title="Mythic Nova [G]">
+        <div class="spell-icon nova">✨</div>
+        <span class="spell-key">G</span>
+        <div class="spell-cooldown" id="cd-G"></div>
+      </div>
+    </div>
+
+    <!-- Top-right: Quest tracker -->
+    <div class="quest-tracker" id="questTracker">
+      <div class="quest-tracker-header">⚔ ACTIVE QUEST</div>
+      <div id="activeQuestTitle" class="quest-tracker-title">—</div>
+      <div id="activeQuestObjective" class="quest-tracker-obj"></div>
+      <div id="activeQuestProgress" class="quest-tracker-progress"></div>
+    </div>
+
+    <!-- Bottom-right: Controls hint -->
+    <div class="controls-hint" id="controlsHint">
+      <span>WASD Move</span>
+      <span>Mouse Look</span>
+      <span>Q/E/R/T/G Spells</span>
+      <span>F Interact</span>
+      <span>I Inventory</span>
+      <span>J Quest Log</span>
+    </div>
+
+    <!-- Center: Interaction prompt -->
+    <div class="interact-prompt hidden" id="interactPrompt">
+      <span class="interact-key">F</span>
+      <span class="interact-text" id="interactText">Interact</span>
+    </div>
+
+    <!-- Shield indicator -->
+    <div class="shield-indicator hidden" id="shieldIndicator">
+      <span>🛡 AEGIS ACTIVE</span>
+    </div>
+
+    <!-- Damage flash -->
+    <div class="damage-vignette hidden" id="damageVignette"></div>
+
+    <!-- Heal flash -->
+    <div class="heal-vignette hidden" id="healVignette"></div>
+  </div>
+
+  <!-- DIALOGUE BOX -->
+  <div id="dialogueBox" class="hidden">
+    <div class="dialogue-portrait" id="dialoguePortrait">👤</div>
+    <div class="dialogue-content">
+      <div class="dialogue-name" id="dialogueName">NPC</div>
+      <div class="dialogue-text" id="dialogueText"></div>
+      <div class="dialogue-options" id="dialogueOptions"></div>
+    </div>
+  </div>
+
+  <!-- QUEST LOG -->
+  <div id="questLog" class="hidden panel">
+    <div class="panel-header">
+      <span class="panel-title">⚔ QUEST CHRONICLE</span>
+      <button class="panel-close" id="closeQuestLog">✕</button>
+    </div>
+    <div class="panel-tabs">
+      <button class="tab-btn active" data-tab="active">Active</button>
+      <button class="tab-btn" data-tab="completed">Completed</button>
+    </div>
+    <div class="panel-body" id="questLogContent"></div>
+  </div>
+
+  <!-- INVENTORY -->
+  <div id="inventoryPanel" class="hidden panel">
+    <div class="panel-header">
+      <span class="panel-title">🎒 INVENTORY</span>
+      <button class="panel-close" id="closeInventory">✕</button>
+    </div>
+    <div class="inventory-grid" id="inventoryGrid"></div>
+    <div class="inventory-details" id="inventoryDetails">
+      <p class="inv-hint">Select an item to view details</p>
+    </div>
+  </div>
+
+  <!-- SETTINGS PANEL -->
+  <div id="settingsPanel" class="hidden panel">
+    <div class="panel-header">
+      <span class="panel-title">⚙ SETTINGS</span>
+      <button class="panel-close" id="closeSettings">✕</button>
+    </div>
+    <div class="panel-body">
+      <div class="setting-row">
+        <label>Music Volume</label>
+        <input type="range" id="musicVolume" min="0" max="100" value="60" />
+      </div>
+      <div class="setting-row">
+        <label>SFX Volume</label>
+        <input type="range" id="sfxVolume" min="0" max="100" value="80" />
+      </div>
+      <div class="setting-row">
+        <label>Camera Sensitivity</label>
+        <input type="range" id="camSensitivity" min="1" max="10" value="5" />
+      </div>
+      <div class="setting-row">
+        <label>Render Quality</label>
+        <select id="renderQuality">
+          <option value="low">Low</option>
+          <option value="medium" selected>Medium</option>
+          <option value="high">High</option>
+        </select>
+      </div>
+    </div>
+    <button class="btn-primary" id="saveSettings">Save Changes</button>
+  </div>
+
+  <!-- CREDITS PANEL -->
+  <div id="creditsPanel" class="hidden panel">
+    <div class="panel-header">
+      <span class="panel-title">✦ LORE & CREDITS</span>
+      <button class="panel-close" id="closeCredits">✕</button>
+    </div>
+    <div class="panel-body credits-body">
+      <p class="credits-lore">
+        "In the age before memory, when the gods still walked among men and
+        dragons carved mountains with their wings, the Emerald Realm was born
+        from a single seed of divine magic..."
+      </p>
+      <div class="credits-divider">⚜</div>
+      <p class="credits-entry"><strong>Game Design & Development</strong><br/>Mythic Chronicles Studio</p>
+      <p class="credits-entry"><strong>Engine</strong><br/>Three.js WebGL</p>
+      <p class="credits-entry"><strong>World</strong><br/>The Emerald Realm — a world of ancient gods, forgotten magic, and eternal adventure</p>
+    </div>
+  </div>
+
+  <!-- LEVEL UP NOTIFICATION -->
+  <div id="levelUpNotif" class="hidden level-up-notif">
+    <div class="level-up-content">
+      <div class="level-up-icon">⭐</div>
+      <div class="level-up-text">LEVEL UP!</div>
+      <div class="level-up-level" id="levelUpNumber">Level 2</div>
+    </div>
+  </div>
+
+  <!-- NOTIFICATION TOASTS -->
+  <div id="toastContainer" class="toast-container"></div>
+
+  <!-- PAUSE MENU -->
+  <div id="pauseMenu" class="hidden">
+    <div class="pause-content">
+      <h2 class="pause-title">⚔ PAUSED</h2>
+      <button class="menu-btn" id="btnResume">▶ Resume</button>
+      <button class="menu-btn" id="btnPauseSettings">⚙ Settings</button>
+      <button class="menu-btn" id="btnMainMenu">⚜ Main Menu</button>
+    </div>
+  </div>
+
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>
