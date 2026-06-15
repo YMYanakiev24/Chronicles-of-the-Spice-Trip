@@ -327,7 +327,7 @@ export const QUESTS = {
       { type: 'collect', item: 'asphodel', count: 6, text: 'Gather 6 Asphodel blooms' },
       { type: 'talk', npc: 'myrrha', text: 'Bring the blooms to Sister Myrrha' },
     ],
-    rewards: { xp: 90, gold: 40, spell: 'wildmend', items: ['ambrosiaCake'] },
+    rewards: { xp: 90, gold: 40, spell: 'wildmend', items: ['TopChuk'] },
   },
   trialBronze: {
     id: 'trialBronze', title: 'Trial of Bronze', giver: 'kassander', region: 'mistwood',

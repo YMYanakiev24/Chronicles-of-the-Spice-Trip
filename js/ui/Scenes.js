@@ -82,10 +82,45 @@ export class Scenes {
       document.getElementById('shop-img').src = img.src;
       document.getElementById('shop-img').classList.remove('hidden');
       document.getElementById('shop-bg').classList.add('hidden');
+      // The photo has no character, so draw Marin's sprite on top of it.
+      document.getElementById('marin-sprite').classList.remove('hidden');
     });
-    use('marin', ['assets/marin.png', 'assets/marin.jpg'], (img) => {
-      const el = document.getElementById('marin-portrait');
-      el.src = img.src; el.classList.remove('hidden');
+    use('marin', ['assets/marin.png'], (img) => {
+      const cv = document.getElementById('marin-portrait');
+      const c = cv.getContext('2d');
+      c.imageSmoothingEnabled = false;
+      if (/\.png(\?|$)/i.test(img.src)) {
+        // A .png is assumed to be a ready-made transparent cutout — show as-is.
+        cv.width = img.width; cv.height = img.height;
+        c.clearRect(0, 0, cv.width, cv.height);
+        c.drawImage(img, 0, 0);
+      } else {
+        // Raw photo: crop to Marin's hat + face (zoomed out a little, but still
+        // stopping short of the "Buy Vape" button on the right and the objects
+        // along the bottom), then fade the edges to transparent so the room
+        // background drops away and he reads as a cutout rather than a boxed photo.
+        const sx = img.width * 0.08, sy = img.height * 0.12;
+        const sw = img.width * 0.50, sh = img.height * 0.44;
+        const W = Math.round(sw), H = Math.round(sh);
+        cv.width = W; cv.height = H;
+        c.clearRect(0, 0, W, H);
+        c.drawImage(img, sx, sy, sw, sh, 0, 0, W, H);
+        c.globalCompositeOperation = 'destination-in';
+        c.save();
+        c.translate(W * 0.52, H * 0.44);
+        c.scale(1, (H * 1.05) / W);
+        const rad = c.createRadialGradient(0, 0, 0, 0, 0, W * 0.58);
+        rad.addColorStop(0, 'rgba(0,0,0,1)');
+        rad.addColorStop(0.50, 'rgba(0,0,0,1)');
+        rad.addColorStop(1, 'rgba(0,0,0,0)');
+        c.fillStyle = rad;
+        c.beginPath(); c.arc(0, 0, W * 0.58, 0, 7); c.fill();
+        c.restore();
+        c.globalCompositeOperation = 'source-over';
+      }
+      cv.classList.remove('hidden');
+      document.getElementById('marin-sprite').classList.add('hidden'); // photo replaces the sprite
+      this._marinPhoto = true;
     });
   }
 
@@ -129,8 +164,9 @@ export class Scenes {
         <div class="scene-stage">
           <canvas class="scene-bg" id="shop-bg" width="${BW}" height="${BH}"></canvas>
           <img class="scene-img hidden" id="shop-img" alt="">
+          <canvas class="marin-sprite hidden" id="marin-sprite" width="48" height="76"></canvas>
         </div>
-        <img class="marin-portrait hidden" id="marin-portrait" alt="">
+        <canvas class="marin-portrait hidden" id="marin-portrait"></canvas>
         <button class="scene-back" data-back="corridor">⟵ Back to the hall</button>
         <div class="shop-gold">GOLD: <span id="shop-gold-val">0</span></div>
         <div class="shop-marin-line" id="marin-line">"Welcome, traveler. Coin for cures?"</div>
@@ -180,6 +216,8 @@ export class Scenes {
     this.shopCtx = document.getElementById('shop-bg').getContext('2d');
     this.corridorCtx.imageSmoothingEnabled = false;
     this.shopCtx.imageSmoothingEnabled = false;
+    this.marinCtx = document.getElementById('marin-sprite').getContext('2d');
+    this.marinCtx.imageSmoothingEnabled = false;
     this.tapCanvas = document.getElementById('tap-canvas');
     this.tapCtx = this.tapCanvas.getContext('2d');
     this.tapCtx.imageSmoothingEnabled = false;
@@ -419,7 +457,17 @@ export class Scenes {
     this.t += 1 / 60;
     // Only animate the procedural pixel scene when no custom image is provided.
     if (this.active === 'corridor' && !this._art.corridor) this._drawCorridor(this.t);
-    else if (this.active === 'shop' && !this._art.shop) this._drawShop(this.t);
+    else if (this.active === 'shop') {
+      if (!this._art.shop) this._drawShop(this.t);   // procedural draw already includes Marin
+      else if (!this._marinPhoto) this._drawMarin(this.t); // sprite only if no photo portrait
+    }
+  }
+
+  // Marin the Wizard standing in his shop (drawn over the photo background).
+  _drawMarin(t) {
+    const ctx = this.marinCtx;
+    ctx.clearRect(0, 0, 48, 76);
+    this._marinSprite(ctx, 24, 28, t);
   }
 
   _bricks(ctx, x, y, w, h, a, b, mortar) {

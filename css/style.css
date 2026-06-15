@@ -546,22 +546,19 @@ html, body {
 
 /* Clickable castle on the main menu (upper-right, over the drawn citadel). */
 .castle-hotspot {
-  position: absolute; top: 9%; right: 1%;
-  width: clamp(200px, 38vw, 500px); height: clamp(170px, 46vh, 420px);
-  background: transparent; border: 2px dashed rgba(255,215,107,0.3); border-radius: 12px;
+  position: absolute; top: 8%; right: 6%;
+  width: clamp(240px, 46vw, 620px); height: clamp(200px, 54vh, 500px);
+  background: transparent; border: none; border-radius: 12px;
   cursor: pointer; transition: all 0.2s; z-index: 5;
   display: flex; align-items: flex-start; justify-content: center;
 }
-.castle-hotspot:hover {
-  border-color: rgba(255,215,107,0.85);
-  box-shadow: 0 0 48px rgba(255,215,107,0.3), inset 0 0 60px rgba(255,215,107,0.14);
-}
+.castle-hotspot:hover { box-shadow: inset 0 0 80px rgba(255,215,107,0.12); }
 .castle-label {
-  font-family: var(--font-title); font-size: 0.95rem; letter-spacing: 0.08em;
-  color: var(--gold-bright); background: rgba(8,6,14,0.88);
-  border: 1px solid var(--gold); border-radius: 16px; padding: 7px 16px;
-  margin-bottom: 18px; opacity: 0.95; transition: all 0.2s;
-  text-shadow: 0 0 10px rgba(255,215,107,0.7); white-space: nowrap;
+  font-family: var(--font-title); font-size: 1.35rem; letter-spacing: 0.08em;
+  color: var(--gold-bright); background: rgba(8,6,14,0.55);
+  border: none; border-radius: 16px; padding: 10px 26px;
+  margin-top: 26px; opacity: 0.96; transition: transform 0.2s, opacity 0.2s;
+  text-shadow: 0 0 14px rgba(255,215,107,0.85), 0 2px 4px #000; white-space: nowrap;
   animation: castlePulse 2s ease-in-out infinite;
 }
 .castle-hotspot:hover .castle-label { transform: scale(1.08); opacity: 1; }
@@ -736,7 +733,7 @@ html, body {
   object-fit: cover; image-rendering: pixelated;
 }
 .has-menu-bg #main-menu { background: rgba(0,0,0,0.18); backdrop-filter: none; }
-.has-menu-bg #main-menu > *:not(.menu-bg) { position: relative; z-index: 1; }
+.has-menu-bg #main-menu > *:not(.menu-bg):not(.castle-hotspot) { position: relative; z-index: 1; }
 /* The supplied art usually has its own title baked in — hide the DOM title. */
 .has-menu-bg #main-menu .game-title,
 .has-menu-bg #main-menu .game-subtitle { display: none; }
@@ -744,13 +741,21 @@ html, body {
 /* The supplied corridor art has its own door signs — hide the DOM labels. */
 .has-corridor-img .door-label { display: none; }
 
+/* Marin's pixel sprite standing in his shop, over the photo background. */
+.marin-sprite {
+  position: absolute; left: 47%; top: 26%;
+  height: 42%; width: auto; transform: translateX(-50%);
+  image-rendering: pixelated; image-rendering: crisp-edges;
+  pointer-events: none;
+  filter: drop-shadow(0 4px 6px rgba(0,0,0,0.6));
+}
+
 /* Marin's character portrait in the shop (assets/marin.png). */
 .marin-portrait {
-  position: fixed; left: 3%; bottom: 14%; z-index: 33;
-  height: min(48vh, 420px); width: auto;
+  position: fixed; left: 3%; bottom: 18%; z-index: 33;
+  height: min(50vh, 440px); width: auto; display: block;
   image-rendering: pixelated; image-rendering: crisp-edges;
-  border: 3px solid var(--gold); border-radius: 10px;
-  background: rgba(8,6,14,0.6);
-  box-shadow: 0 8px 30px rgba(0,0,0,0.6), 0 0 24px rgba(202,168,77,0.25);
+  border: none; background: transparent; border-radius: 0;
+  filter: drop-shadow(0 8px 12px rgba(0,0,0,0.7));
 }
-@media (max-width: 720px) { .marin-portrait { height: 34vh; left: 2%; bottom: 30%; } }
+@media (max-width: 720px) { .marin-portrait { height: 34vh; left: 2%; bottom: 34%; } }
