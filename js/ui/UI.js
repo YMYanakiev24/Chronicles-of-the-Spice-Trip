@@ -213,8 +213,8 @@ export class UI {
       b.addEventListener('click', () => { this.game.audio.sfx('ui'); fn(); });
       btns.appendChild(b);
     };
-    // The RPG is being redesigned — the only way in is by clicking the castle.
-    add('Settings', () => this.openSettings());
+    // Play leads to the Path — the boss map (same as clicking the castle).
+    add('▶ Play', () => this.game.scenes.enterPath(), 'primary');
     menu.classList.remove('hidden');
     this.game.audio.playMusic('menu');
   }

@@ -16,8 +16,35 @@
 
 import { ITEMS } from '../data/GameData.js';
 import { flame, prop } from '../world/PixelArt.js';
+import { BossBattle } from './BossBattle.js';
 
 const BW = 320, BH = 180;   // scene buffer resolution
+
+// The four bosses on the Path map (positions are fractions of the path image,
+// matching where each figure stands so the click hotspots line up).
+const BOSSES = [
+  { id: 'goodPlaz', name: 'The Good Plazmodium', img: 'assets/plazmodiigood.jpg', hp: 120, color: '#5fd06a', cx: 0.27, cy: 0.72 },
+  { id: 'badPlaz', name: 'The Bad Plasmodium', img: 'assets/thebadplasmodium.jpg', hp: 160, color: '#9a5fd0', cx: 0.43, cy: 0.31 },
+  { id: 'mordekai', name: 'Mordekai', img: 'assets/mordekai.jpg', hp: 140, color: '#4a7ad0', cx: 0.58, cy: 0.68 },
+  { id: 'vlado', name: 'Vlado', img: 'assets/vlado.jpg', hp: 190, color: '#3a5a8a', cx: 0.88, cy: 0.62 },
+];
+
+// Selectable champions (the player's fighter). img:null → procedural hero.
+// Drop more art into /assets and add rows here later.
+const CHARACTERS = [
+  { id: 'hero', name: 'Spellwoven', img: null },
+  { id: 'atanas', name: 'Atanas', img: 'assets/atanas.jpg' },
+  { id: 'gakev', name: 'Gakev', img: 'assets/gakev.jpg' },
+  { id: 'nikolay', name: 'Nikolay', img: 'assets/nikolay.jpg' },
+  { id: 'pupesh', name: 'Pupesh', img: 'assets/pupesh.jpg' },
+  { id: 'ristyo', name: 'Ristyo', img: 'assets/ristyo.jpg' },
+  { id: 'iliqnpuh', name: 'Iliqn Puh', img: 'assets/iliqnpuh.jpg' },
+  { id: 'daniilvasil', name: 'Daniil & Vasil', img: 'assets/daniilandvasil.jpg' },
+  { id: 'storyteller', name: 'The Storyteller', img: 'assets/thestoryteller.jpg' },
+  { id: 'fairy', name: 'The Fairy', img: 'assets/thefairy.jpg' },
+  { id: 'soon1', name: 'Coming soon', img: null, empty: true },
+  { id: 'soon2', name: 'Coming soon', img: null, empty: true },
+];
 
 // Items Marin stocks (all integrate with the player's real satchel).
 const SHOP_STOCK = [
@@ -31,16 +58,19 @@ export class Scenes {
   constructor(game) {
     this.game = game;
     this.hub = game.save.loadHub();
-    this.active = null;       // null | 'corridor' | 'shop'
+    this.active = null;       // null | 'path' | 'corridor' | 'shop' | 'battle'
     this.t = 0;
     this._raf = null;
     this._tapRaf = null;
     this.tapCells = [];
     this.tornCount = 0;
+    this.selectedChar = CHARACTERS[0];
+    this.defeatedBosses = new Set(this.hub.defeated || []);
 
     this._buildDOM();
     this._wire();
     this._loadArt();
+    this.battle = new BossBattle(this);
   }
 
   /**
@@ -78,6 +108,11 @@ export class Scenes {
       document.getElementById('corridor-bg').classList.add('hidden');
       document.body.classList.add('has-corridor-img');  // art has its own door signs
     });
+    use('path', ['assets/path.png', 'assets/path.jpg'], (img) => {
+      document.getElementById('path-img').src = img.src;
+      document.getElementById('path-img').classList.remove('hidden');
+      document.getElementById('path-bg').classList.add('hidden');
+    });
     use('shop', ['assets/shop.png', 'assets/shop.jpg'], (img) => {
       document.getElementById('shop-img').src = img.src;
       document.getElementById('shop-img').classList.remove('hidden');
@@ -90,10 +125,12 @@ export class Scenes {
       const c = cv.getContext('2d');
       c.imageSmoothingEnabled = false;
       if (/\.png(\?|$)/i.test(img.src)) {
-        // A .png is assumed to be a ready-made transparent cutout — show as-is.
-        cv.width = img.width; cv.height = img.height;
+        // A .png is a ready-made transparent cutout — shown raw, except the
+        // bottom is trimmed so the objects in his hands aren't displayed.
+        const cropH = Math.round(img.height * 0.64);
+        cv.width = img.width; cv.height = cropH;
         c.clearRect(0, 0, cv.width, cv.height);
-        c.drawImage(img, 0, 0);
+        c.drawImage(img, 0, 0, img.width, cropH, 0, 0, img.width, cropH);
       } else {
         // Raw photo: crop to Marin's hat + face (zoomed out a little, but still
         // stopping short of the "Buy Vape" button on the right and the objects
@@ -155,7 +192,7 @@ export class Scenes {
           <button class="door-hotspot door-wizard" id="door-wizard"><span class="door-label wiz">Marin the Wizard</span></button>
           <button class="door-hotspot door-changing" id="door-changing"><span class="door-label chg">Changing Room</span></button>
         </div>
-        <button class="scene-back" data-back="menu">⟵ Leave</button>
+        <button class="scene-back" data-back="path">⟵ Back to the path</button>
         <div class="scene-hint">Click a door to enter</div>
       </div>
 
@@ -173,6 +210,28 @@ export class Scenes {
         <div class="shop-panel">
           <div class="shop-title">✦ Marin's Apothecary ✦</div>
           <div class="shop-counter" id="shop-items"></div>
+        </div>
+      </div>
+
+      <!-- Path (boss map) -->
+      <div class="scene-overlay hidden" id="scene-path">
+        <div class="scene-stage">
+          <canvas class="scene-bg" id="path-bg" width="${BW}" height="${BH}"></canvas>
+          <img class="scene-img hidden" id="path-img" alt="">
+          <div id="path-bosses"></div>
+          <button class="path-castle" id="path-castle"><span>🏰 Enter the Castle</span></button>
+        </div>
+        <button class="scene-back" data-back="menu">⟵ Leave</button>
+        <div class="scene-hint">Click a boss to fight · enter the castle for the shop &amp; changing room</div>
+      </div>
+
+      <!-- Character select (Changing Room) -->
+      <div class="char-modal hidden" id="char-modal">
+        <div class="char-box">
+          <button class="tap-close" id="char-close">✕</button>
+          <h2>Choose Your Champion</h2>
+          <p class="tap-sub">Pick who you fight as. Drop more art into <code>/assets</code> and add them later.</p>
+          <div class="char-grid" id="char-grid"></div>
         </div>
       </div>
 
@@ -211,25 +270,62 @@ export class Scenes {
 
     this.corridor = document.getElementById('scene-corridor');
     this.shop = document.getElementById('scene-shop');
+    this.path = document.getElementById('scene-path');
     this.fog = document.getElementById('scene-fog');
     this.corridorCtx = document.getElementById('corridor-bg').getContext('2d');
     this.shopCtx = document.getElementById('shop-bg').getContext('2d');
+    this.pathCtx = document.getElementById('path-bg').getContext('2d');
     this.corridorCtx.imageSmoothingEnabled = false;
     this.shopCtx.imageSmoothingEnabled = false;
+    this.pathCtx.imageSmoothingEnabled = false;
     this.marinCtx = document.getElementById('marin-sprite').getContext('2d');
     this.marinCtx.imageSmoothingEnabled = false;
     this.tapCanvas = document.getElementById('tap-canvas');
     this.tapCtx = this.tapCanvas.getContext('2d');
     this.tapCtx.imageSmoothingEnabled = false;
+
+    this._buildBossHotspots();
+    this._buildCharGrid();
+  }
+
+  // Place a clickable hotspot over each boss on the path map.
+  _buildBossHotspots() {
+    const host = document.getElementById('path-bosses');
+    host.innerHTML = '';
+    this.bossEls = {};
+    BOSSES.forEach((boss, i) => {
+      const b = document.createElement('button');
+      b.className = 'boss-hotspot';
+      b.style.left = `${(boss.cx - 0.08) * 100}%`;
+      b.style.top = `${(boss.cy - 0.20) * 100}%`;
+      b.innerHTML = `<span class="boss-tip">⚔ Boss ${i + 1}<br>${boss.name}</span><span class="boss-check">✓</span>`;
+      b.addEventListener('click', () => this._fightBoss(boss));
+      host.appendChild(b);
+      this.bossEls[boss.id] = b;
+    });
+  }
+
+  _buildCharGrid() {
+    const grid = document.getElementById('char-grid');
+    grid.innerHTML = '';
+    CHARACTERS.forEach((ch) => {
+      const card = document.createElement('button');
+      card.className = 'char-card' + (ch.empty ? ' empty' : '') + (ch.id === this.selectedChar.id ? ' selected' : '');
+      card.dataset.id = ch.id;
+      card.innerHTML = ch.empty
+        ? `<div class="char-thumb soon">?</div><div class="char-name">${ch.name}</div>`
+        : `<div class="char-thumb">${ch.img ? `<img src="${ch.img}" alt="" onerror="this.parentNode.classList.add('noimg')">` : '<span class="char-hero">🧙</span>'}</div><div class="char-name">${ch.name}</div>`;
+      if (!ch.empty) card.addEventListener('click', () => this._selectChar(ch));
+      grid.appendChild(card);
+    });
   }
 
   _wire() {
-    this.castleHotspot.addEventListener('click', () => { this.game.audio.sfx('ui'); this.enterCorridor(); });
+    this.castleHotspot.addEventListener('click', () => { this.game.audio.sfx('ui'); this.enterPath(); });
+    document.getElementById('path-castle').addEventListener('click', () => { this.game.audio.sfx('ui'); this.enterCorridor(); });
     document.getElementById('door-wizard').addEventListener('click', () => this.enterShop());
-    document.getElementById('door-changing').addEventListener('click', () => {
-      this.game.audio.sfx('ui');
-      this._flashHint('The changing room is bare for now…');
-    });
+    document.getElementById('door-changing').addEventListener('click', () => { this.game.audio.sfx('ui'); this.openCharacterSelect(); });
+    document.getElementById('char-close').addEventListener('click', () => { this.game.audio.sfx('ui'); document.getElementById('char-modal').classList.add('hidden'); });
     document.querySelectorAll('.scene-back').forEach((b) =>
       b.addEventListener('click', () => { this.game.audio.sfx('ui'); this.back(b.dataset.back); }));
 
@@ -245,8 +341,25 @@ export class Scenes {
   // =========================================================================
   // Navigation
   // =========================================================================
+  _hideAllScenes() {
+    this.corridor.classList.add('hidden');
+    this.shop.classList.add('hidden');
+    this.path.classList.add('hidden');
+  }
+
+  // Play / menu-castle land here: the boss map.
+  enterPath(fromBattle) {
+    if (!fromBattle) this.game.ui.hideMainMenu();
+    this._hideAllScenes();
+    this.path.classList.remove('hidden');
+    this.active = 'path';
+    this._refreshBossMarks();
+    this._startRaf();
+  }
+
   enterCorridor() {
     this.game.ui.hideMainMenu();
+    this._hideAllScenes();
     this.corridor.classList.remove('hidden');
     this.active = 'corridor';
     this._startRaf();
@@ -255,7 +368,7 @@ export class Scenes {
   enterShop() {
     this.game.audio.sfx('quest');
     this._fog(() => {
-      this.corridor.classList.add('hidden');
+      this._hideAllScenes();
       this.shop.classList.remove('hidden');
       this.active = 'shop';
       this._renderShopItems();
@@ -265,17 +378,52 @@ export class Scenes {
 
   back(target) {
     if (target === 'menu') {
-      this.corridor.classList.add('hidden');
+      this._hideAllScenes();
       this.active = null;
       this._stopRaf();
       this.game.ui.showMainMenu(this.game.save.hasSave());
+    } else if (target === 'path') {
+      this._hideAllScenes();
+      this.path.classList.remove('hidden');
+      this.active = 'path';
+      this._refreshBossMarks();
     } else if (target === 'corridor') {
       this._fog(() => {
-        this.shop.classList.add('hidden');
+        this._hideAllScenes();
         this.corridor.classList.remove('hidden');
         this.active = 'corridor';
       });
     }
+  }
+
+  // --- Bosses ---------------------------------------------------------------
+  _fightBoss(boss) {
+    this.game.audio.sfx('quest');
+    this._stopRaf();
+    this._hideAllScenes();
+    this.active = 'battle';
+    this.battle.start(boss, this.selectedChar);
+  }
+  markBossDefeated(id) {
+    this.defeatedBosses.add(id);
+    this.hub.defeated = [...this.defeatedBosses];
+    this.game.save.saveHub(this.hub);
+  }
+  _refreshBossMarks() {
+    if (!this.bossEls) return;
+    for (const id in this.bossEls) this.bossEls[id].classList.toggle('defeated', this.defeatedBosses.has(id));
+  }
+
+  // --- Character select (Changing Room) -------------------------------------
+  openCharacterSelect() {
+    this._buildCharGrid();
+    document.getElementById('char-modal').classList.remove('hidden');
+  }
+  _selectChar(ch) {
+    this.selectedChar = ch;
+    this.game.audio.sfx('pickup');
+    this._buildCharGrid();
+    setTimeout(() => document.getElementById('char-modal').classList.add('hidden'), 220);
   }
 
   // A mystical fog wipe: fade fog in, swap scenes at the peak, fade out.
@@ -460,7 +608,20 @@ export class Scenes {
     else if (this.active === 'shop') {
       if (!this._art.shop) this._drawShop(this.t);   // procedural draw already includes Marin
       else if (!this._marinPhoto) this._drawMarin(this.t); // sprite only if no photo portrait
+    } else if (this.active === 'path' && !this._art.path) {
+      this._drawPathFallback(this.t);
     }
+  }
+
+  // Simple dark backdrop used only if assets/path.jpg is missing.
+  _drawPathFallback(t) {
+    const ctx = this.pathCtx;
+    const sky = ctx.createLinearGradient(0, 0, 0, BH);
+    sky.addColorStop(0, '#14102a'); sky.addColorStop(1, '#0c1410');
+    ctx.fillStyle = sky; ctx.fillRect(0, 0, BW, BH);
+    ctx.fillStyle = '#0a1410'; ctx.fillRect(0, BH * 0.7, BW, BH * 0.3);
+    ctx.fillStyle = '#caa84d'; ctx.font = '10px monospace'; ctx.textAlign = 'center';
+    ctx.fillText('THE PATH', BW / 2, 18); ctx.textAlign = 'left';
   }
 
   // Marin the Wizard standing in his shop (drawn over the photo background).
