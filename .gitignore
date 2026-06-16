@@ -1,0 +1,14 @@
+.vs/
+[Dd]ebug/
+[Rr]elease/
+x64/
+x86/
+[Bb]in/
+[Oo]bj/
+*.ipch
+*.obj
+*.pdb
+*.exe
+*.ilk
+*.user
+*.aps
