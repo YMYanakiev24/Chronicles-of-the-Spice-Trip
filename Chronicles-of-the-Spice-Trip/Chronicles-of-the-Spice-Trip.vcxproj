@@ -111,7 +111,7 @@
       <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp20</LanguageStandard>
-      <AdditionalIncludeDirectories>$(SolutionDir)\vendor\raylib\include;$(ProjectDir);$(ProjectDir)rooms</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)\vendor\raylib\include;$(ProjectDir)include</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -132,7 +132,7 @@
       <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp20</LanguageStandard>
-      <AdditionalIncludeDirectories>$(SolutionDir)\vendor\raylib\include;$(ProjectDir);$(ProjectDir)rooms</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)\vendor\raylib\include;$(ProjectDir)include</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -145,21 +145,21 @@
     </Manifest>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="Chronicles-of-the-Spice-Trip.cpp" />
-    <ClCompile Include="Audio.cpp" />
-    <ClCompile Include="Entities.cpp" />
-    <ClCompile Include="World.cpp" />
-    <ClCompile Include="Render.cpp" />
-    <ClCompile Include="rooms\Rooms.cpp" />
+    <ClCompile Include="src\Chronicles-of-the-Spice-Trip.cpp" />
+    <ClCompile Include="src\Audio.cpp" />
+    <ClCompile Include="src\Entities.cpp" />
+    <ClCompile Include="src\World.cpp" />
+    <ClCompile Include="src\Render.cpp" />
+    <ClCompile Include="src\Rooms.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="Common.h" />
-    <ClInclude Include="Audio.h" />
-    <ClInclude Include="Entities.h" />
-    <ClInclude Include="World.h" />
-    <ClInclude Include="Render.h" />
-    <ClInclude Include="Settings.h" />
-    <ClInclude Include="rooms\Rooms.h" />
+    <ClInclude Include="include\Common.h" />
+    <ClInclude Include="include\Audio.h" />
+    <ClInclude Include="include\Entities.h" />
+    <ClInclude Include="include\World.h" />
+    <ClInclude Include="include\Render.h" />
+    <ClInclude Include="include\Settings.h" />
+    <ClInclude Include="include\Rooms.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
