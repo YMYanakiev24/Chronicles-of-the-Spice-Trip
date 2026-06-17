@@ -110,7 +110,7 @@ int main() {
         "Press 1 and right-click to loose an Emberhex on the mistlings.",
         "Clear a room to open its doors. The boss waits at the far end." };
     std::string dialogue; int dialogueIdx = 0;
-    int kills = 0; float banner = 0;
+    int kills = 0; float banner = 0; int floor = 1;
     Dungeon dungeon; bool inFight = false; std::string bannerText = "The Mistwood Depths";
 
     auto spawnEnemy = [&](const char* name, float hp, float spd, int dmg, int xp,
@@ -152,7 +152,7 @@ int main() {
         player = Player{};
         player.pos = { ROOM_PX_W / 2, ROOM_PX_H / 2 };
         dungeon.generate();
-        kills = 0; banner = 3.0f; bannerText = "The Mistwood Depths"; dialogue.clear();
+        kills = 0; floor = 1; banner = 3.0f; bannerText = "The Mistwood Depths"; dialogue.clear();
         enterRoom();
         music.setMood("mist");
     };
@@ -602,6 +602,21 @@ int main() {
             if (moved) { enterRoom(); continue; }
         }
 
+        // --- step onto the staircase in a cleared boss room to descend ---
+        if (dungeon.cur().isBoss && dungeon.cur().cleared) {
+            Vector2 stairs = { ROOM_PX_W / 2, ROOM_PX_H / 2 };
+            if (Vector2Distance(player.pos, stairs) < 18) {
+                floor++;
+                dungeon.generate();
+                player.hp = fminf(player.maxHp, player.hp + 30);   // a breather between floors
+                player.pos = { ROOM_PX_W / 2, ROOM_PX_H / 2 };
+                enterRoom();
+                banner = 2.5f; bannerText = TextFormat("Descend - Floor %d", floor);
+                play("ultimate");
+                continue;
+            }
+        }
+
         if (player.hp <= 0) {
             play("death");
             player.hp = player.maxHp; player.mana = player.maxMana;
@@ -656,6 +671,17 @@ int main() {
             DrawCircle((int)oraclePos.x, (int)oraclePos.y - 14, 6, { 244, 226, 250, 255 });
             if (nearOracle && dialogue.empty()) DrawText("[E] talk", (int)oraclePos.x - 22, (int)oraclePos.y - 34, 10, RAYWHITE);
         }
+        // staircase down, revealed once the boss room is cleared
+        if (dungeon.cur().isBoss && dungeon.cur().cleared) {
+            float sx = ROOM_PX_W / 2, sy = ROOM_PX_H / 2;
+            DrawRectangle((int)sx - 30, (int)sy - 24, 60, 48, { 8, 8, 12, 255 });   // dark pit
+            for (int i = 0; i < 4; ++i)                                              // descending steps
+                DrawRectangle((int)sx - 26 + i * 3, (int)sy - 18 + i * 11, 52 - i * 6, 9,
+                    { (unsigned char)(78 - i * 14), (unsigned char)(74 - i * 14), (unsigned char)(96 - i * 16), 255 });
+            DrawRectangleLinesEx({ sx - 30, sy - 24, 60, 48 }, 2, { 150, 140, 90, 255 });
+            if (Vector2Distance(player.pos, { sx, sy }) < 60)
+                DrawText("Descend", (int)sx - 28, (int)sy - 40, 14, { 245, 220, 140, 255 });
+        }
         for (auto& e : enemies) drawEnemy(e);
         for (auto& pr : shots) { DrawCircleV(pr.pos, pr.r + 3, Fade(pr.glow, 0.4f)); DrawCircleV(pr.pos, pr.r, pr.color); }
         drawHero(player.pos, player.facing, player.meleeAnim, player.hitFlash > 0);
@@ -685,7 +711,7 @@ int main() {
         DrawRectangle(20, 48, 244, 18, { 10,14,28,200 });
         DrawRectangle(22, 50, (int)(240 * (player.mana / player.maxMana)), 14, { 80, 140, 240, 255 });
         DrawText(TextFormat("Mana %d/%d", (int)player.mana, (int)player.maxMana), 28, 50, 11, RAYWHITE);
-        DrawText(TextFormat("Lv %d   XP %d/%d   Kills %d", player.level, player.xp, player.xpNext, kills), 20, 72, 14, { 220,210,180,255 });
+        DrawText(TextFormat("Lv %d   XP %d/%d   Floor %d   Kills %d", player.level, player.xp, player.xpNext, floor, kills), 20, 72, 14, { 220,210,180,255 });
         for (int i = 0; i < 3; ++i) {
             int x = 20 + i * 70, y = sh - 80;
             bool sel = (i == player.selected);
