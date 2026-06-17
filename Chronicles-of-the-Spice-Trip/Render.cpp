@@ -54,8 +54,10 @@ void drawTree(int tx, int ty) {
 }
 
 std::string findAsset(const char* file) {
-    const char* roots[] = { "site/assets/", "../site/assets/", "../../site/assets/",
-                            "../../../site/assets/", "../../../../site/assets/", "assets/" };
+    // Images live in the project's assets/ folder. Try several relative depths
+    // so it works whether the cwd is the project dir (VS) or x64/Debug (exe).
+    const char* roots[] = { "assets/", "../assets/", "../../assets/",
+                            "../../../assets/", "../../../../assets/" };
     for (auto r : roots) { std::string p = std::string(r) + file; if (FileExists(p.c_str())) return p; }
     return "";
 }
