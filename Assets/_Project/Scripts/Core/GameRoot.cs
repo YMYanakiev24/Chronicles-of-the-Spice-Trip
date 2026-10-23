@@ -33,10 +33,11 @@ namespace SpiceTrip.Core
         public HubController Hub { get; private set; }
         public BossBattleView Battle { get; private set; }
         public MainMenuScreen Menu { get; private set; }
+        public Rpg.ChronicleController Chronicle { get; private set; }
         public LoadingScreen Loading { get; private set; }
         public VisualElement UiRoot { get; private set; }
         public bool Booted { get; private set; }
-        public string State { get; private set; } = "loading";   // loading | menu | hub
+        public string State { get; private set; } = "loading";   // loading | menu | hub | chronicle
 
         float _time;
 
@@ -96,18 +97,24 @@ namespace SpiceTrip.Core
             var docRoot = doc.rootVisualElement;
             var sheet = Resources.Load<StyleSheet>("UI/Spice");
             if (sheet != null) docRoot.styleSheets.Add(sheet);
+            var rpgSheet = Resources.Load<StyleSheet>("UI/Rpg");
+            if (rpgSheet != null) docRoot.styleSheets.Add(rpgSheet);
             UiRoot = UiKit.El("root", "ui");
             docRoot.Add(UiRoot);
             UiFonts.Apply(UiRoot);
 
             var menuLayer = Layer("menu-layer");
             var sceneLayer = Layer("scene-layer");
+            var rpgLayer = Layer("rpg-layer");
             var fogLayer = Layer("fog-layer");
             var battleLayer = Layer("battle-layer");
             var modalLayer = Layer("modal-layer");
 
             Loading = new LoadingScreen(Ctx);
-            Menu = new MainMenuScreen(Ctx, () => Hub.EnterPath());
+            Menu = new MainMenuScreen(Ctx, () => Hub.EnterPath(),
+                () => { HideMainMenu(); State = "chronicle"; Chronicle.StartNew(); },
+                () => { HideMainMenu(); State = "chronicle"; Chronicle.ContinueSaved(); },
+                () => Chronicle != null && Chronicle.HasSave);
             menuLayer.Add(Menu.Root);
             menuLayer.Add(Loading.Root);
 
@@ -123,6 +130,15 @@ namespace SpiceTrip.Core
 
             Hub = new HubController(Ctx, sceneLayer, modalLayer, fogLayer,
                 ShowMainMenu, HideMainMenu, (boss, ch) => Battle.Begin(boss, ch));
+
+            var chronicleGo = new GameObject("Chronicle");
+            chronicleGo.transform.SetParent(transform, false);
+            Chronicle = chronicleGo.AddComponent<Rpg.ChronicleController>();
+            Chronicle.Init(Ctx, Audio, UiRoot, rpgLayer,
+                Resources.Load<Material>("Materials/SpriteAlpha"),
+                Resources.Load<Material>("Materials/SpriteAdditive"),
+                Resources.Load<Material>("Materials/SpriteScreen"),
+                ShowMainMenu);
         }
 
         VisualElement Layer(string name)

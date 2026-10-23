@@ -270,6 +270,64 @@ namespace SpiceTrip.Art
                 ".kkkkkkkkkk.",
                 "............",
             }, P(('k', "#2a2a34"), ('g', "#6a6a7a"), ('w', "#cfcfd6"), ('b', "#5ad0ff"), ('r', "#ff5a4a"))),
+            // --- Chronicle UI: spell schools (🔥 🌊 ⚡ 🌿 🛡️ ☀️) ---
+            ["school-Fire"] = (new[]
+            {
+                ".....r......", "....rr......", "....roor....", "...rooor.r..", "..rroyorrr..", "..royyyorr..",
+                ".rroyyyyorr.", ".roywwwyyor.", ".royywwyyor.", "..royyyyor..", "...rrrrrr...", "............",
+            }, P(('r', "#d8381a"), ('o', "#ff8a3a"), ('y', "#ffd24a"), ('w', "#fff2c0"))),
+            ["school-Water"] = (new[]
+            {
+                "............", "....bb......", "...bccb.....", "..bc..cb..b.", ".bc....cbbc.", "bc......cc..",
+                "............", "....bb......", "...bccb.....", "..bc..cb..b.", ".bc....cbbc.", "bc......cc..",
+            }, P(('b', "#4fd2c8"), ('c', "#bff6ee"))),
+            ["school-Lightning"] = (new[]
+            {
+                "......yyy...", ".....yyy....", "....yyy.....", "...yyy......", "..yyyyyyy...", ".....yyy....",
+                "....yyy.....", "...yyy......", "..yy........", ".yy.........", "y...........", "............",
+            }, P(('y', "#ffe08a"))),
+            ["school-Life"] = (new[]
+            {
+                "..........gg", "........gglg", "......gglgg.", ".....glggg..", "....glggg...", "...glggg....",
+                "..gggg......", "..gg........", ".g..........", "g...........", "............", "............",
+            }, P(('g', "#3f9d3a"), ('l', "#9fe07a"))),
+            ["school-Ward"] = (new[]
+            {
+                "kkkkkkkkkk..", "kssssssssk..", "kslsssssdk..", "kslsssssdk..", "kslsssssdk..", "kslsssssdk..",
+                ".kssssssk...", ".kssssssk...", "..kssssk....", "...kssk.....", "....kk......", "............",
+            }, P(('k', "#5a5a6a"), ('s', "#bfc8d8"), ('l', "#ffffff"), ('d', "#8a90a8"))),
+            ["school-Divine"] = (new[]
+            {
+                ".....y......", "..y..y..y...", "...y.y.y....", "....yyy.....", "yyyyywyyyyy.", "....yyy.....",
+                "...y.y.y....", "..y..y..y...", ".....y......", "............", "............", "............",
+            }, P(('y', "#ffd76b"), ('w', "#ffffff"))),
+            // --- book tabs (📜 ✦ 🐾 🗺 ❖ ⚙ ⏸) ---
+            ["scroll"] = (new[]
+            {
+                ".pppppppp...", "pkppppppkp..", ".pllllllp...", ".pkkkkkkp...", ".pllllllp...", ".pkkkkkp....",
+                ".pllllllp...", ".pkkkkkkp...", "pkppppppkp..", ".pppppppp...", "............", "............",
+            }, P(('p', "#e9dcbf"), ('k', "#7a5a30"), ('l', "#d8c8a0"))),
+            ["paw"] = (new[]
+            {
+                "..b....b....", ".bbb..bbb...", ".bbb..bbb...", "b..........b", "bb.......bbb", "bb..bbbb..b.",
+                "...bbbbbb...", "..bbbbbbbb..", "..bbbbbbbb..", "...bb..bb...", "............", "............",
+            }, P(('b', "#e9dcbf"))),
+            ["map"] = (new[]
+            {
+                "kkkkkkkkkkkk", "kpppgpppppbk", "kppgggpppbbk", "kppggppppbbk", "kpppppprpppk", "kpbpppprrppk",
+                "kbbpppppprpk", "kbbbppgggppk", "kpbpppggpppk", "kkkkkkkkkkkk", "............", "............",
+            }, P(('k', "#7a5a30"), ('p', "#e9dcbf"), ('g', "#5fa04a"), ('b', "#5aa8ff"), ('r', "#d8381a"))),
+            ["gear"] = (new[]
+            {
+                ".....gg.....", "..g.gggg.g..", ".gggggggggg.", "..gggkkggg..", ".gggk..kggg.", "gggk....kggg",
+                "gggk....kggg", ".gggk..kggg.", "..gggkkggg..", ".gggggggggg.", "..g.gggg.g..", ".....gg.....",
+            }, P(('g', "#e9dcbf"), ('k', "#7a5a30"))),
+            ["pause"] = (new[] { "ww..ww", "ww..ww", "ww..ww", "ww..ww", "ww..ww", "ww..ww" }, P(('w', "#e9dcbf"))),
+            ["diamond"] = (new[] { "...w...", "..w.w..", ".w...w.", "w.....w", ".w...w.", "..w.w..", "...w..." }, P(('w', "#e9dcbf"))),
+            ["shield"] = (new[]
+            {
+                "bbbbbbbb", "bccccccb", "bccccccb", "bccccccb", ".bccccb.", ".bccccb.", "..bccb..", "...bb...",
+            }, P(('b', "#7fc8ff"), ('c', "#cfe8ff"))),
         };
 
         static Dictionary<char, string> P(params (char, string)[] e)

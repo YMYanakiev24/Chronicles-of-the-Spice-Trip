@@ -56,6 +56,53 @@ unless they're listed below.
     caught by the end-to-end run's log; without it the game would have been
     silent.
 
+## Phase 2 (the Chronicle): differences and why
+
+14. **The RPG has its own menu entries.** The web game's Play goes to the
+    Path, and the RPG can't be reached. It's restored as **New Chronicle** and
+    **Continue Chronicle** on the main menu, and Play is unchanged. Marin's hub
+    wallet stays separate from the Chronicle's gold, as it was in the web game
+    whenever no RPG run was active. Shop purchases are handed over when a
+    Chronicle starts, with the original toast.
+15. **The intro cinematic plays when a new Chronicle starts.** The web build
+    skipped `IntroScene` at boot. It's skippable on any key or click, and moves
+    on by itself after 26 seconds, as before.
+16. **Lighting reproduces the original's maths instead of using URP Light2D.**
+    The web game darkens the view with `rgba(5,6,14,darkness)`, cuts light
+    pools out with `destination-out` radial gradients (1 → 0.7 at 60% → 0),
+    then adds coloured glows and a vignette. URP's 2D lights multiply instead
+    and use different falloff curves, and the screen-blended fog would need a
+    custom lit shader. So the darkness layer is computed on the CPU at half the
+    virtual resolution, with the same formula, and drawn over the scene. Glows,
+    fog and vignette use the same blend modes as the canvas.
+17. **The paint order is kept exactly.** The renderer is immediate-mode
+    (`IWorldPainter`): each draw call gets the next sorting order. The original
+    y-sorted draw() methods are ported line by line rather than rewritten as
+    scene objects.
+18. **Pixel scale follows `Game._resize`.** It's an integer scale from the
+    window height (base 270, clamped 2–5), and the virtual screen fills the
+    window at that scale. The Pixel Perfect Camera component isn't used,
+    because it picks its zoom differently (it never rounds up), so it would
+    show a different area at some window sizes.
+19. **Timers run on game time.** `setTimeout` calls (the tutorial hint, the
+    staggered Stormcrown's Wrath strikes and its Reckoning repeat) now pause
+    with the game while a panel or dialogue is open.
+20. **Invulnerability blink after rolling.** In `Player.draw`, the blink test
+    is `!this.rolling`. `rolling` goes slightly negative after the first roll
+    and never returns to 0, so the player never blinked again after rolling
+    once. The port treats "not rolling" as `rolling <= 0`.
+21. **World Map orbs.** `openMap` reads `r.sky.top`, which regions don't have,
+    so the web orbs had no colour. Each region's light tint is used instead.
+22. **Unknown quest rewards are skipped with a warning** (see `TopChuk` below).
+    In the web game the item went into the satchel, and opening the satchel
+    then threw an error, because `ITEMS['TopChuk']` is undefined.
+23. **Emoji in the RPG UI** (school icons 🔥🌊⚡🌿🛡️☀️, book tabs, ✔/◇ in the
+    tracker) are pixel icons, as in Phase 1. Quest markers (! ? ✔) above NPCs
+    are drawn as pixel glyphs.
+24. **Settings that do nothing in the web game** ("Shadows", "Mouse
+    Sensitivity") are kept and saved, and still do nothing, as before.
+    `Game.applyQuality` was empty in the web version too.
+
 ## Problems found in the web source
 
 1. **`TopChuk`:** the `asphodel` quest rewards item `'TopChuk'`, which doesn't

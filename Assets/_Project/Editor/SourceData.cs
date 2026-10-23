@@ -9,6 +9,7 @@
 
 using System;
 using System.Collections.Generic;
+using SpiceTrip.Data;
 using UnityEngine;
 
 namespace SpiceTrip.EditorTools
@@ -26,6 +27,25 @@ namespace SpiceTrip.EditorTools
         public List<int> xpForLevel;
         public List<SrcCreature> creatures;
         public List<SrcNpc> npcs;
+
+        // Full RPG definitions (parsed straight into the runtime types)
+        public List<GodDef> gods;
+        public List<RegionDef> regions;
+        public List<string> regionOrder;
+        public List<SpellDef> spells;
+        public List<string> spellOrder;
+        public List<QuestDef> quests;
+        public List<string> questOrder;
+
+        /// <summary>The same file read as runtime creature/NPC definitions.</summary>
+        [Serializable]
+        public class RpgView
+        {
+            public List<CreatureDef> creatures;
+            public List<NpcDef> npcs;
+        }
+
+        public static RpgView LoadRpg() => JsonUtility.FromJson<RpgView>(System.IO.File.ReadAllText(AssetPath));
 
         public const string AssetPath = "Assets/_Project/Data/Source/source-data.json";
 

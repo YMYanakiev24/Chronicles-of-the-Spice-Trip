@@ -1,0 +1,80 @@
+{
+  "mistwood": {
+    "w": 48,
+    "h": 42,
+    "walls": 176,
+    "solids": 282,
+    "props": 218,
+    "pickups": 14,
+    "lights": 9,
+    "gridHash": "6bd53125",
+    "propsHash": "823a35f0",
+    "pickupsHash": "42201433",
+    "lightsHash": "bff715ab"
+  },
+  "temple": {
+    "w": 46,
+    "h": 38,
+    "walls": 164,
+    "solids": 272,
+    "props": 147,
+    "pickups": 10,
+    "lights": 10,
+    "gridHash": "be80116f",
+    "propsHash": "caac76d5",
+    "pickupsHash": "355a7983",
+    "lightsHash": "179d75a5"
+  },
+  "ruins": {
+    "w": 50,
+    "h": 42,
+    "walls": 180,
+    "solids": 340,
+    "props": 322,
+    "pickups": 10,
+    "lights": 10,
+    "gridHash": "6b016673",
+    "propsHash": "05120ea6",
+    "pickupsHash": "d80b1cd9",
+    "lightsHash": "55d3bb57"
+  },
+  "caves": {
+    "w": 54,
+    "h": 46,
+    "walls": 1743,
+    "solids": 1744,
+    "props": 8,
+    "pickups": 10,
+    "lights": 1,
+    "gridHash": "b39c2451",
+    "propsHash": "e282abc5",
+    "pickupsHash": "e948c571",
+    "lightsHash": "a9e1479f"
+  },
+  "citadel": {
+    "w": 46,
+    "h": 40,
+    "walls": 168,
+    "solids": 268,
+    "props": 127,
+    "pickups": 10,
+    "lights": 23,
+    "gridHash": "214c592f",
+    "propsHash": "cfa8bdfe",
+    "pickupsHash": "2c0db6af",
+    "lightsHash": "6daa8f1a"
+  },
+  "godreach": {
+    "w": 46,
+    "h": 44,
+    "walls": 176,
+    "solids": 334,
+    "props": 176,
+    "pickups": 10,
+    "lights": 8,
+    "gridHash": "4c430575",
+    "propsHash": "794bb0ac",
+    "pickupsHash": "c7bfb174",
+    "lightsHash": "08acb291"
+  }
+}

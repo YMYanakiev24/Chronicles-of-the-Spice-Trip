@@ -137,6 +137,37 @@ namespace SpiceTrip.Tests
         }
 
         [UnityTest]
+        public IEnumerator ChronicleStartsSavesQuitsAndContinues()
+        {
+            _g.Ctx.Hub.AddToStash("nectarVial");
+            var ch = _g.Chronicle;
+            ch.StartNew(skipIntro: true);
+            yield return null;
+            yield return null;
+            Assert.IsTrue(ch.Active && ch.Game.Playing, "playing");
+            Assert.AreEqual("mistwood", ch.Game.CurrentRegion);
+            Assert.AreEqual(1, ch.Game.Player.ItemCount("nectarVial"), "Marin's stash is handed over");
+            Assert.AreEqual(0, _g.Ctx.Hub.stash.Count);
+            Assert.AreEqual("mist", _g.Audio.CurrentMood);
+
+            ch.Game.Player.gold = 77;
+            ch.Game.Player.x += 20;
+            float x = ch.Game.Player.x;
+            ch.QuitToTitle();   // saves first, like the web game
+            yield return null;
+            Assert.IsFalse(ch.Active);
+            Assert.AreEqual("menu", _g.State);
+            Assert.IsTrue(ch.HasSave);
+
+            ch.ContinueSaved();
+            yield return null;
+            Assert.IsTrue(ch.Game.Playing);
+            Assert.AreEqual(77, ch.Game.Player.gold);
+            Assert.AreEqual(x, ch.Game.Player.x, 0.01);
+            ch.QuitToTitle();
+        }
+
+        [UnityTest]
         public IEnumerator ChampionChoiceSurvivesAReload()
         {
             _g.Hub.EnterPath();

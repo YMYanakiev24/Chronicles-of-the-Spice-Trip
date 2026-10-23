@@ -81,6 +81,17 @@ namespace SpiceTrip.EditorTools
             db.battle = new BattleTuning();
             db.loom = new LoomTuning();
 
+            var rpg = SourceData.LoadRpg();
+            db.gods = src.gods;
+            db.regions = src.regions;
+            db.regionOrder = src.regionOrder;
+            db.spells = src.spells;
+            db.spellOrder = src.spellOrder;
+            db.creatures = rpg.creatures;
+            db.quests = src.quests;
+            db.questOrder = src.questOrder;
+            db.npcs = rpg.npcs;
+
             if (create)
             {
                 Directory.CreateDirectory(Path.GetDirectoryName(DatabasePath));
@@ -88,7 +99,8 @@ namespace SpiceTrip.EditorTools
             }
             EditorUtility.SetDirty(db);
             AssetDatabase.SaveAssets();
-            Debug.Log($"GameDatabase: {db.items.Count} items, {db.bosses.Count} bosses, {db.characters.Count} characters, {db.shopStock.Count} shop entries");
+            Debug.Log($"GameDatabase: {db.items.Count} items, {db.bosses.Count} bosses, {db.characters.Count} characters, {db.shopStock.Count} shop entries, " +
+                $"{db.regions.Count} regions, {db.spells.Count} spells, {db.creatures.Count} creatures, {db.quests.Count} quests, {db.npcs.Count} NPCs");
             return db;
         }
 

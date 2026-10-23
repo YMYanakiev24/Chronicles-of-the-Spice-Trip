@@ -45,12 +45,18 @@ namespace SpiceTrip.Hub
     {
         public readonly VisualElement Root;
         public readonly ClickEl CastleHotspot;
-        readonly VisualElement _castleLabel;
-        readonly Action _onPlay;
+        readonly VisualElement _castleLabel, _buttons;
+        readonly Action _onPlay, _onNewChronicle, _onContinue;
+        readonly Func<bool> _hasSave;
+        readonly GameContext _ctx;
 
-        public MainMenuScreen(GameContext ctx, Action onPlay)
+        public MainMenuScreen(GameContext ctx, Action onPlay, Action onNewChronicle = null, Action onContinue = null, Func<bool> hasSave = null)
         {
+            _ctx = ctx;
             _onPlay = onPlay;
+            _onNewChronicle = onNewChronicle;
+            _onContinue = onContinue;
+            _hasSave = hasSave;
             Root = El("screen hidden", "main-menu");
 
             var art = ArtLibrary.Load("menu");
@@ -63,14 +69,9 @@ namespace SpiceTrip.Hub
                 Root.AddToClassList("has-menu-bg");   // hide the text title; the art has its own
             }
 
-            Root.Add(Lbl("The Mythic Chronicles", "game-title"));
-            Root.Add(Lbl("The Hidden World", "game-subtitle"));
-            var buttons = El("menu-buttons", "main-menu-buttons");
-            buttons.Add(Btn("Play", "menu-btn primary", () => { ctx.Audio.Sfx("ui"); _onPlay(); }, "play", 12));
-            Root.Add(buttons);
-            Root.Add(Lbl("An original fantasy realm · forge your legend", "footer-note"));
-
-            // Castle hotspot lives inside the main menu so it shows/hides with it.
+            // Castle hotspot lives inside the main menu so it shows/hides with it. It is
+            // added first so the menu buttons sit above it (the Chronicle buttons overlap
+            // its left edge, and must not open the Path).
             CastleHotspot = new ClickEl(() => { ctx.Audio.Sfx("ui"); _onPlay(); }) { name = "castle-hotspot" };
             CastleHotspot.AddToClassList("castle-hotspot");
             _castleLabel = El("castle-label");
@@ -79,6 +80,13 @@ namespace SpiceTrip.Hub
             _castleLabel.pickingMode = PickingMode.Ignore;
             CastleHotspot.Add(_castleLabel);
             Root.Add(CastleHotspot);
+
+            Root.Add(Lbl("The Mythic Chronicles", "game-title"));
+            Root.Add(Lbl("The Hidden World", "game-subtitle"));
+            _buttons = El("menu-buttons", "main-menu-buttons");
+            Root.Add(_buttons);
+            Root.Add(Lbl("An original fantasy realm · forge your legend", "footer-note"));
+            RefreshButtons();
 
             Root.RegisterCallback<GeometryChangedEvent>(_ => Layout());
         }
@@ -100,6 +108,31 @@ namespace SpiceTrip.Hub
             _castleLabel.style.translate = new Translate(0, -5 * e);
         }
 
-        public void Show(bool show) => UiKit.Show(Root, show);
+        // Play leads to the Path (the web game). The Chronicle (the restored RPG) has its own entries.
+        void RefreshButtons()
+        {
+            _buttons.Clear();
+            var play = Btn("Play", "menu-btn primary", () => { _ctx.Audio.Sfx("ui"); _onPlay(); }, "play", 12);
+            play.name = "btn-play";
+            _buttons.Add(play);
+            if (_onNewChronicle != null)
+            {
+                var nc = Btn("New Chronicle", "menu-btn", () => { _ctx.Audio.Sfx("ui"); _onNewChronicle(); }, "scroll", 14);
+                nc.name = "btn-new-chronicle";
+                _buttons.Add(nc);
+            }
+            if (_onContinue != null && _hasSave != null && _hasSave())
+            {
+                var cc = Btn("Continue Chronicle", "menu-btn", () => { _ctx.Audio.Sfx("ui"); _onContinue(); }, "emblem", 12);
+                cc.name = "btn-continue-chronicle";
+                _buttons.Add(cc);
+            }
+        }
+
+        public void Show(bool show)
+        {
+            if (show) RefreshButtons();
+            UiKit.Show(Root, show);
+        }
     }
 }

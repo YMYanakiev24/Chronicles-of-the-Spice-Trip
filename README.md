@@ -1,9 +1,15 @@
 # Chronicles of the Spice Trip (Unity)
 
 A Unity 6 port of the browser game in `../Chronicles-of-the-Spice-Trip`
-(vanilla JavaScript + HTML5 Canvas). Phase 1 ports the game that is playable
-today: the main menu, the Path boss map, the four boss fights, and the Citadel
-hub (corridor, Marin's Apothecary, the Enchanted Loom and the Changing Room).
+(vanilla JavaScript + HTML5 Canvas).
+
+- **Play** (the game the web version shows today): the Path boss map, the four
+  boss fights, and the Citadel hub (corridor, Marin's Apothecary, the Enchanted
+  Loom, the Changing Room).
+- **New / Continue Chronicle** (restored in Phase 2): the full top-down RPG that
+  was in the web code but unreachable. It has six realms, six divine powers,
+  monsters, NPCs and dialogue, a five-quest chain, the HUD and the book panels,
+  saves, fast travel and the intro cinematic.
 
 - **Engine:** Unity 6000.6.5f1, URP 2D Renderer, Input System, UI Toolkit
 - **Target:** Windows standalone (64-bit)
@@ -37,6 +43,19 @@ The build goes to `Build/Windows/SpiceTrip.exe`.
 | W A S D / arrows | Move in battle |
 | Left click / Space | Shoot toward the mouse |
 
+In a Chronicle:
+
+| Input | Action |
+| --- | --- |
+| W A S D / arrows | Move (Shift runs) |
+| Mouse | Aim spells and the blade |
+| 1 – 6 | Cast the power in that slot |
+| Left click / Right click | Godless blade / cast slot 1 |
+| Space | Dodge-roll |
+| E | Talk to an NPC (pickups collect themselves) |
+| Tab / I / K / B / M | Journal / Satchel / Spellbook / Bestiary / World Map |
+| Esc | Pause, or close a panel or dialogue |
+
 ## Replacing the art
 
 Painted scenes and character sheets are plain files in
@@ -61,8 +80,8 @@ Unity.exe -batchmode -nographics -projectPath . -runTests -testPlatform EditMode
 Unity.exe -batchmode -projectPath . -runTests -testPlatform PlayMode -testResults Logs/playmode-results.xml
 ```
 
-- **EditMode tests (44):** data parity with the JS, pixel parity of all 75 procedural sprites, RNG/hash bit-exactness, battle rules, Loom grid and physics, saves, hotspot geometry, synth output, and shop/navigation logic.
-- **PlayMode tests (6):** boot, every boss fight, win/lose, the fog wipe into the shop, buying, the Loom, and champion persistence across a reload.
+- **EditMode tests (61):** data parity with the JS, pixel parity of all 75 procedural sprites, map parity for all six regions, RNG/hash bit-exactness, battle rules, Loom grid and physics, saves, hotspot geometry, synth output, shop/navigation logic, and the Chronicle rules (movement, collision, casting, weaknesses, melee, levelling, wards, death, quests and dialogue, pickups, unlocks, travel, consumables, save round-trip, enemy AI).
+- **PlayMode tests (7):** boot, every boss fight, win/lose, the fog wipe into the shop, buying, the Loom, champion persistence, and a Chronicle started, saved, quit and continued.
 
 **End-to-end autopilot:** this plays through every screen with real injected
 mouse and keyboard events, saves screenshots and writes a PASS/FAIL log. It
@@ -83,6 +102,7 @@ exported from the web game's JavaScript:
 ```
 node Tools~/export-source-data.mjs ../Chronicles-of-the-Spice-Trip Assets/_Project/Data/Source/source-data.json
 node Tools~/pixel-parity.mjs       ../Chronicles-of-the-Spice-Trip Assets/_Project/Data/Source/pixel-hashes.json
+node Tools~/map-parity.mjs         ../Chronicles-of-the-Spice-Trip Assets/_Project/Data/Source/map-signatures.json
 ```
 
 Then run **Spice Trip ▸ Rebuild Project**. It regenerates the `GameDatabase`
@@ -98,6 +118,9 @@ Assets/_Project/
   Scripts/Art/       PixelCanvas, PixelArt (port of PixelArt.js), icons, art loading
   Scripts/Hub/       menu, Path, corridor, shop, Loom, Changing Room, navigation
   Scripts/Battle/    BattleSim (rules) + BossBattleView (rendering and input)
+  Scripts/Rpg/       the Chronicle: ChronicleGame (Game.js), TileMap, Player/Enemy/Npc,
+                     Magic/Combat/Quest systems, RpgView (renderer), RpgHud, BookPanels,
+                     IntroCinematic, ChronicleController, ChronicleSave
   Shaders/           unlit sprite shader (alpha / additive / screen blending)
   Resources/UI/      Spice.uss (port of style.css), panel settings, theme
   Editor/            ProjectBuilder, DataImporter, BuildScript, AutopilotRunner

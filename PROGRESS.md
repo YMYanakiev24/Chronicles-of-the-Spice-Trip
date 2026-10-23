@@ -30,12 +30,35 @@ UI Toolkit).
 - **The built `.exe` was not launched** because of Smart App Control. The same
   code was exercised in the editor's Play mode.
 
-## Phase 2: restore the dormant RPG (not started)
+## Phase 2: the Chronicle (restored RPG) ✅ (Checkpoint B, 2026-10-23)
 
-Regions and tilemaps, lighting and fog, player/enemy/NPC, spells, quests and
-dialogue, the full HUD and panels, and the intro cinematic. The data for all
-of it is already exported in `source-data.json`, and its procedural sprites
-(tiles, props, NPCs, monsters) already pass the pixel-parity test.
+| Area | Status | Verified by |
+| --- | --- | --- |
+| RPG data (gods, regions, spells, creatures, quests, NPCs) | ✅ | Imported from `source-data.json` |
+| Map generation for all six regions | ✅ | `MapParityTests`: walls, props, pickups and lights hash-identical to `TileMap.js` |
+| Player: walk/run, collision and sliding, roll, blade, casting, regen, levelling | ✅ | `ChronicleRulesTests` + autopilot (real keys) |
+| Spells: projectiles, chaining beam, heal, ward, ultimate, upgrades, lights | ✅ | Tests (weakness one-shot, ward absorb) + screenshots |
+| Enemies: wander/chase/attack, melee + ranged, weakness, hit flash, bars, Cinder-Maw, drip respawn | ✅ | Tests + screenshots |
+| Quests, NPC markers, data-driven dialogue, rewards, chaining | ✅ | Tests + autopilot (E to talk, dialogue buttons, hand-in) |
+| Darkness, light pools, fog, glows, vignette (original maths) | ✅ | Screenshots of the Mistwood, the Underway and the Pale Citadel |
+| HUD: vitals, hotbar + cooldowns, minimap, tracker, toasts, banners, damage numbers, hint, vignette, shake | ✅ | Screenshots |
+| Book: Satchel (use items), Spellbook, Bestiary, World Map (travel), Journal (track), Settings, Pause | ✅ | Autopilot opens each with its hotkey + screenshots |
+| Death screen and respawn | ✅ | Tests + autopilot |
+| Saves: save, quit to title, continue (position, stats, quests, regions, bestiary) | ✅ | Save round-trip test, PlayMode test, autopilot |
+| Region unlocks and fast travel | ✅ | Tests + autopilot through the World Map |
+| Intro cinematic + title card (skippable) | ✅ | Autopilot + screenshot |
+| Marin's stash handed to a new Chronicle | ✅ | PlayMode + autopilot |
+
+**Test results:** EditMode 61/61, PlayMode 7/7, autopilot 66/66 checks (hub +
+Chronicle, real input in the editor's Play mode). Windows build: 0 errors, 0
+warnings.
+
+**Not verified:**
+- **Sound** was not listened to; it is still checked numerically only.
+- **The built `.exe`** still can't be launched on this PC (Smart App Control).
+- **Balance over a full playthrough.** The tests cover each system and the
+  first quest end to end, but nobody has played all five quests and six realms
+  by hand.
 
 ## Phase 3: abilities from the art (waiting on a design approval)
 

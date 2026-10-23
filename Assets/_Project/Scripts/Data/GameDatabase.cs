@@ -68,6 +68,26 @@ namespace SpiceTrip.Data
         public BattleTuning battle = new BattleTuning();
         public LoomTuning loom = new LoomTuning();
 
+        // The Chronicle (RPG) content
+        public List<GodDef> gods = new List<GodDef>();
+        public List<RegionDef> regions = new List<RegionDef>();
+        public List<string> regionOrder = new List<string>();
+        public List<SpellDef> spells = new List<SpellDef>();
+        public List<string> spellOrder = new List<string>();
+        public List<CreatureDef> creatures = new List<CreatureDef>();
+        public List<QuestDef> quests = new List<QuestDef>();
+        public List<string> questOrder = new List<string>();
+        public List<NpcDef> npcs = new List<NpcDef>();
+
+        public RegionDef Region(string id) => regions.Find(r => r.id == id);
+        public SpellDef Spell(string id) => spells.Find(s => s.id == id);
+        public CreatureDef Creature(string id) => creatures.Find(c => c.id == id);
+        public QuestDef Quest(string id) => quests.Find(q => q.id == id);
+        public NpcDef Npc(string id) => npcs.Find(n => n.id == id);
+
+        /// <summary>xpForLevel(L) = floor(60 · L^1.5)</summary>
+        public static int XpForLevel(int level) => (int)Math.Floor(60 * Math.Pow(level, 1.5));
+
         public const string ResourcePath = "Data/GameDatabase";
 
         static GameDatabase _instance;

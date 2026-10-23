@@ -235,6 +235,33 @@ namespace SpiceTrip.Art
                 }
         }
 
+        /// <summary>Fills a closed polygon (non-zero winding is not needed; even-odd scanline).</summary>
+        public void FillPolygon(IList<Vector2> pts, Color32 col)
+        {
+            if (pts.Count < 3) return;
+            float minY = float.MaxValue, maxY = float.MinValue;
+            foreach (var p in pts) { minY = Mathf.Min(minY, p.y); maxY = Mathf.Max(maxY, p.y); }
+            int y0 = Math.Max(0, (int)Math.Floor(minY)), y1 = Math.Min(Height - 1, (int)Math.Ceiling(maxY));
+            var xs = new List<float>();
+            for (int y = y0; y <= y1; y++)
+            {
+                float sy = y + 0.5f;
+                xs.Clear();
+                for (int i = 0, j = pts.Count - 1; i < pts.Count; j = i++)
+                {
+                    var a = pts[i]; var b = pts[j];
+                    if ((a.y <= sy && b.y > sy) || (b.y <= sy && a.y > sy))
+                        xs.Add(a.x + (sy - a.y) / (b.y - a.y) * (b.x - a.x));
+                }
+                xs.Sort();
+                for (int k = 0; k + 1 < xs.Count; k += 2)
+                {
+                    int xa = Math.Max(0, (int)Math.Ceiling(xs[k] - 0.5f)), xb = Math.Min(Width - 1, (int)Math.Floor(xs[k + 1] - 0.5f));
+                    for (int x = xa; x <= xb; x++) Blend(y * Width + x, col);
+                }
+            }
+        }
+
         static float Edge(Vector2 p, Vector2 a, Vector2 b) => (p.x - b.x) * (a.y - b.y) - (a.x - b.x) * (p.y - b.y);
 
         /// <summary>Draws text with a built-in 3×5 pixel font (A–Z, digits, a few runes).</summary>
