@@ -1,0 +1,102 @@
+{
+  "_comment": "Phase 3 abilities (approved design). Every number the boss and champion kits use lives here; edit and run Spice Trip > Rebuild Project. Times are seconds, speeds are arena px/s, angles are radians.",
+  "bosses": [
+    {
+      "id": "goodPlaz", "kit": "split", "name": "Multiplies x3 on death",
+      "params": [
+        { "k": "form1Spread", "v": 3 }, { "k": "spreadAngle", "v": 0.22 },
+        { "k": "copies", "v": 3 }, { "k": "copyHp", "v": 25 }, { "k": "copyRadius", "v": 16 }, { "k": "copySpeed", "v": 140 },
+        { "k": "copySpread", "v": 1 }, { "k": "copyFireInterval", "v": 1.4 },
+        { "k": "tinyChance", "v": 0.4 }, { "k": "tinyHp", "v": 10 }, { "k": "tinyRadius", "v": 9 }, { "k": "tinySpeed", "v": 120 }
+      ]
+    },
+    {
+      "id": "badPlaz", "kit": "split", "name": "Multiplies x3 on death",
+      "params": [
+        { "k": "form1Spread", "v": 5 }, { "k": "spreadAngle", "v": 0.22 },
+        { "k": "copies", "v": 3 }, { "k": "copyHp", "v": 25 }, { "k": "copyRadius", "v": 16 }, { "k": "copySpeed", "v": 140 },
+        { "k": "copySpread", "v": 3 }, { "k": "copyFireInterval", "v": 1.4 },
+        { "k": "tinyChance", "v": 0.4 }, { "k": "tinyHp", "v": 10 }, { "k": "tinyRadius", "v": 9 }, { "k": "tinySpeed", "v": 120 }
+      ]
+    },
+    {
+      "id": "mordekai", "kit": "feathers", "name": "Feather Shot",
+      "params": [
+        { "k": "fanCount", "v": 7 }, { "k": "fanStep", "v": 0.15 }, { "k": "fanInterval", "v": 1.6 },
+        { "k": "featherSpeed", "v": 300 }, { "k": "featherDamage", "v": 5 },
+        { "k": "diveEvery", "v": 3 }, { "k": "diveSpeed", "v": 420 }, { "k": "diveTime", "v": 0.6 }
+      ]
+    },
+    {
+      "id": "vlado", "kit": "conductor", "name": "Tickets, whistle and bus No.9",
+      "params": [
+        { "k": "spiralCount", "v": 12 }, { "k": "spiralInterval", "v": 2 }, { "k": "spiralTurn", "v": 0.26 },
+        { "k": "ticketSpeed", "v": 200 }, { "k": "ticketDamage", "v": 6 },
+        { "k": "whistleEvery", "v": 8 }, { "k": "busWarn", "v": 1.0 }, { "k": "busSpeed", "v": 700 },
+        { "k": "busDamage", "v": 20 }, { "k": "busWidth", "v": 160 }, { "k": "busHeight", "v": 60 }
+      ]
+    }
+  ],
+  "champions": [
+    { "id": "hero", "ability": "", "special": "none", "cooldown": 0, "params": [] },
+    {
+      "id": "atanas", "ability": "Aura of Calmness", "special": "aura", "cooldown": 10,
+      "params": [ { "k": "heal", "v": 25 }, { "k": "shotSlow", "v": 0.5 }, { "k": "duration", "v": 3 } ]
+    },
+    {
+      "id": "gakev", "ability": "Coin Dash", "special": "dash", "cooldown": 4,
+      "params": [
+        { "k": "coinChance", "v": 0.25 }, { "k": "coinHeal", "v": 5 }, { "k": "coinLife", "v": 6 },
+        { "k": "duration", "v": 0.25 }, { "k": "speedMul", "v": 3 }
+      ]
+    },
+    {
+      "id": "nikolay", "ability": "Mug-Shield", "special": "shield", "cooldown": 6,
+      "params": [ { "k": "hpBonus", "v": 25 }, { "k": "speed", "v": 190 }, { "k": "duration", "v": 2 }, { "k": "arc", "v": 2.1 } ]
+    },
+    {
+      "id": "pupesh", "ability": "Melon Roll", "special": "roll", "cooldown": 5,
+      "params": [
+        { "k": "seedCount", "v": 3 }, { "k": "seedStep", "v": 0.18 }, { "k": "seedDamage", "v": 4 },
+        { "k": "duration", "v": 0.6 }, { "k": "speedMul", "v": 1.8 }, { "k": "rollDamage", "v": 20 }
+      ]
+    },
+    {
+      "id": "ristyo", "ability": "Drink", "special": "drink", "cooldown": 6,
+      "params": [
+        { "k": "heal", "v": 20 }, { "k": "wobble", "v": 0.35 }, { "k": "wobbleTime", "v": 4 },
+        { "k": "drunkPerDrink", "v": 40 }, { "k": "drunkDecay", "v": 10 },
+        { "k": "nicotineStart", "v": 100 }, { "k": "nicotineDrain", "v": 5 }, { "k": "fireRateBonus", "v": 0.3 }
+      ]
+    },
+    {
+      "id": "iliqnpuh", "ability": "Bear Jump", "special": "jump", "cooldown": 3,
+      "params": [
+        { "k": "honeyInterval", "v": 0.35 }, { "k": "honeyRadius", "v": 18 }, { "k": "honeyLife", "v": 6 }, { "k": "honeySlow", "v": 0.5 },
+        { "k": "duration", "v": 0.6 }
+      ]
+    },
+    {
+      "id": "daniilvasil", "ability": "Coin Barrage", "special": "coinring", "cooldown": 0,
+      "params": [
+        { "k": "twinOffset", "v": 8 }, { "k": "twinDamage", "v": 5 },
+        { "k": "powerPerHit", "v": 5 }, { "k": "powerMax", "v": 100 },
+        { "k": "ringCount", "v": 16 }, { "k": "ringSpeed", "v": 300 }, { "k": "ringDamage", "v": 10 }
+      ]
+    },
+    {
+      "id": "storyteller", "ability": "Release the Koi", "special": "koi", "cooldown": 7,
+      "params": [
+        { "k": "stillRegen", "v": 2 },
+        { "k": "koiCount", "v": 3 }, { "k": "koiSpeed", "v": 180 }, { "k": "koiTurn", "v": 3 }, { "k": "koiDamage", "v": 12 }, { "k": "koiLife", "v": 4 }
+      ]
+    },
+    {
+      "id": "fairy", "ability": "Blink", "special": "teleport", "cooldown": 0.3,
+      "params": [
+        { "k": "homingTurn", "v": 2.5 }, { "k": "shotDamage", "v": 6 },
+        { "k": "dustMax", "v": 50 }, { "k": "dustCost", "v": 10 }, { "k": "dustRegen", "v": 2 }, { "k": "invuln", "v": 0.2 }
+      ]
+    }
+  ]
+}

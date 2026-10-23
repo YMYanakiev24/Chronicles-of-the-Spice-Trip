@@ -79,6 +79,13 @@ namespace SpiceTrip.Data
         public List<string> questOrder = new List<string>();
         public List<NpcDef> npcs = new List<NpcDef>();
 
+        // Phase 3 abilities (from abilities.json)
+        public List<BossKitDef> bossKits = new List<BossKitDef>();
+        public List<ChampionKitDef> championKits = new List<ChampionKitDef>();
+
+        public BossKitDef BossKit(string id) => bossKits.Find(k => k.id == id);
+        public ChampionKitDef ChampionKit(string id) => championKits.Find(k => k.id == id);
+
         public RegionDef Region(string id) => regions.Find(r => r.id == id);
         public SpellDef Spell(string id) => spells.Find(s => s.id == id);
         public CreatureDef Creature(string id) => creatures.Find(c => c.id == id);

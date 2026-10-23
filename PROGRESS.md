@@ -60,7 +60,21 @@ warnings.
   first quest end to end, but nobody has played all five quests and six realms
   by hand.
 
-## Phase 3: abilities from the art (waiting on a design approval)
+## Phase 3: abilities from the art ✅ (built 2026-10-23, design approved)
+
+| Area | Status | Verified by |
+| --- | --- | --- |
+| Plasmodia split ×3, tiny copies at 40%, one shared health bar, win when all gone | ✅ | `AbilityTests` + autopilot screenshot |
+| Bad Plasmodium 5-shot / copies 3-shot; Good copies single shots | ✅ | `AbilityTests` |
+| Mordekai: 7-feather fan every 1.6 s, dive every third volley | ✅ | `AbilityTests` |
+| Vlado: 12-ticket spirals, whistle, bus №9 down your lane (20 damage) | ✅ | `AbilityTests` + autopilot screenshot |
+| All ten champion kits (Spellwoven, Atanas, Gakev, Nikolay, Pupesh, Ristyo, Iliqn Puh, Daniil & Vasil, The Storyteller, Mitko) | ✅ | One `AbilityTests` test each; Atanas's right-click checked end to end with a real mouse click |
+| Ability HUD (cooldown/meter bars) and hint text | ✅ | Screenshot |
+
+**Test results:** EditMode 77/77, PlayMode 7/7, autopilot 71/71 checks.
+
+**Not verified:** how the new fights feel to play. The numbers come straight
+from the design table; tune them in `abilities.json` after playing.
 
 ## Open questions for you
 

@@ -103,6 +103,26 @@ unless they're listed below.
     Sensitivity") are kept and saved, and still do nothing, as before.
     `Game.applyQuality` was empty in the web version too.
 
+## Phase 3: abilities from the art (approved design)
+
+New content, not in the web game. It was built from the approved design table:
+
+- **Bosses.** The two Plasmodia multiply ×3 on death into small, fast copies
+  (25 HP). Each copy has a 40% chance to leave a tiny copy (10 HP, touch damage
+  only), and one health bar covers every body. The Bad Plasmodium fires a
+  5-shot spread and its copies fire 3-shot spreads; the Good Plazmodium's
+  copies fire single shots. Mordekai fires a fan of 7 feathers every 1.6 s and
+  dives every third volley. Vlado throws 12-ticket spirals, and every 8 s his
+  whistle sends bus №9 down the player's lane after a 1 s warning (20 damage).
+- **Champions.** Right-click or Q triggers each champion's special, alongside
+  their passives and meters, exactly as in the table. Spellwoven keeps the
+  original shot and has no special.
+- **Data.** Every number is in `Data/Source/abilities.json`.
+- **Unchanged without a kit.** A fight with no kit is still the original, and
+  the Phase 1 battle tests still pass unchanged.
+- **New sound.** Vlado's whistle is a new synthesised effect (two sharp
+  blasts).
+
 ## Problems found in the web source
 
 1. **`TopChuk`:** the `asphodel` quest rewards item `'TopChuk'`, which doesn't

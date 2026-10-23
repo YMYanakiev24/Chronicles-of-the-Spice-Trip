@@ -129,10 +129,22 @@ namespace SpiceTrip.Core
             yield return Wait(0.3f);
             Check("Fight again restarts at full HP", battle.Active && !battle.ResultShowing && battle.Sim.Player.hp == battle.Sim.Player.maxHp);
             battle.Sim.Boss.hp = 8;
-            for (float t = 0; t < 10 && !battle.ResultShowing; t += Time.unscaledDeltaTime)
+            bool splitShot = false;
+            for (float t = 0; t < 15 && !battle.ResultShowing; t += Time.unscaledDeltaTime)
             {
-                // aim at the boss every frame, like a player tracking it with the mouse
-                battle.ScriptedInput = new BattleSim.Inputs { aim = new Vector2(battle.Sim.Boss.x, battle.Sim.Boss.y), shoot = true };
+                var sim = battle.Sim;
+                sim.Player.hp = sim.Player.maxHp;
+                if (sim.Units.Count > 1 && !splitShot)
+                {
+                    // Phase 3: the Good Plazmodium multiplies ×3 when killed
+                    splitShot = true;
+                    Check("the Good Plazmodium splits into three copies", sim.Units.Count == 3 && sim.Units.TrueForAll(u => u.form == 1));
+                    battle.ScriptedInput = new BattleSim.Inputs();
+                    yield return Shot("plazmodium-split");
+                }
+                if (splitShot) foreach (var u in sim.Units) u.hp = Mathf.Min(u.hp, 1);
+                // aim at a boss body every frame, like a player tracking it with the mouse
+                battle.ScriptedInput = new BattleSim.Inputs { aim = new Vector2(sim.Boss.x, sim.Boss.y), shoot = true };
                 yield return null;
             }
             battle.ScriptedInput = null;
@@ -217,6 +229,32 @@ namespace SpiceTrip.Core
             yield return Wait(0.8f);
             Check($"{boss4.name} fight starts with {boss4.hp} HP", battle.Active && Mathf.Approximately(battle.Sim.Boss.maxHp, boss4.hp));
             yield return Shot("battle-champion");
+
+            // Phase 3: Atanas' Aura of Calmness on right-click, then Vlado's tickets and bus №9
+            battle.Sim.Player.hp = 40;
+            var mouse = Mouse.current;
+            var mp = mouse.position.ReadValue();
+            InputSystem.QueueStateEvent(mouse, new MouseState { position = mp }.WithButton(UnityEngine.InputSystem.LowLevel.MouseButton.Right, true));
+            yield return null;
+            yield return null;
+            InputSystem.QueueStateEvent(mouse, new MouseState { position = mp }.WithButton(UnityEngine.InputSystem.LowLevel.MouseButton.Right, false));
+            yield return Wait(0.2f);
+            Check("right-click casts Aura of Calmness (heals 25)", battle.Sim.AuraT > 0 && battle.Sim.Player.hp >= 64);
+            yield return Shot("atanas-aura");
+            bool sawBus = false, sawTickets = false;
+            for (float t = 0; t < 10.5f && battle.Active; t += Time.unscaledDeltaTime)
+            {
+                battle.Sim.Player.hp = battle.Sim.Player.maxHp;
+                sawTickets |= battle.Sim.BossShots.Exists(s => s.kind == BattleSim.ShotKind.Ticket);
+                if (!sawBus && battle.Sim.ActiveBus != null && battle.Sim.ActiveBus.driving && battle.Sim.ActiveBus.x > 250)
+                {
+                    sawBus = true;
+                    yield return Shot("vlado-bus");
+                }
+                yield return null;
+            }
+            Check("Vlado throws ticket spirals", sawTickets);
+            Check("Vlado's whistle sends bus №9", sawBus);
             yield return Click(Q("bb-flee"), "Flee");
             yield return Wait(0.3f);
             Check("Flee returns to the Path", hub.Active == "path" && !battle.Active);

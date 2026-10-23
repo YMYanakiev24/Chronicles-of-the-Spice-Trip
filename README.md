@@ -42,6 +42,11 @@ The build goes to `Build/Windows/SpiceTrip.exe`.
 | Mouse | Click scenes, doors, bosses and shop items; aim in battle |
 | W A S D / arrows | Move in battle |
 | Left click / Space | Shoot toward the mouse |
+| Right click / Q | Your champion's special ability (Phase 3) |
+
+Each champion and boss has an ability designed from their character sheet.
+All the numbers live in `Assets/_Project/Data/Source/abilities.json`. Edit it,
+then run **Spice Trip ▸ Rebuild Project**.
 
 In a Chronicle:
 
@@ -80,7 +85,7 @@ Unity.exe -batchmode -nographics -projectPath . -runTests -testPlatform EditMode
 Unity.exe -batchmode -projectPath . -runTests -testPlatform PlayMode -testResults Logs/playmode-results.xml
 ```
 
-- **EditMode tests (61):** data parity with the JS, pixel parity of all 75 procedural sprites, map parity for all six regions, RNG/hash bit-exactness, battle rules, Loom grid and physics, saves, hotspot geometry, synth output, shop/navigation logic, and the Chronicle rules (movement, collision, casting, weaknesses, melee, levelling, wards, death, quests and dialogue, pickups, unlocks, travel, consumables, save round-trip, enemy AI).
+- **EditMode tests (77):** the 16 Phase 3 ability tests (one per boss and champion kit), plus data parity with the JS, pixel parity of all 75 procedural sprites, map parity for all six regions, RNG/hash bit-exactness, battle rules, Loom grid and physics, saves, hotspot geometry, synth output, shop/navigation logic, and the Chronicle rules (movement, collision, casting, weaknesses, melee, levelling, wards, death, quests and dialogue, pickups, unlocks, travel, consumables, save round-trip, enemy AI).
 - **PlayMode tests (7):** boot, every boss fight, win/lose, the fog wipe into the shop, buying, the Loom, champion persistence, and a Chronicle started, saved, quit and continued.
 
 **End-to-end autopilot:** this plays through every screen with real injected

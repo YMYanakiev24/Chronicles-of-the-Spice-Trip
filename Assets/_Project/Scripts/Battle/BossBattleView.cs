@@ -42,17 +42,20 @@ namespace SpiceTrip.Battle
         public bool Active => Sim != null && _root != null && !_root.ClassListContains("hidden");
 
         // scene objects
-        SpriteRenderer _bossSr, _bossShadow, _playerSr, _playerShadow;
-        SpriteRenderer _bossEyeL, _bossEyeR;
+        SpriteRenderer _playerSr, _playerShadow;
+        Sprite _bossSprite, _feather, _ticket, _seed, _koi, _bus, _ring;
+        readonly List<SpriteRenderer> _draws = new List<SpriteRenderer>();
+        int _drawn;
+        ChampionKitDef _kit;
         readonly List<(SpriteRenderer r, float x, float y, float s, float sway, Transform[] parts)> _trees = new List<(SpriteRenderer, float, float, float, float, Transform[])>();
         readonly List<SpriteRenderer> _fog = new List<SpriteRenderer>();
-        readonly List<SpriteRenderer> _shotPool = new List<SpriteRenderer>();
-        readonly List<SpriteRenderer> _corePool = new List<SpriteRenderer>();
         bool _bossHasArt;
 
         // UI overlay
         VisualElement _root, _hud, _result, _bossFill, _playerFill;
-        Label _bossLabel, _resultTitle, _resultSub;
+        Label _bossLabel, _resultTitle, _resultSub, _hint;
+        readonly List<VisualElement> _kitBars = new List<VisualElement>();
+        readonly List<(VisualElement fill, Label label, Func<float> value, Func<string> text)> _kitMeters = new List<(VisualElement, Label, Func<float>, Func<string>)>();
         ClickEl _flee;
         Action _onExit;
         Action<string> _onBossDefeated;
@@ -101,6 +104,46 @@ namespace SpiceTrip.Battle
             var ellipse = new PixelCanvas(128, 32);
             ellipse.FillEllipse(64, 16, 63.5, 15.5, new Color32(255, 255, 255, 255));
             _ellipse = Spr(Tex(ellipse));
+
+            // Phase 3 projectiles and hazards, drawn as small pixel sprites.
+            _feather = Spr(Tex(Grid(new[] { "..bbbbbbbbbb..", "wwwwwwwwwwwwwk", "..bbbbbbbbbb..", "...cccccccc..." },
+                ('b', "#5a8ad8"), ('w', "#f4f6ff"), ('c', "#9fc4ff"), ('k', "#2a3a6a")), FilterMode.Point));
+            _ticket = Spr(Tex(Grid(new[] { "kkkkkkkkkkkk", "kpppppppppk.", "kpddpdpddpk.", "kpppppppppk.", "kpdddpddppk.", "kpppppppppk.", "kkkkkkkkkkkk" },
+                ('k', "#9a7a40"), ('p', "#efe6cc"), ('d', "#3a2a1a")), FilterMode.Point));
+            _seed = Spr(Tex(Grid(new[] { ".gg.", "gllg", "gggg", ".gg." }, ('g', "#2a5a1a"), ('l', "#7fbf4a")), FilterMode.Point));
+            _koi = Spr(Tex(Grid(new[] { "o.....oooo....", "oo..oowwoooo..", "ooooowoooooke.", "oo..oooowoo...", "o.....oooo...." },
+                ('o', "#ff8a3a"), ('w', "#ffffff"), ('k', "#1a1414"), ('e', "#ffb070")), FilterMode.Point));
+            _bus = Spr(Tex(Grid(new[]
+            {
+                "llllllllllllllllllllllllllllllll",
+                "lyyyybbbbbbbbbbbbbbbbbbbbbbbbbbl",
+                "lynnybbbbbbbbbbbbbbbbbbbbbbbbbbl",
+                "lyyyybwwwbwwwbwwwbwwwbwwwbwwwwbl",
+                "lbbbbbwwwbwwwbwwwbwwwbwwwbwwwwbl",
+                "lbbbbbwwwbwwwbwwwbwwwbwwwbwwwwbl",
+                "lbbbbbbbbbbbbbbbbbbbbbbbbbbddbbh",
+                "lbbbbbbbbbbbbbbbbbbbbbbbbbbddbbh",
+                "lssssssssssssssssssssssssssddssl",
+                "llkkkllllllllllllllllllllkkklll.",
+                "..kkk....................kkk....",
+            }, ('l', "#1a3a7a"), ('b', "#2a6ad0"), ('w', "#bfe8ff"), ('y', "#ffb347"), ('n', "#1a1414"),
+               ('d', "#1a3a7a"), ('h', "#ffe08a"), ('s', "#d8dce8"), ('k', "#0a0a10")), FilterMode.Point));
+            var ring = new PixelCanvas(128, 128);
+            ring.FillCircle(64, 64, 63.5, new Color32(255, 255, 255, 255));
+            for (int y = 0; y < 128; y++)
+                for (int x = 0; x < 128; x++)
+                    if (Mathf.Sqrt((x + 0.5f - 64) * (x + 0.5f - 64) + (y + 0.5f - 64) * (y + 0.5f - 64)) < 57) ring.Pixels[y * 128 + x] = default;
+            _ring = Spr(Tex(ring));
+        }
+
+        static PixelCanvas Grid(string[] rows, params (char key, string color)[] pal)
+        {
+            var c = new PixelCanvas(rows[0].Length, rows.Length);
+            for (int y = 0; y < rows.Length; y++)
+                for (int x = 0; x < rows[y].Length; x++)
+                    foreach (var (key, color) in pal)
+                        if (rows[y][x] == key) c.Px(x, y, color);
+            return c;
         }
 
         void BuildCamera()
@@ -204,10 +247,6 @@ namespace SpiceTrip.Battle
             Rect(vgSr, 0, 0, AW, AH);
 
             // fighters (images are set per fight)
-            _bossSr = Make("Boss", _circle, _alpha, 40, Color.white);
-            _bossEyeL = Make("BossEyeL", _white, _alpha, 41, PixelCanvas.Col("#ff5a4a"));
-            _bossEyeR = Make("BossEyeR", _white, _alpha, 41, PixelCanvas.Col("#ff5a4a"));
-            _bossShadow = Make("BossShadow", _ellipse, _alpha, 42, new Color(0, 0, 0, 0.35f));
             _playerSr = Make("Player", _white, _alpha, 50, Color.white);
             _playerShadow = Make("PlayerShadow", _ellipse, _alpha, 51, new Color(0, 0, 0, 0.35f));
         }
@@ -273,7 +312,8 @@ namespace SpiceTrip.Battle
             _root.Add(_flee);
             var hintRow = El("bb-hint-row");
             hintRow.pickingMode = PickingMode.Ignore;
-            hintRow.Add(Lbl("WASD / arrows to move · aim & click (or Space) to shoot", "bb-hint"));
+            _hint = Lbl(BaseHint, "bb-hint");
+            hintRow.Add(_hint);
             _root.Add(hintRow);
 
             _result = El("bb-result hidden", "bb-result");
@@ -293,6 +333,8 @@ namespace SpiceTrip.Battle
             layer.Add(_root);
             _root.RegisterCallback<GeometryChangedEvent>(_ => LayoutArena());
         }
+
+        const string BaseHint = "WASD / arrows to move · aim & click (or Space) to shoot";
 
         // A health bar in arena coordinates: dark frame, inner track, coloured fill, centred label.
         VisualElement Bar(VisualElement host, float x, float y, float w, float h, string color, out Label label)
@@ -346,7 +388,8 @@ namespace SpiceTrip.Battle
         {
             _boss = boss;
             _char = ch;
-            Sim = new BattleSim(T, boss);
+            _kit = ch != null ? _ctx.Db.ChampionKit(ch.id) : null;
+            Sim = new BattleSim(T, boss, null, _kit, _ctx.Db.BossKit(boss.id));
             Sim.OnSfx += s => _ctx.Audio.Sfx(s);
             Sim.OnEnd += End;
             UiKit.Show(_root, true);
@@ -355,11 +398,9 @@ namespace SpiceTrip.Battle
             _cam.enabled = true;
 
             // Boss art: the main figure cropped from the sheet; a coloured circle with red eyes if missing.
-            var bossSprite = ArtLibrary.Crop(boss.img, boss.portraitRect);
-            _bossHasArt = bossSprite != null;
-            _bossSr.sprite = _bossHasArt ? bossSprite : _circle;
-            _bossSr.color = _bossHasArt ? Color.white : PixelCanvas.Col(boss.color ?? "#9a5fd0");
-            _bossEyeL.enabled = _bossEyeR.enabled = !_bossHasArt;
+            _bossSprite = ArtLibrary.Crop(boss.img, boss.portraitRect);
+            _bossHasArt = _bossSprite != null;
+            BuildKitHud();
 
             // Player art: the champion's crop, or the procedural hero facing up.
             Sprite playerSprite = null;
@@ -428,6 +469,7 @@ namespace SpiceTrip.Battle
                 if (kb.aKey.isPressed || kb.leftArrowKey.isPressed) inp.move.x -= 1;
                 if (kb.dKey.isPressed || kb.rightArrowKey.isPressed) inp.move.x += 1;
                 inp.shoot |= kb.spaceKey.isPressed;
+                inp.special |= kb.qKey.wasPressedThisFrame;
             }
             if (mouse != null)
             {
@@ -435,7 +477,9 @@ namespace SpiceTrip.Battle
                 var wp = _cam.ScreenToWorldPoint(new Vector3(sp.x, sp.y, 10));
                 inp.aim = new Vector2(wp.x * PxPerUnit + T.arenaWidth / 2, T.arenaHeight / 2 - wp.y * PxPerUnit);
                 // Clicking the Flee button must not also fire a shot.
-                inp.shoot |= mouse.leftButton.isPressed && !PointerOverButton(sp);
+                bool overButton = PointerOverButton(sp);
+                inp.shoot |= mouse.leftButton.isPressed && !overButton;
+                inp.special |= mouse.rightButton.wasPressedThisFrame && !overButton;
             }
             return inp;
         }
@@ -450,11 +494,70 @@ namespace SpiceTrip.Battle
             return false;
         }
 
+        // Champion ability HUD: the special's cooldown (or meter) plus any extra meters, under the arena's bottom-right.
+        void BuildKitHud()
+        {
+            foreach (var b in _kitBars) b.RemoveFromHierarchy();
+            _kitBars.Clear();
+            _kitMeters.Clear();
+            var sim = Sim;
+            if (_kit == null || _kit.special == "none") { _hint.text = BaseHint; return; }
+            _hint.text = $"{BaseHint} · right-click (or Q): {_kit.ability}";
+            float x = T.arenaWidth - 260, y = T.arenaHeight - 28;
+            void Meter(string color, Func<float> value, Func<string> text)
+            {
+                var fill = Bar(_hud, x, y, 240, 14, color, out var label);
+                _kitBars.Add(fill.parent.parent);
+                _kitMeters.Add((fill, label, value, text));
+                y -= 22;
+            }
+            switch (_kit.special)
+            {
+                case "coinring":
+                    Meter("#e0b030", () => sim.CoinPower / _kit.P("powerMax", 100),
+                        () => sim.CoinPower >= _kit.P("powerMax", 100) ? $"{_kit.ability.ToUpperInvariant()} READY" : "COIN POWER");
+                    break;
+                case "teleport":
+                    Meter("#e07ad0", () => sim.Dust / _kit.P("dustMax", 50), () => $"DUST {Mathf.FloorToInt(sim.Dust)} · {_kit.ability.ToUpperInvariant()}");
+                    break;
+                default:
+                    Meter("#7a5ad0", () => _kit.cooldown > 0 ? 1 - Mathf.Clamp01(sim.SpecialCooldown / _kit.cooldown) : 1,
+                        () => sim.SpecialCooldown > 0 ? _kit.ability.ToUpperInvariant() : $"{_kit.ability.ToUpperInvariant()} READY");
+                    break;
+            }
+            if (_kit.special == "drink")
+            {
+                Meter("#d8a838", () => sim.Drunk / 100f, () => "DRUNK LEVEL");
+                Meter("#9ab0a0", () => sim.Nicotine / Mathf.Max(1, _kit.P("nicotineStart", 100)), () => "NICOTINE STATUS");
+            }
+            LayoutArena();
+        }
+
+        SpriteRenderer D(Sprite sprite, Material mat, int order, float x, float y, float w, float h, float rotDeg = 0, Color? color = null, float brightness = 1)
+        {
+            if (_drawn == _draws.Count) _draws.Add(Make("Draw", sprite, mat, order, Color.white));
+            var r = _draws[_drawn++];
+            r.enabled = true;
+            r.sprite = sprite;
+            r.sharedMaterial = mat;
+            r.sortingOrder = order;
+            r.color = color ?? Color.white;
+            r.transform.localPosition = W(x, y);
+            r.transform.localRotation = Quaternion.Euler(0, 0, rotDeg);
+            Size(r, w, h);
+            _mpb.SetFloat("_Brightness", brightness);
+            r.SetPropertyBlock(_mpb);
+            return r;
+        }
+
+        static float Deg(float vx, float vy) => -Mathf.Atan2(vy, vx) * Mathf.Rad2Deg;   // canvas y points down
+
         void Render()
         {
             if (Sim == null) return;
             float t = Sim.Time;
             PlaceTrees(t);
+            _drawn = 0;
 
             // fog drift: each row slides right and wraps (off = (t·(10+6i)) % (AW+120) - 60)
             int idx = 0;
@@ -467,60 +570,121 @@ namespace SpiceTrip.Battle
             }
 
             var p = Sim.Player;
-            var b = Sim.Boss;
+            var gold = PixelCanvas.Col("#ffd24a");
 
-            // Boss (+ shadow drawn over its feet, as on the canvas)
-            float bs = _bossHasArt ? b.r * T.bossSpriteScale : b.r * 2;
-            _bossSr.transform.localPosition = W(b.x, b.y);
-            Size(_bossSr, bs, bs);
-            _mpb.SetFloat("_Brightness", b.hurt > 0 ? 2f : 1f);
-            _bossSr.SetPropertyBlock(_mpb);
-            if (!_bossHasArt)
+            // Ground effects: honey puddles, dropped coins, the bus lane warning.
+            foreach (var pd in Sim.Puddles)
+                D(_ellipse, _alpha, 34, pd.x, pd.y, pd.r * 2.2f, pd.r * 1.2f, 0, new Color(0.93f, 0.66f, 0.12f, Mathf.Min(0.5f, pd.life * 0.5f)));
+            foreach (var c in Sim.Coins)
             {
-                Rect(_bossEyeL, b.x - 8, b.y - 6, 4, 4);
-                Rect(_bossEyeR, b.x + 4, b.y - 6, 4, 4);
+                float bob = Mathf.Sin(t * 6 + c.x) * 2;
+                D(_glow, _additive, 35, c.x, c.y + bob, 22, 22, 0, new Color(1, 0.8f, 0.2f, 0.6f));
+                D(_circle, _alpha, 36, c.x, c.y + bob, 9, 9, 0, gold);
             }
-            _bossShadow.transform.localPosition = W(b.x, b.y + b.r);
-            Size(_bossShadow, b.r * 1.6f, b.r * 0.6f);
+            var bus = Sim.ActiveBus;
+            if (bus != null && !bus.driving)
+                D(_white, _alpha, 37, T.arenaWidth / 2, bus.y, T.arenaWidth, bus.h, 0, new Color(1, 0.2f, 0.15f, 0.12f + 0.12f * Mathf.Abs(Mathf.Sin(t * 14))));
 
-            // Player (blinks while invulnerable)
+            // Boss bodies (+ shadows drawn over their feet, as on the canvas)
+            var bossColor = PixelCanvas.Col(_boss.color ?? "#9a5fd0");
+            foreach (var u in Sim.Units)
+            {
+                float size = _bossHasArt ? u.r * T.bossSpriteScale : u.r * 2;
+                D(_bossHasArt ? _bossSprite : _circle, _alpha, 40, u.x, u.y, size, size, 0, _bossHasArt ? Color.white : (Color)bossColor, u.hurt > 0 ? 2f : 1f);
+                if (!_bossHasArt)
+                {
+                    float k = u.r / T.bossRadius;
+                    D(_white, _alpha, 41, u.x - 6 * k, u.y - 4 * k, 4 * k, 4 * k, 0, PixelCanvas.Col("#ff5a4a"));
+                    D(_white, _alpha, 41, u.x + 6 * k, u.y - 4 * k, 4 * k, 4 * k, 0, PixelCanvas.Col("#ff5a4a"));
+                }
+                D(_ellipse, _alpha, 42, u.x, u.y + u.r, u.r * 1.6f, u.r * 0.6f, 0, new Color(0, 0, 0, 0.35f));
+            }
+
+            // Player (blinks while invulnerable; rolls, jumps, flickers while dashing/blinking)
             float alpha = p.hurt > 0 && Mathf.FloorToInt(p.hurt * 12) % 2 == 1 ? 0.4f : 1f;
+            if (Sim.DashT > 0 || Sim.TeleportT > 0) alpha = 0.55f;
             _playerSr.color = new Color(1, 1, 1, alpha);
-            _playerSr.transform.localPosition = W(p.x, p.y);
-            if (_playerIsHero) Size(_playerSr, PixelArt.HeroW * T.heroSpriteScale, PixelArt.HeroH * T.heroSpriteScale);
-            else Size(_playerSr, T.playerSpriteSize, T.playerSpriteSize);
+            float lift = 0, grow = 1;
+            if (Sim.JumpT > 0 && _kit != null)
+            {
+                float k = Mathf.Sin(Mathf.PI * (1 - Sim.JumpT / Mathf.Max(0.01f, _kit.P("duration", 0.6f))));
+                lift = 22 * k; grow = 1 + 0.3f * k;
+            }
+            _playerSr.transform.localPosition = W(p.x, p.y - lift);
+            _playerSr.transform.localRotation = Quaternion.Euler(0, 0, Sim.RollT > 0 ? Sim.RollT * 900 : 0);
+            if (_playerIsHero) Size(_playerSr, PixelArt.HeroW * T.heroSpriteScale * grow, PixelArt.HeroH * T.heroSpriteScale * grow);
+            else Size(_playerSr, T.playerSpriteSize * grow, T.playerSpriteSize * grow);
             _playerShadow.transform.localPosition = W(p.x, p.y + 16);
-            Size(_playerShadow, 28, 10);
+            Size(_playerShadow, 28 / grow, 10 / grow);
 
-            // Projectiles: additive glow (radius r·2.2) + a 2×2 white core
-            int n = 0;
+            // Atanas' calm aura and Nikolay's mug-shield
+            if (Sim.AuraT > 0)
+            {
+                float k = 1 - Mathf.Repeat(t * 1.2f, 1);
+                D(_ring, _additive, 55, p.x, p.y, 60 + 50 * (1 - k), 60 + 50 * (1 - k), 0, new Color(0.3f, 0.95f, 0.85f, 0.6f * k));
+            }
+            if (Sim.ShieldT > 0)
+            {
+                float aim = Mathf.Atan2(Sim.FacingAim.y, Sim.FacingAim.x), arc = _kit?.P("arc", 2.1f) ?? 2.1f;
+                for (int i = -3; i <= 3; i++)
+                {
+                    float a = aim + i * arc / 6;
+                    D(_white, _alpha, 55, p.x + Mathf.Cos(a) * 30, p.y + Mathf.Sin(a) * 30, 5, 13, Deg(Mathf.Cos(a), Mathf.Sin(a)), PixelCanvas.Col("#c8843a"));
+                }
+            }
+
+            // Projectiles
             var playerGlow = PixelCanvas.Col("#9fe0ff");
             var bossGlow = PixelCanvas.Col(_boss.color ?? "#ff6a3a");
-            foreach (var s in Sim.PlayerShots) DrawShot(n++, s, playerGlow);
-            foreach (var s in Sim.BossShots) DrawShot(n++, s, bossGlow);
-            for (int i = n; i < _shotPool.Count; i++) { _shotPool[i].enabled = false; _corePool[i].enabled = false; }
+            foreach (var s in Sim.PlayerShots) DrawShot(s, playerGlow, t);
+            foreach (var s in Sim.BossShots) DrawShot(s, bossGlow, t);
 
-            // HUD bars
-            _bossFill.style.width = Length.Percent(Mathf.Max(0, b.hp / b.maxHp) * 100);
+            // Bus №9 on top of everything on the ground
+            if (bus != null && bus.driving) D(_bus, _alpha, 70, bus.x, bus.y, bus.w, bus.h);
+
+            for (int i = _drawn; i < _draws.Count; i++) _draws[i].enabled = false;
+
+            // HUD bars: one health bar covers every boss body
+            _bossFill.style.width = Length.Percent(Sim.BossHpRatio * 100);
             _playerFill.style.width = Length.Percent(Mathf.Max(0, p.hp / p.maxHp) * 100);
-            _bossLabel.text = _boss.name.ToUpperInvariant();
+            _bossLabel.text = _boss.name.ToUpperInvariant() + (Sim.Units.Count > 1 ? $"  ×{Sim.Units.Count}" : "");
+            foreach (var (fill, label, value, text) in _kitMeters)
+            {
+                fill.style.width = Length.Percent(Mathf.Clamp01(value()) * 100);
+                label.text = text();
+            }
         }
 
-        void DrawShot(int i, BattleSim.Shot s, Color col)
+        void DrawShot(BattleSim.Shot s, Color glow, float t)
         {
-            while (_shotPool.Count <= i)
+            switch (s.kind)
             {
-                _shotPool.Add(Make("Shot", _glow, _additive, 60, Color.white));
-                _corePool.Add(Make("ShotCore", _white, _additive, 61, Color.white));
+                case BattleSim.ShotKind.Feather:
+                    D(_feather, _alpha, 60, s.x, s.y, 16, 5, Deg(s.vx, s.vy));
+                    break;
+                case BattleSim.ShotKind.Ticket:
+                    D(_ticket, _alpha, 60, s.x, s.y, 13, 8, t * s.spin * Mathf.Rad2Deg);
+                    break;
+                case BattleSim.ShotKind.Seed:
+                    D(_seed, _alpha, 60, s.x, s.y, 7, 7, Deg(s.vx, s.vy));
+                    break;
+                case BattleSim.ShotKind.Coin:
+                    D(_glow, _additive, 59, s.x, s.y, s.r * 4, s.r * 4, 0, new Color(1, 0.8f, 0.25f, 0.8f));
+                    D(_circle, _alpha, 60, s.x, s.y, s.r * 1.8f, s.r * 1.8f, 0, PixelCanvas.Col("#ffd24a"));
+                    break;
+                case BattleSim.ShotKind.Koi:
+                    D(_koi, _alpha, 60, s.x, s.y, 18, 7, Deg(s.vx, s.vy));
+                    break;
+                case BattleSim.ShotKind.Sparkle:
+                    D(_glow, _additive, 60, s.x, s.y, s.r * 4.4f, s.r * 4.4f, 0, PixelCanvas.Col("#ff9ae8"));
+                    D(_white, _additive, 61, s.x, s.y, 2, 2, t * 400, Color.white);
+                    break;
+                default:
+                    // additive glow (radius r·2.2) + a 2×2 white core
+                    D(_glow, _additive, 60, s.x, s.y, s.r * 4.4f, s.r * 4.4f, 0, glow);
+                    D(_white, _additive, 61, s.x, s.y, 2, 2, 0, Color.white);
+                    break;
             }
-            var g = _shotPool[i];
-            g.enabled = true;
-            g.color = col;
-            g.transform.localPosition = W(s.x, s.y);
-            Size(g, s.r * 4.4f, s.r * 4.4f);
-            var c = _corePool[i];
-            c.enabled = true;
-            Rect(c, s.x - 1, s.y - 1, 2, 2);
         }
     }
 }

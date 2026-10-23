@@ -19,6 +19,14 @@ namespace SpiceTrip.EditorTools
     public static class DataImporter
     {
         public const string DatabasePath = "Assets/_Project/Resources/Data/GameDatabase.asset";
+        public const string AbilitiesPath = "Assets/_Project/Data/Source/abilities.json";
+
+        [System.Serializable]
+        class AbilityFile
+        {
+            public List<BossKitDef> bosses = new List<BossKitDef>();
+            public List<ChampionKitDef> champions = new List<ChampionKitDef>();
+        }
 
         // Normalised crops (x, y, w, h; top-left origin) around each sheet's main figure,
         // square in pixels so the arena sprites keep their proportions.
@@ -35,7 +43,7 @@ namespace SpiceTrip.EditorTools
             ["storyteller"] = new Rect(0.14f, 0.150f, 0.66f, 0.495f),  // 720×960: hot tub
             ["fairy"] = new Rect(0.38f, 0.320f, 0.56f, 0.258f),        // 443×960: fairy by the trailer
             // bosses
-            ["goodPlaz"] = new Rect(0.00f, 0.325f, 0.53f, 0.245f),     // 443×960: form 1
+            ["goodPlaz"] = new Rect(0.00f, 0.325f, 0.50f, 0.231f),     // 443×960: form 1
             ["badPlaz"] = new Rect(0.06f, 0.290f, 0.58f, 0.268f),      // 443×960: form 1
             ["mordekai"] = new Rect(0.22f, 0.300f, 0.70f, 0.323f),     // 443×960: bird-man
             ["vlado"] = new Rect(0.18f, 0.170f, 0.62f, 0.286f),        // 443×960: the conductor
@@ -92,6 +100,10 @@ namespace SpiceTrip.EditorTools
             db.questOrder = src.questOrder;
             db.npcs = rpg.npcs;
 
+            var kits = JsonUtility.FromJson<AbilityFile>(File.ReadAllText(AbilitiesPath));
+            db.bossKits = kits.bosses;
+            db.championKits = kits.champions;
+
             if (create)
             {
                 Directory.CreateDirectory(Path.GetDirectoryName(DatabasePath));
@@ -100,7 +112,8 @@ namespace SpiceTrip.EditorTools
             EditorUtility.SetDirty(db);
             AssetDatabase.SaveAssets();
             Debug.Log($"GameDatabase: {db.items.Count} items, {db.bosses.Count} bosses, {db.characters.Count} characters, {db.shopStock.Count} shop entries, " +
-                $"{db.regions.Count} regions, {db.spells.Count} spells, {db.creatures.Count} creatures, {db.quests.Count} quests, {db.npcs.Count} NPCs");
+                $"{db.regions.Count} regions, {db.spells.Count} spells, {db.creatures.Count} creatures, {db.quests.Count} quests, {db.npcs.Count} NPCs, " +
+                $"{db.bossKits.Count} boss kits, {db.championKits.Count} champion kits");
             return db;
         }
 

@@ -71,10 +71,20 @@ namespace SpiceTrip.Tests
             _g.Hub.EnterPath();
             _g.Hub.FightBoss(boss);
             yield return null;
-            _g.Battle.Sim.Boss.hp = 1;
-            _g.Battle.Sim.PlayerShots.Add(new BattleSim.Shot { x = _g.Battle.Sim.Boss.x, y = _g.Battle.Sim.Boss.y, r = 5, life = 1 });
-            yield return null;
-            yield return null;
+            // The Bad Plasmodium multiplies ×3 when killed (Phase 3), so every body has to fall.
+            bool split = false;
+            for (int frame = 0; frame < 120 && !_g.Battle.ResultShowing; frame++)
+            {
+                var sim = _g.Battle.Sim;
+                if (sim.Units.Count > 1) split = true;
+                foreach (var u in sim.Units)
+                {
+                    u.hp = Mathf.Min(u.hp, 1);
+                    sim.PlayerShots.Add(new BattleSim.Shot { x = u.x, y = u.y, r = 5, life = 1 });
+                }
+                yield return null;
+            }
+            Assert.IsTrue(split, "the Plasmodium split into copies");
             Assert.IsTrue(_g.Battle.ResultShowing);
             Assert.AreEqual("VICTORY", _g.Battle.ResultTitle);
             CollectionAssert.Contains(new SaveService(_dir).LoadHub(1450).defeated, boss.id);

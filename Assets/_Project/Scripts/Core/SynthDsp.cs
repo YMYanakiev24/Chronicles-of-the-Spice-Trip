@@ -124,11 +124,12 @@ namespace SpiceTrip.Core
             "levelup" => 3 * 0.11 + 0.27,
             "ui" => 0.08,
             "death" => 1.22,
+            "whistle" => 0.42,
             _ => 0,
         };
 
         public static readonly string[] SfxNames =
-            { "fire", "nature", "lightning", "heal", "shield", "ultimate", "hit", "hurt", "pickup", "quest", "levelup", "ui", "death" };
+            { "fire", "nature", "lightning", "heal", "shield", "ultimate", "hit", "hurt", "pickup", "quest", "levelup", "ui", "death", "whistle" };
 
         /// <summary>Renders one of the named effects; each is the same sound-design recipe as sfx(name) in JS.</summary>
         public static float[] RenderSfx(string name, int sr, int seed = 1)
@@ -182,6 +183,10 @@ namespace SpiceTrip.Core
                     break;
                 case "death":
                     Tone(buf, sr, 0, 300, 60, Wave.Sawtooth, 1.2, 0.4);
+                    break;
+                case "whistle":   // Phase 3: Vlado's conductor whistle (two sharp blasts)
+                    Tone(buf, sr, 0, 1900, 2050, Wave.Sine, 0.14, 0.22);
+                    Tone(buf, sr, 0.2, 1900, 2150, Wave.Sine, 0.2, 0.22);
                     break;
             }
             return buf;
