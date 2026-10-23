@@ -1,0 +1,19 @@
+{
+    "name": "SpiceTrip.Editor",
+    "rootNamespace": "SpiceTrip.EditorTools",
+    "references": [
+        "SpiceTrip.Runtime",
+        "Unity.InputSystem"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

@@ -1,0 +1,25 @@
+{
+    "name": "SpiceTrip.Tests.EditMode",
+    "rootNamespace": "SpiceTrip.Tests",
+    "references": [
+        "SpiceTrip.Runtime",
+        "SpiceTrip.Editor",
+        "UnityEngine.TestRunner",
+        "UnityEditor.TestRunner"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": true,
+    "precompiledReferences": [
+        "nunit.framework.dll"
+    ],
+    "autoReferenced": false,
+    "defineConstraints": [
+        "UNITY_INCLUDE_TESTS"
+    ],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

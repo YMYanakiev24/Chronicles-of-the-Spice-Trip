@@ -1,0 +1,546 @@
+/* ===========================================================================
+   Chronicles of the Spice Trip — UI theme (port of the web game's style.css)
+   An "ancient illuminated spellbook" aesthetic: gilded edges, dark panels,
+   glowing arcane accents. USS has no gradients, box-shadows, gap or
+   backdrop-filter, so gradients come from generated textures (UiKit) and
+   glows are approximated with borders and text shadows.
+   =========================================================================== */
+
+:root {
+    --green-bright: #4fd27a;
+    --purple: #6a3aa8;
+    --purple-bright: #b98aff;
+    --gold: #caa84d;
+    --gold-bright: #ffd76b;
+    --parchment: #e9dcbf;
+    --ink: #3a2a1a;
+}
+
+.root {
+    position: absolute;
+    left: 0; top: 0; right: 0; bottom: 0;
+    color: var(--parchment);
+    font-size: 16px;
+}
+
+.hidden { display: none; }
+
+/* ---- Shared headings ------------------------------------------------------ */
+.game-title {
+    font-size: 56px;
+    -unity-font-style: bold;
+    letter-spacing: 6px;
+    color: var(--gold-bright);
+    text-shadow: 0 0 18px rgba(255, 215, 107, 0.55);
+    -unity-text-align: middle-center;
+}
+.game-title.small { font-size: 32px; }
+.game-subtitle {
+    font-size: 24px;
+    letter-spacing: 8px;
+    color: var(--purple-bright);
+    text-shadow: 0 0 14px rgba(185, 138, 255, 0.6);
+    -unity-text-align: middle-center;
+    margin-top: 4px;
+}
+
+/* ---- Screens (loading, main menu) ---------------------------------------- */
+.screen {
+    position: absolute;
+    left: 0; top: 0; right: 0; bottom: 0;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    background-color: rgba(4, 10, 9, 0.9);
+}
+.screen > * { margin-top: 9px; margin-bottom: 9px; }
+
+.book-emblem { width: 44px; height: 44px; }
+
+.loading-bar {
+    width: 420px; height: 10px;
+    border-radius: 6px;
+    background-color: rgba(0, 0, 0, 0.5);
+    border-width: 1px; border-color: var(--gold);
+    overflow: hidden;
+}
+.loading-fill { height: 100%; width: 0; background-color: var(--gold-bright); }
+.tip {
+    color: rgba(233, 220, 191, 0.7);
+    -unity-font-style: italic;
+    max-width: 540px;
+    white-space: normal;
+    -unity-text-align: middle-center;
+}
+
+/* Menu background art (cover-fit) behind the menu content. */
+.menu-bg {
+    position: absolute;
+    left: 0; top: 0; right: 0; bottom: 0;
+    -unity-background-scale-mode: scale-and-crop;
+    margin: 0;
+}
+.has-menu-bg { background-color: rgba(0, 0, 0, 0.18); }
+.has-menu-bg .game-title, .has-menu-bg .game-subtitle { display: none; }
+
+.menu-buttons { flex-direction: column; min-width: 280px; margin-top: 18px; }
+.menu-buttons > * { margin-bottom: 12px; }
+
+/* ---- Buttons ------------------------------------------------------------------ */
+.menu-btn {
+    font-size: 18px;
+    letter-spacing: 1px;
+    color: var(--parchment);
+    background-color: rgba(30, 21, 15, 0.95);
+    border-width: 2px; border-color: var(--gold);
+    border-radius: 8px;
+    padding: 12px 26px;
+    margin: 0;
+    flex-direction: row;
+    justify-content: center;
+    align-items: center;
+    transition-property: translate, border-color, color;
+    transition-duration: 0.15s;
+}
+.menu-btn:hover {
+    color: var(--gold-bright);
+    border-color: var(--gold-bright);
+    translate: 0 -2px;
+}
+.menu-btn.primary { border-color: var(--purple-bright); color: #ffffff; background-color: rgba(42, 21, 65, 0.95); }
+.menu-btn.primary:hover { border-color: #d6bcff; }
+.menu-btn.small { font-size: 14px; padding: 8px 16px; }
+.btn-icon { margin-right: 10px; }
+
+/* Button captions are child labels; colour them explicitly rather than relying
+   on inheritance past the default theme. */
+.btn-text { color: var(--parchment); padding: 0; margin: 0; }
+.menu-btn .btn-text { font-size: 18px; }
+.menu-btn.small .btn-text, .scene-back .btn-text, .bb-flee .btn-text, .tap-upload .btn-text, .tap-btn .btn-text { font-size: 14px; }
+.menu-btn:hover .btn-text, .scene-back:hover .btn-text, .bb-flee:hover .btn-text, .tap-btn:hover .btn-text { color: var(--gold-bright); }
+.menu-btn.primary .btn-text, .tap-upload .btn-text { color: #ffffff; }
+
+.footer-note {
+    margin-top: 26px;
+    color: rgba(233, 220, 191, 0.45);
+    -unity-font-style: italic;
+    font-size: 14px;
+}
+
+/* Clickable castle on the main menu (upper-right, over the painted castle). */
+.castle-hotspot {
+    position: absolute;
+    top: 8%; right: 6%;
+    background-color: rgba(0, 0, 0, 0);
+    border-width: 0;
+    border-radius: 12px;
+    align-items: center;
+    justify-content: flex-start;
+    margin: 0; padding: 0;
+}
+.castle-hotspot:hover { background-color: rgba(255, 215, 107, 0.06); }
+.castle-label {
+    flex-direction: row;
+    align-items: center;
+    font-size: 22px;
+    letter-spacing: 1px;
+    color: var(--gold-bright);
+    background-color: rgba(8, 6, 14, 0.55);
+    border-radius: 16px;
+    padding: 10px 26px;
+    margin-top: 26px;
+    text-shadow: 0 0 14px rgba(255, 215, 107, 0.85);
+    white-space: nowrap;
+}
+.castle-label Label { color: var(--gold-bright); text-shadow: 0 0 14px rgba(255, 215, 107, 0.85); }
+
+/* ---- Scene overlays and the 16:9 stage ------------------------------------- */
+.scene-overlay {
+    position: absolute;
+    left: 0; top: 0; right: 0; bottom: 0;
+    background-color: #05040a;
+    overflow: hidden;
+}
+.scene-stage {
+    position: absolute;
+    -unity-background-scale-mode: stretch-to-fill;
+}
+
+.scene-back {
+    position: absolute;
+    top: 18px; left: 18px;
+    font-size: 14px;
+    color: var(--parchment);
+    background-color: rgba(8, 6, 14, 0.85);
+    border-width: 2px; border-color: var(--gold);
+    border-radius: 8px;
+    padding: 8px 16px;
+    margin: 0;
+    flex-direction: row;
+    align-items: center;
+}
+.scene-back:hover { color: var(--gold-bright); border-color: var(--gold-bright); }
+
+.scene-hint {
+    position: absolute;
+    bottom: 22px;
+    align-self: center;
+    color: rgba(233, 220, 191, 0.7);
+    -unity-font-style: italic;
+    background-color: rgba(8, 6, 14, 0.7);
+    padding: 6px 16px;
+    border-radius: 16px;
+}
+.hint-row {
+    position: absolute;
+    left: 0; right: 0; bottom: 22px;
+    align-items: center;
+}
+.hint-row .scene-hint { position: relative; bottom: 0; }
+.scene-hint.flash { color: var(--gold-bright); }
+
+/* Door hotspots (positioned over the painted doors within the stage). */
+.door-hotspot {
+    position: absolute;
+    background-color: rgba(0, 0, 0, 0);
+    border-width: 2px; border-color: rgba(0, 0, 0, 0);
+    border-radius: 8px;
+    margin: 0; padding: 0;
+    overflow: visible;
+}
+.door-hotspot:hover { border-color: rgba(255, 235, 150, 0.8); background-color: rgba(255, 235, 150, 0.12); }
+.door-wizard { left: 9%; top: 19%; width: 25%; height: 60%; }
+.door-changing { left: 65%; top: 24%; width: 26%; height: 54%; }
+.door-label {
+    position: absolute;
+    bottom: 100%;
+    align-self: center;
+    white-space: nowrap;
+    padding: 4px 10px;
+    margin-bottom: 8px;
+    border-radius: 6px;
+    font-size: 9px;
+    border-width: 1px;
+}
+.door-label.wiz { color: #ff7ad0; background-color: rgba(10, 8, 20, 0.85); border-color: #7a3a8a; text-shadow: 0 0 6px #ff7ad0; }
+.door-label.chg { color: #e8d6a0; background-color: #3a2a18; border-color: #5a4226; }
+.has-corridor-img .door-label { display: none; }
+
+/* Fog transition */
+.scene-fog {
+    position: absolute;
+    left: 0; top: 0; right: 0; bottom: 0;
+    opacity: 0;
+    -unity-background-scale-mode: stretch-to-fill;
+    transition-property: opacity;
+    transition-duration: 0.36s;
+    transition-timing-function: ease-in-out;
+}
+.scene-fog.show { opacity: 1; }
+
+/* ---- Shop ------------------------------------------------------------------------ */
+.shop-gold {
+    position: absolute;
+    top: 18px; right: 22px;
+    font-size: 13px;
+    color: var(--gold-bright);
+    background-color: rgba(8, 6, 14, 0.85);
+    border-width: 2px; border-color: var(--gold);
+    border-radius: 8px;
+    padding: 8px 14px;
+    text-shadow: 0 0 8px rgba(255, 215, 107, 0.5);
+}
+.shop-marin-row {
+    position: absolute;
+    left: 0; right: 0; top: 15%;
+    align-items: center;
+}
+.shop-marin-line {
+    max-width: 60%;
+    white-space: normal;
+    -unity-text-align: middle-center;
+    -unity-font-style: italic;
+    color: var(--parchment);
+    background-color: rgba(10, 8, 20, 0.6);
+    padding: 6px 16px;
+    border-radius: 14px;
+}
+.marin-portrait {
+    position: absolute;
+    left: 3%; bottom: 18%;
+    -unity-background-scale-mode: stretch-to-fill;
+}
+.marin-sprite {
+    position: absolute;
+    -unity-background-scale-mode: stretch-to-fill;
+}
+.shop-panel {
+    position: absolute;
+    left: 0; right: 0; bottom: 0;
+    padding: 26px 16px 16px 16px;
+    -unity-background-scale-mode: stretch-to-fill;
+}
+.shop-title {
+    -unity-text-align: middle-center;
+    color: var(--gold-bright);
+    letter-spacing: 2px;
+    margin-bottom: 10px;
+    text-shadow: 0 0 10px rgba(255, 215, 107, 0.4);
+}
+.shop-counter {
+    flex-direction: row;
+    flex-wrap: wrap;
+    justify-content: center;
+    max-width: 1000px;
+    align-self: center;
+}
+.shop-item {
+    width: 168px;
+    margin: 6px;
+    padding: 10px 12px;
+    flex-direction: column;
+    align-items: flex-start;
+    justify-content: flex-start;
+    background-color: rgba(30, 22, 42, 0.95);
+    border-width: 2px; border-color: var(--gold);
+    border-radius: 10px;
+    color: var(--parchment);
+    transition-property: translate, border-color;
+    transition-duration: 0.15s;
+}
+.shop-item:hover { translate: 0 -4px; border-color: var(--gold-bright); }
+.shop-item.loom { border-color: var(--purple-bright); }
+.shop-item.loom:hover { border-color: #e0c8ff; }
+.si-icon { width: 24px; height: 24px; margin-bottom: 3px; }
+.si-name { color: var(--gold-bright); font-size: 15px; margin-bottom: 3px; }
+.si-desc { font-size: 12px; color: rgba(233, 220, 191, 0.75); white-space: normal; min-height: 30px; -unity-text-align: upper-left; }
+.si-price-row { flex-direction: row; align-items: center; margin-top: 4px; }
+.si-price { -unity-font-style: bold; color: var(--gold-bright); font-size: 11px; }
+.si-coin { width: 12px; height: 12px; margin-right: 4px; }
+
+/* ---- Modals (Loom, character select) --------------------------------------- */
+.modal {
+    position: absolute;
+    left: 0; top: 0; right: 0; bottom: 0;
+    background-color: rgba(3, 4, 10, 0.85);
+    align-items: center;
+    justify-content: center;
+}
+.modal-box {
+    background-color: rgba(21, 14, 32, 0.98);
+    border-width: 3px;
+    border-radius: 14px;
+    padding: 22px;
+}
+.tapestry-box { border-color: var(--purple-bright); }
+.char-box { border-color: var(--gold); padding: 24px; }
+.modal-title { font-size: 26px; }
+.tapestry-box .modal-title { color: var(--purple-bright); text-shadow: 0 0 12px rgba(185, 138, 255, 0.5); }
+.char-box .modal-title { color: var(--gold-bright); text-shadow: 0 0 10px rgba(255, 215, 107, 0.4); }
+.tap-sub { color: rgba(233, 220, 191, 0.8); -unity-font-style: italic; margin-top: 6px; margin-bottom: 14px; white-space: normal; }
+.tap-close {
+    position: absolute;
+    top: 10px; right: 12px;
+    width: 30px; height: 30px;
+    border-radius: 15px;
+    background-color: #3a2452;
+    border-width: 2px; border-color: var(--purple-bright);
+    padding: 0; margin: 0;
+    align-items: center; justify-content: center;
+}
+.tap-close:hover { background-color: #b04a3a; }
+.char-box .tap-close { border-color: var(--gold); }
+
+.tap-controls { flex-direction: row; flex-wrap: wrap; align-items: center; margin-bottom: 12px; }
+.tap-controls > * { margin-right: 10px; margin-bottom: 4px; }
+.tap-upload {
+    flex-direction: row;
+    align-items: center;
+    background-color: rgba(50, 27, 81, 0.95);
+    border-width: 2px; border-color: var(--purple-bright);
+    border-radius: 8px;
+    padding: 8px 14px;
+    color: #ffffff;
+    font-size: 14px;
+    margin-left: 0;
+}
+.tap-sel { flex-direction: row; align-items: center; }
+.tap-sel-label { font-size: 14px; color: var(--parchment); margin-right: 6px; }
+.tap-btn {
+    background-color: rgba(40, 30, 55, 0.9);
+    color: var(--parchment);
+    border-width: 1px; border-color: var(--gold);
+    border-radius: 6px;
+    padding: 6px 10px;
+    font-size: 14px;
+}
+.tap-btn:hover { border-color: var(--gold-bright); color: var(--gold-bright); }
+.tap-count { flex-direction: row; font-size: 14px; color: var(--parchment); margin-left: auto; }
+.tap-count-value { color: var(--gold-bright); -unity-font-style: bold; font-size: 14px; }
+.tap-stage { align-items: center; justify-content: center; }
+.tap-canvas {
+    border-width: 2px; border-color: #3a2c52;
+    border-radius: 6px;
+    background-color: #1a1622;
+}
+.tap-empty {
+    position: absolute;
+    color: rgba(233, 220, 191, 0.5);
+    -unity-font-style: italic;
+    -unity-text-align: middle-center;
+}
+.tap-foot { -unity-text-align: middle-center; color: rgba(233, 220, 191, 0.6); font-size: 13px; margin-top: 8px; }
+
+/* Dropdown (UI Toolkit DropdownField) restyled to match .tap-sel select */
+.tap-dropdown { margin: 0; min-width: 80px; }
+.tap-dropdown .unity-base-popup-field__input {
+    background-color: rgba(40, 30, 55, 0.9);
+    color: var(--parchment);
+    border-width: 1px; border-color: var(--gold);
+    border-radius: 6px;
+    padding: 4px 8px;
+}
+.tap-dropdown .unity-base-popup-field__text { color: var(--parchment); font-size: 14px; }
+
+/* Character select */
+.char-grid { flex-direction: row; flex-wrap: wrap; margin-top: 16px; }
+.char-card {
+    margin: 0 12px 12px 0;
+    padding: 8px;
+    flex-direction: column;
+    align-items: center;
+    background-color: rgba(40, 30, 55, 0.6);
+    border-width: 2px; border-color: rgba(202, 168, 77, 0.4);
+    border-radius: 10px;
+    color: var(--parchment);
+    transition-property: translate, border-color;
+    transition-duration: 0.15s;
+}
+.char-card:hover { border-color: var(--gold-bright); translate: 0 -3px; }
+.char-card.selected { border-color: var(--green-bright); background-color: rgba(40, 90, 60, 0.35); }
+.char-card.empty { opacity: 0.5; }
+.char-card.empty:hover { translate: 0 0; border-color: rgba(202, 168, 77, 0.4); }
+.char-thumb {
+    border-radius: 8px;
+    overflow: hidden;
+    background-color: #0c0a14;
+    align-items: center;
+    justify-content: center;
+    -unity-background-scale-mode: scale-and-crop;
+    margin-bottom: 6px;
+}
+.char-soon { font-size: 32px; color: rgba(233, 220, 191, 0.4); }
+.char-name { font-size: 13px; -unity-text-align: middle-center; color: var(--gold-bright); white-space: normal; }
+.char-card.empty .char-name { color: rgba(233, 220, 191, 0.5); }
+
+/* ---- Path (boss map) ------------------------------------------------------------ */
+.boss-hotspot {
+    position: absolute;
+    width: 16%; height: 28%;
+    background-color: rgba(0, 0, 0, 0);
+    border-width: 2px; border-color: rgba(0, 0, 0, 0);
+    border-radius: 12px;
+    margin: 0; padding: 0;
+    overflow: visible;
+    transition-property: border-color, background-color;
+    transition-duration: 0.15s;
+}
+.boss-hotspot:hover { border-color: rgba(255, 90, 90, 0.85); background-color: rgba(255, 90, 90, 0.12); }
+.boss-tip {
+    position: absolute;
+    bottom: 100%;
+    align-self: center;
+    margin-bottom: 4px;
+    background-color: rgba(8, 6, 14, 0.9);
+    border-width: 1px; border-color: #b03a3a;
+    border-radius: 8px;
+    padding: 5px 9px;
+    opacity: 0;
+    transition-property: opacity;
+    transition-duration: 0.15s;
+}
+.boss-tip Label { color: #ffd0c0; font-size: 9px; -unity-text-align: middle-center; white-space: nowrap; }
+.boss-tip-row { flex-direction: row; align-items: center; justify-content: center; }
+.boss-hotspot:hover .boss-tip { opacity: 1; }
+.boss-check {
+    position: absolute;
+    top: 4px; right: 6px;
+    width: 20px; height: 20px;
+    opacity: 0;
+}
+.boss-hotspot.defeated .boss-check { opacity: 1; }
+.boss-hotspot.defeated { opacity: 0.7; }
+
+.path-castle {
+    position: absolute;
+    right: 1%; top: 4%; width: 17%; height: 44%;
+    background-color: rgba(0, 0, 0, 0);
+    border-width: 2px; border-color: rgba(255, 215, 107, 0.25);
+    border-radius: 10px;
+    margin: 0; padding: 0;
+    justify-content: flex-end;
+    align-items: center;
+}
+.path-castle:hover { border-color: rgba(255, 215, 107, 0.85); background-color: rgba(255, 215, 107, 0.08); }
+.path-castle-label {
+    flex-direction: row;
+    align-items: center;
+    background-color: rgba(8, 6, 14, 0.85);
+    border-width: 1px; border-color: var(--gold);
+    border-radius: 14px;
+    padding: 5px 12px;
+    margin-bottom: 10px;
+}
+.path-castle-label Label { font-size: 13px; color: var(--gold-bright); text-shadow: 0 0 8px rgba(255, 215, 107, 0.6); white-space: nowrap; }
+
+/* ---- Boss battle overlay ---------------------------------------------------------- */
+.battle-root {
+    position: absolute;
+    left: 0; top: 0; right: 0; bottom: 0;
+}
+.bb-hud { position: absolute; }
+.bb-bar { position: absolute; background-color: rgba(8, 6, 14, 0.8); }
+.bb-bar-inner { position: absolute; background-color: #1a1014; }
+.bb-bar-fill { position: absolute; left: 0; top: 0; bottom: 0; }
+.bb-bar-label {
+    position: absolute; left: 0; right: 0; top: 0; bottom: 0;
+    color: #eeeeee;
+    -unity-font-style: bold;
+    -unity-text-align: middle-center;
+    padding: 0; margin: 0;
+}
+.bb-flee {
+    position: absolute;
+    top: 16px; left: 16px;
+    font-size: 14px;
+    color: var(--parchment);
+    background-color: rgba(8, 6, 14, 0.85);
+    border-width: 2px; border-color: var(--gold);
+    border-radius: 8px;
+    padding: 7px 14px;
+    margin: 0;
+    flex-direction: row;
+    align-items: center;
+}
+.bb-flee:hover { color: var(--gold-bright); border-color: var(--gold-bright); }
+.bb-hint-row { position: absolute; left: 0; right: 0; bottom: 14px; align-items: center; }
+.bb-hint {
+    color: rgba(233, 220, 191, 0.7);
+    font-size: 13px;
+    background-color: rgba(8, 6, 14, 0.6);
+    padding: 5px 14px;
+    border-radius: 14px;
+}
+.bb-result {
+    position: absolute;
+    left: 0; top: 0; right: 0; bottom: 0;
+    background-color: rgba(3, 4, 10, 0.8);
+    align-items: center;
+    justify-content: center;
+}
+.bb-result-title { font-size: 64px; letter-spacing: 8px; -unity-font-style: bold; margin-bottom: 10px; }
+.bb-result-title.win { color: var(--gold-bright); text-shadow: 0 0 30px rgba(255, 215, 107, 0.7); }
+.bb-result-title.lose { color: #ff5a4a; text-shadow: 0 0 30px rgba(255, 40, 40, 0.7); }
+.bb-result-sub { color: rgba(233, 220, 191, 0.85); -unity-font-style: italic; margin-bottom: 18px; }
+.bb-result-btns { flex-direction: row; justify-content: center; }
+.bb-result-btns > * { margin: 0 6px; }
