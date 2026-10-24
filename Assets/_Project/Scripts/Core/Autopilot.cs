@@ -109,6 +109,7 @@ namespace SpiceTrip.Core
             var battle = _g.Battle;
             Check("boss hotspot starts the battle", battle.Active && hub.Active == "battle");
             Check($"boss starts with {boss.hp} HP", battle.Sim != null && Mathf.Approximately(battle.Sim.Boss.maxHp, boss.hp));
+            Check($"{boss.name} fights in its own arena", battle.ShowingArenaArt);
             // Hold Space and strafe for a moment with real keyboard input.
             var kb = Keyboard.current ?? InputSystem.AddDevice<Keyboard>();
             InputSystem.QueueStateEvent(kb, new KeyboardState(Key.Space, Key.D));
@@ -258,6 +259,17 @@ namespace SpiceTrip.Core
             yield return Click(Q("bb-flee"), "Flee");
             yield return Wait(0.3f);
             Check("Flee returns to the Path", hub.Active == "path" && !battle.Active);
+
+            // the other two arenas
+            foreach (var other in new[] { ctx.Db.bosses[2], ctx.Db.bosses[1] })
+            {
+                yield return Click(hub.Path.BossButton(other.id), other.name);
+                yield return Wait(1.5f);
+                Check($"{other.name} fights in its own arena", battle.Active && battle.ShowingArenaArt);
+                yield return Shot("arena-" + other.id);
+                yield return Click(Q("bb-flee"), "Flee");
+                yield return Wait(0.3f);
+            }
 
             yield return Click(Q("scene-path").Q(className: "scene-back"), "leave");
             yield return Wait(0.3f);

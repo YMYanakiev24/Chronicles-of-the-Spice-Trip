@@ -85,10 +85,10 @@ MonoBehaviour:
     cy: 0.31
     portraitRect:
       serializedVersion: 2
-      x: 0.06
-      y: 0.29
-      width: 0.58
-      height: 0.268
+      x: 0.04
+      y: 0.3
+      width: 0.49
+      height: 0.226
   - id: mordekai
     name: Mordekai
     img: mordekai.jpg

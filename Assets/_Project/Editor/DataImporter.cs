@@ -44,7 +44,7 @@ namespace SpiceTrip.EditorTools
             ["fairy"] = new Rect(0.38f, 0.320f, 0.56f, 0.258f),        // 443×960: fairy by the trailer
             // bosses
             ["goodPlaz"] = new Rect(0.00f, 0.325f, 0.50f, 0.231f),     // 443×960: form 1
-            ["badPlaz"] = new Rect(0.06f, 0.290f, 0.58f, 0.268f),      // 443×960: form 1
+            ["badPlaz"] = new Rect(0.04f, 0.300f, 0.49f, 0.226f),      // 443×960: form 1 (left of the "multiplies" caption)
             ["mordekai"] = new Rect(0.22f, 0.300f, 0.70f, 0.323f),     // 443×960: bird-man
             ["vlado"] = new Rect(0.18f, 0.170f, 0.62f, 0.286f),        // 443×960: the conductor
         };

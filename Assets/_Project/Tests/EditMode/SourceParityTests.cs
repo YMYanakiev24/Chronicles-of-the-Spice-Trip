@@ -105,6 +105,15 @@ namespace SpiceTrip.Tests
         }
 
         [Test]
+        public void EveryBossFightsInItsOwnArena()
+        {
+            // arena-<bossId>.jpg: Mordekai the blue ruins, Vlado the Sephora bus stop,
+            // the Bad Plasmodium the purple ruins, the Good Plazmodium the dark green ruins
+            foreach (var b in _db.bosses)
+                FileAssert.Exists(Path.Combine(Application.streamingAssetsPath, "assets", $"arena-{b.id}.jpg"), b.id);
+        }
+
+        [Test]
         public void PortraitCropsStayInsideTheirImages()
         {
             foreach (var r in DataImporter.PortraitCrops.Values)

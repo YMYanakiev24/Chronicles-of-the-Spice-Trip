@@ -43,6 +43,8 @@ namespace SpiceTrip.Battle
 
         // scene objects
         SpriteRenderer _playerSr, _playerShadow;
+        SpriteRenderer _arenaArt;                       // a boss's own backdrop (arena-<bossId>.jpg)
+        readonly List<SpriteRenderer> _forest = new List<SpriteRenderer>();   // the procedural night forest
         Sprite _bossSprite, _feather, _ticket, _seed, _koi, _bus, _ring;
         readonly List<SpriteRenderer> _draws = new List<SpriteRenderer>();
         int _drawn;
@@ -210,17 +212,25 @@ namespace SpiceTrip.Battle
             var skyTex = sky.ToTexture(null, FilterMode.Bilinear);
             var skySr = Make("Sky", Sprite.Create(skyTex, new UnityEngine.Rect(0, 0, 1, 128), new Vector2(0.5f, 0.5f), 1), _alpha, 0, Color.white);
             Rect(skySr, 0, 0, AW, AH);
+            _forest.Add(skySr);
+
+            // A boss's painted arena replaces the forest when its image exists.
+            _arenaArt = Make("ArenaArt", _white, _alpha, 0, Color.white);
+            _arenaArt.enabled = false;
 
             // moon halo + moon
             float mx = AW * 0.8f, my = AH * 0.18f;
             var halo = Make("MoonHalo", _glow, _alpha, 1, new Color(180 / 255f, 170 / 255f, 210 / 255f, 0.35f));
             Rect(halo, mx - 90, my - 90, 180, 180);
+            _forest.Add(halo);
             var moon = Make("Moon", _circle, _alpha, 2, PixelCanvas.Col("#c9c2dd"));
             Rect(moon, mx - 26, my - 26, 52, 52);
+            _forest.Add(moon);
 
             // ground
             var ground = Make("Ground", _white, _alpha, 3, PixelCanvas.Col("#0e1a12"));
             Rect(ground, 0, AH * 0.82f, AW, AH * 0.18f);
+            _forest.Add(ground);
 
             // trees are placed in Start() of each fight (random, like _spawnTrees)
             // fog bands: 3 rows of ellipses, screen-blended
@@ -251,7 +261,38 @@ namespace SpiceTrip.Battle
             _playerShadow = Make("PlayerShadow", _ellipse, _alpha, 51, new Color(0, 0, 0, 0.35f));
         }
 
-        void SpawnTrees()
+        /// <summary>
+        /// The boss's painted arena (StreamingAssets/assets/arena-&lt;bossId&gt;.png or .jpg),
+        /// cover-fitted to the 16:9 arena; null when there is none.
+        /// </summary>
+        Sprite ArenaArt(string bossId)
+        {
+            string name = "arena-" + bossId;
+            var tex = ArtLibrary.Load(name);
+            if (tex == null) return null;
+            var r = LoomModel.CoverRect(tex.width, tex.height, T.arenaWidth / T.arenaHeight);
+            return ArtLibrary.Crop(name, new UnityEngine.Rect(r.x / tex.width, r.y / tex.height, r.width / tex.width, r.height / tex.height));
+        }
+
+        public bool ShowingArenaArt => _arenaArt != null && _arenaArt.enabled;
+
+        void SetBackdrop(BossDef boss)
+        {
+            var art = ArenaArt(boss.id);
+            _arenaArt.enabled = art != null;
+            if (art != null)
+            {
+                _arenaArt.sprite = art;
+                Rect(_arenaArt, 0, 0, T.arenaWidth, T.arenaHeight);
+            }
+            foreach (var r in _forest) r.enabled = art == null;
+            // The forest's drifting fog bands read as grey stripes over a painting, so they go too.
+            foreach (var f in _fog) f.enabled = art == null;
+            ClearTrees();
+            if (art == null) SpawnTrees();
+        }
+
+        void ClearTrees()
         {
             foreach (var t in _trees)
             {
@@ -259,6 +300,11 @@ namespace SpiceTrip.Battle
                 foreach (var part in t.parts) Destroy(part.gameObject);
             }
             _trees.Clear();
+        }
+
+        void SpawnTrees()
+        {
+            ClearTrees();
             float AW = T.arenaWidth, AH = T.arenaHeight;
             float R() => UnityEngine.Random.value;
             var black = PixelCanvas.Col("#05060a");
@@ -414,7 +460,7 @@ namespace SpiceTrip.Battle
             else _playerIsHero = false;
             _playerSr.sprite = playerSprite;
 
-            SpawnTrees();
+            SetBackdrop(boss);
             _ctx.Audio.PlayMusic("caves");   // tense bed
             LayoutArena();
             Render();

@@ -77,6 +77,7 @@ missing, the procedural pixel scene is drawn instead.
 | `shop.jpg` | Marin's Apothecary |
 | `marin.png` | Marin's portrait (transparent cut-out, top 64% shown) |
 | champion and boss sheets | Changing Room cards and battle sprites (cropped, see `DataImporter.PortraitCrops`) |
+| `arena-<bossId>.jpg` | That boss's fight background, cover-fitted to the 16:9 arena: `arena-mordekai`, `arena-vlado`, `arena-badPlaz`, `arena-goodPlaz`. Without one, the fight uses the original moonlit forest. |
 
 ## Tests
 
