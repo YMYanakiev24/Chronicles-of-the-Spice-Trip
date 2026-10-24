@@ -55,7 +55,18 @@ namespace SpiceTrip.Battle
 
         // UI overlay
         VisualElement _root, _hud, _result, _bossFill, _playerFill;
-        Label _bossLabel, _resultTitle, _resultSub, _hint;
+        Label _bossLabel, _resultTitle, _resultSub, _hint, _resultReward, _resultTime, _stageBanner;
+        VisualElement _stars;
+        readonly List<(VisualElement slot, Label count)> _itemSlots = new List<(VisualElement, Label)>();
+
+        // The Gauntlet: all four bosses back to back, health carried between stages.
+        class GauntletRun { public int stage; public float totalTime, carryHp; }
+        GauntletRun _run;
+        float _nextStageAt = -1;
+        public bool InGauntlet => _run != null;
+        public int GauntletStage => _run?.stage ?? -1;
+        public Progression.Reward? LastReward { get; private set; }
+        public bool StageTransition => _nextStageAt >= 0;
         readonly List<VisualElement> _kitBars = new List<VisualElement>();
         readonly List<(VisualElement fill, Label label, Func<float> value, Func<string> text)> _kitMeters = new List<(VisualElement, Label, Func<float>, Func<string>)>();
         ClickEl _flee;
@@ -353,6 +364,28 @@ namespace SpiceTrip.Battle
             you.text = "YOU";
             _root.Add(_hud);
 
+            // Marin's battle items: three slots above the health bar, keys 1–3.
+            for (int i = 0; i < 3; i++)
+            {
+                var slot = El("bb-item");
+                slot.userData = new UnityEngine.Rect(20 + i * 40, T.arenaHeight - 66, 34, 34);
+                slot.name = "bb-item-" + (i + 1);
+                var icon = El("bb-item-icon");
+                slot.Add(icon);
+                var key = Lbl((i + 1).ToString(), "bb-item-key");
+                slot.Add(key);
+                var count = Lbl("0", "bb-item-count");
+                slot.Add(count);
+                _hud.Add(slot);
+                _itemSlots.Add((slot, count));
+            }
+
+            var stageRow = El("bb-stage-row");
+            stageRow.pickingMode = PickingMode.Ignore;
+            _stageBanner = Lbl("", "bb-stage-banner hidden");
+            stageRow.Add(_stageBanner);
+            _root.Add(stageRow);
+
             _flee = Btn("Flee", "bb-flee", Stop, "back", 10);
             _flee.name = "bb-flee";
             _root.Add(_flee);
@@ -367,8 +400,15 @@ namespace SpiceTrip.Battle
             _resultSub = Lbl("", "bb-result-sub");
             _result.Add(_resultTitle);
             _result.Add(_resultSub);
+            _stars = El("bb-stars");
+            _result.Add(_stars);
+            _resultReward = Lbl("", "bb-result-reward");
+            _resultReward.name = "bb-reward";
+            _result.Add(_resultReward);
+            _resultTime = Lbl("", "bb-result-time");
+            _result.Add(_resultTime);
             var btns = El("bb-result-btns");
-            var again = Btn("Fight again", "menu-btn", () => Begin(_boss, _char));
+            var again = Btn("Fight again", "menu-btn", () => { if (_run != null) BeginGauntlet(_char); else Begin(_boss, _char); });
             again.name = "bb-again";
             var ret = Btn("Return to the path", "menu-btn primary", Stop);
             ret.name = "bb-return";
@@ -432,12 +472,43 @@ namespace SpiceTrip.Battle
         // =====================================================================
         public void Begin(BossDef boss, CharacterDef ch)
         {
+            _run = null;
+            BeginFight(boss, ch);
+        }
+
+        /// <summary>Starts the Gauntlet: every boss in order, health carried between stages.</summary>
+        public void BeginGauntlet(CharacterDef ch)
+        {
+            _run = new GauntletRun();
+            BeginFight(_ctx.Db.Boss(_ctx.Db.gauntlet.order[0]), ch);
+        }
+
+        void BeginFight(BossDef boss, CharacterDef ch)
+        {
             _boss = boss;
             _char = ch;
+            _nextStageAt = -1;
+            LastReward = null;
+            Show(_stageBanner, false);
             _kit = ch != null ? _ctx.Db.ChampionKit(ch.id) : null;
             Sim = new BattleSim(T, boss, null, _kit, _ctx.Db.BossKit(boss.id));
             Sim.OnSfx += s => _ctx.Audio.Sfx(s);
             Sim.OnEnd += End;
+            var defs = _ctx.Db.battleItems;
+            Sim.LoadItems(defs, defs.ConvertAll(d => _ctx.Hub.SatchelCount(d.id)));
+            Sim.OnItemUsed += slot =>
+            {
+                _ctx.Hub.SetSatchel(defs[slot].id, Sim.ItemCounts[slot]);   // used items are gone even if you flee
+                _ctx.SaveHub();
+            };
+            if (_run != null && _run.stage > 0)
+                Sim.Player.hp = Mathf.Min(Sim.Player.maxHp, _run.carryHp + _ctx.Db.gauntlet.healBetween);
+            for (int i = 0; i < _itemSlots.Count; i++)
+            {
+                var icon = _itemSlots[i].slot.Q(className: "bb-item-icon");
+                icon.Clear();
+                if (i < defs.Count) icon.Add(Icon(defs[i].icon, 20));
+            }
             UiKit.Show(_root, true);
             UiKit.Show(_result, false);
             _world.gameObject.SetActive(true);
@@ -470,6 +541,8 @@ namespace SpiceTrip.Battle
 
         public void Stop()
         {
+            _run = null;
+            _nextStageAt = -1;
             Sim = null;
             UiKit.Show(_root, false);
             _world.gameObject.SetActive(false);
@@ -480,14 +553,65 @@ namespace SpiceTrip.Battle
 
         void End(bool win)
         {
-            _resultTitle.text = win ? "VICTORY" : "DEFEATED";
+            var hub = _ctx.Hub;
+            float hpRatio = Mathf.Max(0, Sim.Player.hp) / Sim.Player.maxHp;
+            Progression.Reward? reward = null;
+            string title = win ? "VICTORY" : "DEFEATED";
+            string sub;
+
+            if (_run != null)
+            {
+                var order = _ctx.Db.gauntlet.order;
+                _run.totalTime += Sim.EndTime;
+                if (win) _onBossDefeated?.Invoke(_boss.id);
+                if (win && _run.stage < order.Count - 1)
+                {
+                    // On to the next boss after a short breath.
+                    _run.carryHp = Sim.Player.hp;
+                    _run.stage++;
+                    var next = _ctx.Db.Boss(order[_run.stage]);
+                    _stageBanner.text = $"STAGE {_run.stage + 1} / {order.Count}  —  {next.name.ToUpperInvariant()}";
+                    Show(_stageBanner, true);
+                    _nextStageAt = Time.unscaledTime + 1.6f;
+                    return;
+                }
+                if (win)
+                {
+                    var g = _ctx.Db.gauntlet;
+                    reward = Progression.RecordWin(hub, Progression.GauntletId, g.first, g.repeat, g.par, hpRatio, _run.totalTime);
+                    title = "GAUNTLET CONQUERED";
+                    sub = "All four have fallen, one after another.";
+                }
+                else sub = $"You fell at stage {_run.stage + 1} of {order.Count}, to {_boss.name}.";
+            }
+            else if (win)
+            {
+                var b = _ctx.Db.Bounty(_boss.id);
+                if (b != null) reward = Progression.RecordWin(hub, _boss.id, b.first, b.repeat, b.par, hpRatio, Sim.EndTime);
+                sub = $"{_boss.name} has fallen.";
+                _onBossDefeated?.Invoke(_boss.id);
+            }
+            else sub = $"{_boss.name} bested you. Steel yourself and try again.";
+
+            if (reward.HasValue) _ctx.SaveHub();
+            LastReward = reward;
+            _resultTitle.text = title;
             _resultTitle.EnableInClassList("win", win);
             _resultTitle.EnableInClassList("lose", !win);
-            _resultSub.text = win
-                ? $"{_boss.name} has fallen."
-                : $"{_boss.name} bested you. Steel yourself and try again.";
+            _resultSub.text = sub;
+            _stars.Clear();
+            if (reward.HasValue)
+            {
+                var r = reward.Value;
+                for (int i = 0; i < 3; i++) _stars.Add(Icon(i < r.stars ? "star" : "star-empty", 30, "bb-star"));
+                _resultReward.text = $"+{r.gold} gold" + (r.firstWin ? "  ·  first victory bounty" : "") + (r.newBestStars && !r.firstWin ? "  ·  new best rating" : "");
+                float par = _run != null ? _ctx.Db.gauntlet.par : _ctx.Db.Bounty(_boss.id)?.par ?? 0;
+                _resultTime.text = $"Time {Progression.Clock(r.time)}  ·  best {Progression.Clock(r.bestTime)}  ·  par {Progression.Clock(par)}" + (r.newBestTime && !r.firstWin ? "  ·  new record!" : "");
+            }
+            else { _resultReward.text = ""; _resultTime.text = ""; }
+            Show(_resultReward, reward.HasValue);
+            Show(_resultTime, reward.HasValue);
             UiKit.Show(_result, true);
-            if (win) _onBossDefeated?.Invoke(_boss.id);
         }
 
         public bool ResultShowing => _result != null && !_result.ClassListContains("hidden");
@@ -499,9 +623,18 @@ namespace SpiceTrip.Battle
         void Update()
         {
             if (!Active) return;
+            if (_nextStageAt >= 0 && Time.unscaledTime >= _nextStageAt)
+            {
+                var order = _ctx.Db.gauntlet.order;
+                BeginFight(_ctx.Db.Boss(order[_run.stage]), _char);
+                return;
+            }
             Sim.Step(Time.deltaTime, ScriptedInput ?? ReadInput());
             Render();
         }
+
+        /// <summary>Skips the pause between Gauntlet stages (tests and the autopilot).</summary>
+        public void SkipStageTransition() { if (_nextStageAt >= 0) _nextStageAt = 0; }
 
         BattleSim.Inputs ReadInput()
         {
@@ -516,6 +649,9 @@ namespace SpiceTrip.Battle
                 if (kb.dKey.isPressed || kb.rightArrowKey.isPressed) inp.move.x += 1;
                 inp.shoot |= kb.spaceKey.isPressed;
                 inp.special |= kb.qKey.wasPressedThisFrame;
+                if (kb.digit1Key.wasPressedThisFrame) inp.itemSlot = 1;
+                else if (kb.digit2Key.wasPressedThisFrame) inp.itemSlot = 2;
+                else if (kb.digit3Key.wasPressedThisFrame) inp.itemSlot = 3;
             }
             if (mouse != null)
             {
@@ -663,6 +799,14 @@ namespace SpiceTrip.Battle
             _playerShadow.transform.localPosition = W(p.x, p.y + 16);
             Size(_playerShadow, 28 / grow, 10 / grow);
 
+            // Swiftwing Elixir glow and Warding Charm orbs
+            if (Sim.SwiftT > 0) D(_glow, _additive, 49, p.x, p.y + 8, 70, 30, 0, new Color(0.5f, 1f, 0.6f, 0.45f));
+            for (int i = 0; i < Sim.WardHits; i++)
+            {
+                float a = t * 3 + i * Mathf.PI * 2 / Mathf.Max(1, Sim.WardHits);
+                D(_glow, _additive, 56, p.x + Mathf.Cos(a) * 26, p.y + Mathf.Sin(a) * 26, 16, 16, 0, new Color(0.55f, 0.8f, 1f, 0.9f));
+            }
+
             // Atanas' calm aura and Nikolay's mug-shield
             if (Sim.AuraT > 0)
             {
@@ -694,6 +838,12 @@ namespace SpiceTrip.Battle
             _bossFill.style.width = Length.Percent(Sim.BossHpRatio * 100);
             _playerFill.style.width = Length.Percent(Mathf.Max(0, p.hp / p.maxHp) * 100);
             _bossLabel.text = _boss.name.ToUpperInvariant() + (Sim.Units.Count > 1 ? $"  ×{Sim.Units.Count}" : "");
+            for (int i = 0; i < _itemSlots.Count; i++)
+            {
+                int n = i < Sim.ItemCounts.Count ? Sim.ItemCounts[i] : 0;
+                _itemSlots[i].count.text = n.ToString();
+                _itemSlots[i].slot.EnableInClassList("empty", n == 0);
+            }
             foreach (var (fill, label, value, text) in _kitMeters)
             {
                 fill.style.width = Length.Percent(Mathf.Clamp01(value()) * 100);

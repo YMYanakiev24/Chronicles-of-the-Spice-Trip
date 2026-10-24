@@ -76,6 +76,14 @@ namespace SpiceTrip.Data
         public RewardDef rewards = new RewardDef();
     }
 
+    /// <summary>Quest items scattered in a realm (chronicle-extra.json).</summary>
+    [Serializable]
+    public class PickupDef
+    {
+        public string region, item, type, color;
+        public int count;
+    }
+
     [Serializable]
     public class NpcDef
     {

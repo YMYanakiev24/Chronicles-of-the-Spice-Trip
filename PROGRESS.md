@@ -76,6 +76,25 @@ warnings.
 **Not verified:** how the new fights feel to play. The numbers come straight
 from the design table; tune them in `abilities.json` after playing.
 
+## More things to do ✅ (built 2026-10-24)
+
+| Area | Status | Verified by |
+| --- | --- | --- |
+| Boss bounties (first win / repeat), 1–3 star ratings, best times on the Path | ✅ | `BountyTests`, autopilot (bounty paid, Path shows the ratings) + screenshots |
+| Marin's battle wares (Healing Draught, Swiftwing Elixir, Warding Charm), carry limit 3 each, keys 1–3 in fights | ✅ | `BattleItemTests`, `MarinBattleWaresTests`, autopilot (buys a draught, drinks it with a real key 1 press) |
+| The Gauntlet: unlocks after all four, back to back, stage banners, health carried over, own bounty and best time | ✅ | `MarinBattleWaresTests`, PlayMode `TheGauntletRunsAllFourBossesAndPaysOut`, autopilot + screenshots |
+| A quest-giver and quest in each realm beyond the Mistwood (Nerissa, Damon, Ione, Captain Aster, the Herald) | ✅ | `RealmQuestTests` (all five), autopilot talks to Damon and gathers the Grave Tokens |
+| Quest items (Grave Tokens, Star Embers) scattered by a fixed seed, at least 6 tiles from spawn | ✅ | `RealmQuestTests`; the map-parity hashes still match because they're added after the original map is built |
+| The "E — Speak with…" prompt no longer shows through an open dialogue | ✅ | Screenshot |
+| The autopilot empties its own `-savedir` first, so "first win" checks hold on every run | ✅ | Passes when run over the previous run's save |
+
+**Test results:** EditMode 95/95, PlayMode 8/8, autopilot 84/84 checks.
+Windows build: 0 errors, 0 warnings.
+
+**Not verified:** the new prices, bounties and par times haven't been
+play-tested by hand. They are all in `progression.json` and
+`chronicle-extra.json`, ready to tune.
+
 ## Open questions for you
 
 1. What is the `TopChuk` quest reward?

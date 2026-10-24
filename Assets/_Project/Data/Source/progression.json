@@ -1,0 +1,30 @@
+{
+  "_comment": "Boss-fight progression: bounties paid into Marin's wallet, star ratings, the Gauntlet and the battle items Marin sells. Edit and run Spice Trip > Rebuild Project. Times are seconds.",
+  "bounties": [
+    { "id": "goodPlaz", "first": 150, "repeat": 40, "par": 45 },
+    { "id": "badPlaz",  "first": 200, "repeat": 50, "par": 60 },
+    { "id": "mordekai", "first": 180, "repeat": 45, "par": 50 },
+    { "id": "vlado",    "first": 250, "repeat": 60, "par": 70 }
+  ],
+  "gauntlet": {
+    "order": [ "goodPlaz", "badPlaz", "mordekai", "vlado" ],
+    "first": 600, "repeat": 150, "par": 240, "healBetween": 20
+  },
+  "battleItems": [
+    {
+      "id": "healingDraught", "name": "Healing Draught", "icon": "draught", "price": 60, "max": 3,
+      "effect": "heal", "value": 35, "duration": 0,
+      "desc": "Boss fights: restores 35 health. Press 1 to drink."
+    },
+    {
+      "id": "swiftwingElixir", "name": "Swiftwing Elixir", "icon": "swift", "price": 90, "max": 3,
+      "effect": "swift", "value": 0.4, "duration": 6,
+      "desc": "Boss fights: 40% faster feet and shots for 6 seconds. Press 2."
+    },
+    {
+      "id": "wardingCharm", "name": "Warding Charm", "icon": "charm", "price": 120, "max": 3,
+      "effect": "ward", "value": 3, "duration": 0,
+      "desc": "Boss fights: the next 3 hits are turned aside. Press 3."
+    }
+  ]
+}

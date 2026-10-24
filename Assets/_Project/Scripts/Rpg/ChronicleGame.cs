@@ -142,6 +142,7 @@ namespace SpiceTrip.Rpg
             CurrentRegion = regionId;
             var region = Db.Region(regionId);
             Map.Load(regionId);
+            Map.AddQuestPickups(Db.questPickups);
             Enemies.Clear();
             Npcs.Clear();
             Magic.Clear();

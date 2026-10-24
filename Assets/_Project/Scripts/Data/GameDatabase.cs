@@ -79,11 +79,24 @@ namespace SpiceTrip.Data
         public List<string> questOrder = new List<string>();
         public List<NpcDef> npcs = new List<NpcDef>();
 
+        // New Chronicle content (chronicle-extra.json): realm quest items and where to find them.
+        // Kept apart from `items` so the original GameData items stay exactly as exported.
+        public List<ItemDef> extraItems = new List<ItemDef>();
+        public List<PickupDef> questPickups = new List<PickupDef>();
+
         // Phase 3 abilities (from abilities.json)
         public List<BossKitDef> bossKits = new List<BossKitDef>();
         public List<ChampionKitDef> championKits = new List<ChampionKitDef>();
 
         public BossKitDef BossKit(string id) => bossKits.Find(k => k.id == id);
+
+        // Boss-fight progression (from progression.json)
+        public List<BountyDef> bounties = new List<BountyDef>();
+        public GauntletDef gauntlet = new GauntletDef();
+        public List<BattleItemDef> battleItems = new List<BattleItemDef>();
+
+        public BountyDef Bounty(string id) => bounties.Find(b => b.id == id);
+        public BattleItemDef BattleItem(string id) => battleItems.Find(b => b.id == id);
         public ChampionKitDef ChampionKit(string id) => championKits.Find(k => k.id == id);
 
         public RegionDef Region(string id) => regions.Find(r => r.id == id);
@@ -107,7 +120,7 @@ namespace SpiceTrip.Data
             }
         }
 
-        public ItemDef Item(string id) => items.Find(i => i.id == id);
+        public ItemDef Item(string id) => items.Find(i => i.id == id) ?? extraItems.Find(i => i.id == id);
         public BossDef Boss(string id) => bosses.Find(b => b.id == id);
         public CharacterDef Character(string id) => characters.Find(c => c.id == id);
     }

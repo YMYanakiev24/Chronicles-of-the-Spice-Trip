@@ -80,8 +80,11 @@ namespace SpiceTrip.Hub
     public class PathScreen : SceneScreen
     {
         readonly Dictionary<string, VisualElement> _bossEls = new Dictionary<string, VisualElement>();
+        readonly Dictionary<string, (VisualElement stars, Label best)> _ratings = new Dictionary<string, (VisualElement, Label)>();
+        readonly Label _gold, _gauntletText;
+        public readonly ClickEl GauntletButton;
 
-        public PathScreen(GameContext ctx, Action<BossDef> onFight, Action onCastle, Action onLeave)
+        public PathScreen(GameContext ctx, Action<BossDef> onFight, Action onCastle, Action onLeave, Action onGauntlet = null)
             : base(ctx, "scene-path", "path")
         {
             var host = El(null, "path-bosses");
@@ -104,6 +107,13 @@ namespace SpiceTrip.Hub
                 row.Add(Lbl($"Boss {i + 1}"));
                 tip.Add(row);
                 tip.Add(Lbl(boss.name));
+                var rating = El("boss-tip-row boss-rating");
+                var stars = El("boss-stars");
+                rating.Add(stars);
+                var best = Lbl("", "boss-best");
+                rating.Add(best);
+                tip.Add(rating);
+                _ratings[boss.id] = (stars, best);
                 tip.pickingMode = PickingMode.Ignore;
                 b.Add(tip);
                 b.Add(Icon("check", 20, "boss-check"));
@@ -122,6 +132,45 @@ namespace SpiceTrip.Hub
 
             BackButton("Leave", onLeave);
             Hint("Click a boss to fight · enter the castle for the shop & changing room");
+
+            // Marin's wallet: boss bounties are paid into it.
+            var goldBox = El("path-gold");
+            goldBox.Add(Icon("coin", 14, "btn-icon"));
+            _gold = Lbl("0", "path-gold-text");
+            goldBox.Add(_gold);
+            Root.Add(goldBox);
+
+            // The Gauntlet: all four bosses back to back, once each has fallen.
+            var gauntletRow = El("gauntlet-row");
+            gauntletRow.pickingMode = PickingMode.Ignore;
+            GauntletButton = new ClickEl(() => onGauntlet?.Invoke()) { name = "btn-gauntlet" };
+            GauntletButton.AddToClassList("gauntlet-btn");
+            GauntletButton.Add(Icon("swords", 14, "btn-icon"));
+            _gauntletText = Lbl("The Gauntlet", "gauntlet-text");
+            GauntletButton.Add(_gauntletText);
+            gauntletRow.Add(GauntletButton);
+            Root.Add(gauntletRow);
+        }
+
+        public bool GauntletUnlocked { get; private set; }
+
+        /// <summary>Gold, star ratings and best times, and whether the Gauntlet is open.</summary>
+        public void RefreshProgress(HubData hub, ICollection<string> defeated)
+        {
+            _gold.text = hub.gold.ToString();
+            foreach (var kv in _ratings)
+            {
+                var rec = hub.records.Find(r => r.id == kv.Key);
+                kv.Value.stars.Clear();
+                for (int i = 0; i < 3; i++) kv.Value.stars.Add(Icon(rec != null && i < rec.bestStars ? "star" : "star-empty", 9));
+                kv.Value.best.text = rec != null && rec.bestTime > 0 ? "best " + Battle.Progression.Clock(rec.bestTime) : "unbeaten";
+            }
+            GauntletUnlocked = Ctx.Db.bosses.TrueForAll(b => defeated.Contains(b.id));
+            GauntletButton.EnableInClassList("locked", !GauntletUnlocked);
+            var g = hub.records.Find(r => r.id == Battle.Progression.GauntletId);
+            _gauntletText.text = !GauntletUnlocked ? "The Gauntlet — defeat all four to unlock"
+                : g != null && g.bestTime > 0 ? $"The Gauntlet — best {Battle.Progression.Clock(g.bestTime)}"
+                : "The Gauntlet — all four, back to back";
         }
 
         public VisualElement BossButton(string id) => _bossEls.TryGetValue(id, out var e) ? e : null;
@@ -172,9 +221,13 @@ namespace SpiceTrip.Hub
         Texture2D _marinTex;
         readonly bool _marinPhoto;
 
-        public ShopScreen(GameContext ctx, Action<ShopEntry> onBuy, Action onLoom, Action onBack)
+        readonly Dictionary<string, Label> _carried = new Dictionary<string, Label>();
+        readonly Action<BattleItemDef> _onBuyBattle;
+
+        public ShopScreen(GameContext ctx, Action<ShopEntry> onBuy, Action onLoom, Action onBack, Action<BattleItemDef> onBuyBattle = null)
             : base(ctx, "scene-shop", "shop")
         {
+            _onBuyBattle = onBuyBattle;
             // The shop photo has no character, so Marin's pixel sprite stands in it
             // unless his portrait art (marin.png) replaces it.
             _marinSprite = El("marin-sprite hidden");
@@ -283,6 +336,33 @@ namespace SpiceTrip.Hub
             tryRow[1].style.marginLeft = 4;
             loom.Add(tryRow);
             _counter.Add(loom);
+
+            // Battle wares: carried into boss fights (keys 1–3), up to a few of each.
+            foreach (var bi in Ctx.Db.battleItems)
+            {
+                var def = bi;
+                var card = new ClickEl(() => _onBuyBattle?.Invoke(def)) { name = "shop-battle-" + bi.id };
+                card.AddToClassList("shop-item");
+                card.AddToClassList("battle");
+                card.Add(Icon(bi.icon, 24, "si-icon"));
+                card.Add(Lbl(bi.name, "si-name"));
+                card.Add(Lbl(bi.desc, "si-desc"));
+                var price = El("si-price-row");
+                price.Add(Icon("coin", 12, "si-coin"));
+                price.Add(Lbl(bi.price.ToString(), "si-price"));
+                var carried = Lbl("", "si-carried");
+                price.Add(carried);
+                _carried[bi.id] = carried;
+                card.Add(price);
+                _counter.Add(card);
+            }
+            RefreshCarried();
+        }
+
+        public void RefreshCarried()
+        {
+            foreach (var bi in Ctx.Db.battleItems)
+                if (_carried.TryGetValue(bi.id, out var l)) l.text = $"carried {Ctx.Hub.SatchelCount(bi.id)}/{bi.max}";
         }
 
         public void SetGold(int gold) => _gold.text = gold.ToString();

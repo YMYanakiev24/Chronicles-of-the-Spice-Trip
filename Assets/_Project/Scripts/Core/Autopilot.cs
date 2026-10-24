@@ -150,6 +150,7 @@ namespace SpiceTrip.Core
             }
             battle.ScriptedInput = null;
             Check("winning shows VICTORY", battle.ResultTitle == "VICTORY");
+            Check("the first victory pays the bounty", battle.LastReward.HasValue && battle.LastReward.Value.firstWin && battle.LastReward.Value.gold == ctx.Db.Bounty(boss.id).first);
             Check("victory is saved", ctx.Hub.defeated.Contains(boss.id));
             yield return Shot("victory");
 
@@ -180,6 +181,9 @@ namespace SpiceTrip.Core
             Check($"buying {first.id} costs {first.price}", ctx.Hub.gold == gold - first.price);
             Check("purchase goes to the stash", ctx.Hub.StashCount(first.id) >= 1);
             Check("Marin thanks you", hub.Shop.MarinLine.Contains("A fine choice"));
+            yield return Click(Q("shop-battle-healingDraught"), "buy a Healing Draught");
+            yield return Wait(0.2f);
+            Check("Marin's battle wares go to the battle satchel", ctx.Hub.SatchelCount("healingDraught") == 1);
             yield return Shot("shop-bought");
 
             int saved = ctx.Hub.gold;
@@ -231,6 +235,12 @@ namespace SpiceTrip.Core
             Check($"{boss4.name} fight starts with {boss4.hp} HP", battle.Active && Mathf.Approximately(battle.Sim.Boss.maxHp, boss4.hp));
             yield return Shot("battle-champion");
 
+            // A Healing Draught on key 1
+            battle.Sim.Player.hp = 40;
+            yield return Press(Key.Digit1);
+            yield return Wait(0.1f);
+            Check("key 1 drinks the Healing Draught", battle.Sim.Player.hp >= 74 && ctx.Hub.SatchelCount("healingDraught") == 0);
+
             // Phase 3: Atanas' Aura of Calmness on right-click, then Vlado's tickets and bus №9
             battle.Sim.Player.hp = 40;
             var mouse = Mouse.current;
@@ -270,6 +280,43 @@ namespace SpiceTrip.Core
                 yield return Click(Q("bb-flee"), "Flee");
                 yield return Wait(0.3f);
             }
+
+            // The Gauntlet (all four bosses back to back) once every boss has fallen
+            foreach (var b in ctx.Db.bosses) hub.MarkBossDefeated(b.id);
+            hub.EnterPath(true);
+            yield return Wait(0.3f);
+            int goldBefore = ctx.Hub.gold;
+            yield return Click(Q("btn-gauntlet"), "The Gauntlet");
+            yield return Wait(0.5f);
+            Check("the Gauntlet starts with the first boss", battle.InGauntlet && battle.GauntletStage == 0);
+            var order = ctx.Db.gauntlet.order;
+            for (int stage = 0; stage < order.Count; stage++)
+            {
+                for (float t = 0; t < 8 && battle.Sim.Active; t += Time.unscaledDeltaTime)
+                {
+                    var sim = battle.Sim;
+                    sim.Player.hp = Mathf.Max(sim.Player.hp, sim.Player.maxHp * 0.6f);
+                    foreach (var u in sim.Units) u.hp = Mathf.Min(u.hp, 1);
+                    battle.ScriptedInput = new BattleSim.Inputs { aim = new Vector2(sim.Boss.x, sim.Boss.y), shoot = true };
+                    yield return null;
+                }
+                battle.ScriptedInput = null;
+                if (stage < order.Count - 1)
+                {
+                    yield return Wait(0.3f);
+                    if (stage == 0) yield return Shot("gauntlet-stage");
+                    battle.SkipStageTransition();
+                    yield return Wait(0.3f);
+                }
+            }
+            yield return Wait(0.4f);
+            Check("the Gauntlet is conquered", battle.ResultTitle == "GAUNTLET CONQUERED");
+            Check("the Gauntlet pays its bounty", ctx.Hub.gold == goldBefore + ctx.Db.gauntlet.first);
+            yield return Shot("gauntlet-won");
+            yield return Click(Q("bb-return"), "return to the path");
+            yield return Wait(0.4f);
+            Check("the Path shows best times and stars", Q("scene-path").Q(className: "boss-best") != null);
+            yield return Shot("path-progress");
 
             yield return Click(Q("scene-path").Q(className: "scene-back"), "leave");
             yield return Wait(0.3f);
@@ -434,6 +481,35 @@ namespace SpiceTrip.Core
             yield return Wait(1.5f);
             Check("fast travel reaches the Underway", game.CurrentRegion == "caves" && ch.Book.ActivePanel == null);
             yield return Shot("underway");
+
+            // A new realm quest: Damon in the Hollow Reach
+            game.TravelTo("ruins");
+            yield return Wait(1.0f);
+            var damon = game.Npcs.Find(n => n.def.id == "damon");
+            Check("the Hollow Reach has its quest-giver", damon != null && game.Map.Pickups.FindAll(p => p.item == "graveToken").Count == 5);
+            game.Enemies.Clear();
+            game.Player.x = damon.x + 12; game.Player.y = damon.y;
+            yield return Wait(0.2f);
+            yield return Press(Key.E);
+            yield return Wait(0.3f);
+            Check("Damon talks", ch.Hud.DialogueOpen);
+            yield return Shot("damon");
+            for (int i = 0; i < 4 && ch.Hud.DialogueOpen; i++)
+            {
+                VisualElement first = null;
+                foreach (var c in ch.Hud.DialogueChoices) { first = c; break; }
+                yield return Click(first, "dialogue choice");
+                yield return Wait(0.25f);
+            }
+            Check("Names of the Fallen is accepted", game.Quests.state["namesOfTheFallen"] == "active");
+            foreach (var pk in game.Map.Pickups.FindAll(p => p.item == "graveToken"))
+            {
+                game.Player.x = pk.x; game.Player.y = pk.y;
+                yield return null;
+                yield return null;
+            }
+            Check("five Grave Tokens make it ready", game.Quests.state["namesOfTheFallen"] == "ready");
+            yield return Shot("grave-tokens");
             game.TravelTo("citadel");
             yield return Wait(1.5f);
             yield return Shot("pale-citadel");

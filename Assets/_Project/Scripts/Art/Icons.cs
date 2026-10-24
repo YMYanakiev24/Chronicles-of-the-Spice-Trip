@@ -270,6 +270,96 @@ namespace SpiceTrip.Art
                 ".kkkkkkkkkk.",
                 "............",
             }, P(('k', "#2a2a34"), ('g', "#6a6a7a"), ('w', "#cfcfd6"), ('b', "#5ad0ff"), ('r', "#ff5a4a"))),
+            // ☆ empty rating star
+            ["star-empty"] = (new[]
+            {
+                "....y....",
+                "....y....",
+                "...y.y...",
+                "..y...y..",
+                "yyy...yyy",
+                "..y...y..",
+                "...y.y...",
+                "....y....",
+                "....y....",
+            }, P(('y', "#6a5a3a"))),
+            // --- realm quest items ---
+            ["graveToken"] = (new[]
+            {
+                "............",
+                "...kkkkkk...",
+                "..kcccccck..",
+                ".kccdddccck.",
+                ".kcdcccdcck.",
+                ".kccdddccck.",
+                ".kcccccdcck.",
+                ".kccdddccck.",
+                "..kcccccck..",
+                "...kkkkkk...",
+                "............",
+                "............",
+            }, P(('k', "#4a3a5a"), ('c', "#c8b8e8"), ('d', "#6a5a7a"))),
+            ["starEmber"] = (new[]
+            {
+                ".....y......",
+                ".....y......",
+                "....yoy.....",
+                "y..yowoy..y.",
+                ".yyowwwoyy..",
+                "..yowwwoy...",
+                ".yyowwwoyy..",
+                "y..yowoy..y.",
+                "....yoy.....",
+                ".....y......",
+                ".....y......",
+                "............",
+            }, P(('y', "#ffd24a"), ('o', "#ff9a3a"), ('w', "#fff2c0"))),
+            // --- Marin's battle items ---
+            ["draught"] = (new[]
+            {
+                "....kk......",
+                "....ww......",
+                "...kwwk.....",
+                "..krrrrk....",
+                ".krrwrrrk...",
+                ".krwrrrrk...",
+                ".krrrrrdk...",
+                ".krrrrddk...",
+                "..krrddk....",
+                "...kkkk.....",
+                "............",
+                "............",
+            }, P(('k', "#3a1a1a"), ('w', "#e9dcbf"), ('r', "#e0403a"), ('d', "#9a2020"))),
+            ["swift"] = (new[]
+            {
+                "....kk...g..",
+                "....ww..gg..",
+                "...kwwkggl..",
+                "..kggggglg..",
+                ".kgglggglg..",
+                ".kglgggkg...",
+                ".kgggggdk...",
+                ".kggggddk...",
+                "..kggddk....",
+                "...kkkk.....",
+                "............",
+                "............",
+            }, P(('k', "#1a3a1a"), ('w', "#e9dcbf"), ('g', "#5fd06a"), ('l', "#d6ffc8"), ('d', "#2a8a3a"))),
+            ["charm"] = (new[]
+            {
+                "...gggg.....",
+                "..g....g....",
+                "..g....g....",
+                "...gggg.....",
+                "....bb......",
+                "...bccb.....",
+                "..bcwccb....",
+                "..bccccb....",
+                "...bccb.....",
+                "....bb......",
+                "............",
+                "............",
+            }, P(('g', "#caa84d"), ('b', "#3a6ad0"), ('c', "#7fc8ff"), ('w', "#ffffff"))),
             // --- Chronicle UI: spell schools (🔥 🌊 ⚡ 🌿 🛡️ ☀️) ---
             ["school-Fire"] = (new[]
             {

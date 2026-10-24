@@ -123,6 +123,33 @@ New content, not in the web game. It was built from the approved design table:
 - **New sound.** Vlado's whistle is a new synthesised effect (two sharp
   blasts).
 
+## More things to do (new content)
+
+None of this is in the web game. It was added on request, after Phase 3.
+
+- **Where the gold goes.** Bounties and battle items use the hub wallet
+  (Marin's gold), the same one the Apothecary already used. The Chronicle keeps
+  its own gold, as before.
+- **Stars.** One for the win, one for ending with half your health or more, and
+  one for that plus beating par. Being fast but badly hurt earns one star, so
+  speed can't stand in for skill. The best rating and best time are kept
+  separately, so they can come from different wins.
+- **The Gauntlet** uses the four fights as they are, kits included. Between
+  fights the player keeps their health and gets 20 back. The score is the total
+  fight time, not counting the pauses between stages. Fleeing ends the run with
+  nothing recorded.
+- **Battle items** are kept in `hub.json` (`battleSatchel`), separate from the
+  Chronicle satchel. A Healing Draught isn't used up at full health. A ward
+  absorbs any hit, including contact and bus №9.
+- **Realm quests** live in `chronicle-extra.json` and are appended after the
+  original five-quest chain, so the original chain and its order are
+  unchanged. Each NPC stands in their realm's cleared spawn area. Quest items
+  are placed after the original map is generated, from their own seed, so
+  `MapParityTests` still match the JavaScript.
+- **The Last Rite** (the Threshold) rewards a Stormcrown's Wrath upgrade
+  instead of an item. Every other quest gives XP, Chronicle gold and existing
+  consumables.
+
 ## Problems found in the web source
 
 1. **`TopChuk`:** the `asphodel` quest rewards item `'TopChuk'`, which doesn't

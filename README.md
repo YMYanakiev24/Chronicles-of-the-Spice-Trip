@@ -10,6 +10,10 @@ A Unity 6 port of the browser game in `../Chronicles-of-the-Spice-Trip`
   was in the web code but unreachable. It has six realms, six divine powers,
   monsters, NPCs and dialogue, a five-quest chain, the HUD and the book panels,
   saves, fast travel and the intro cinematic.
+- **More to do** (added after Phase 3): gold bounties, star ratings and best
+  times for every boss; the Gauntlet (all four bosses back to back); battle
+  items from Marin you can use mid-fight; and a quest-giver with a new quest in
+  each of the five realms beyond the Mistwood.
 
 - **Engine:** Unity 6000.6.5f1, URP 2D Renderer, Input System, UI Toolkit
 - **Target:** Windows standalone (64-bit)
@@ -43,10 +47,27 @@ The build goes to `Build/Windows/SpiceTrip.exe`.
 | W A S D / arrows | Move in battle |
 | Left click / Space | Shoot toward the mouse |
 | Right click / Q | Your champion's special ability (Phase 3) |
+| 1 / 2 / 3 | Healing Draught / Swiftwing Elixir / Warding Charm (bought from Marin) |
 
 Each champion and boss has an ability designed from their character sheet.
 All the numbers live in `Assets/_Project/Data/Source/abilities.json`. Edit it,
 then run **Spice Trip ▸ Rebuild Project**.
+
+### Bounties, stars and the Gauntlet
+
+- **Bounties.** The first win against a boss pays its bounty into Marin's
+  wallet; every later win pays a smaller reward.
+- **Stars.** Every win is rated one to three stars: one for winning, a second
+  for finishing with at least half your health, and a third for doing that
+  under the boss's par time. The Path shows each boss's best rating and best
+  time when you hover it.
+- **The Gauntlet.** It opens once all four bosses have fallen. You fight them
+  back to back, keeping your health between fights plus 20. It has its own
+  bounty, par time and best time.
+- **Battle items.** Marin sells battle items alongside her usual wares. You can
+  carry three of each, and you use them with 1, 2 and 3 in any boss fight.
+
+All the numbers are in `Assets/_Project/Data/Source/progression.json`.
 
 In a Chronicle:
 
@@ -86,8 +107,8 @@ Unity.exe -batchmode -nographics -projectPath . -runTests -testPlatform EditMode
 Unity.exe -batchmode -projectPath . -runTests -testPlatform PlayMode -testResults Logs/playmode-results.xml
 ```
 
-- **EditMode tests (77):** the 16 Phase 3 ability tests (one per boss and champion kit), plus data parity with the JS, pixel parity of all 75 procedural sprites, map parity for all six regions, RNG/hash bit-exactness, battle rules, Loom grid and physics, saves, hotspot geometry, synth output, shop/navigation logic, and the Chronicle rules (movement, collision, casting, weaknesses, melee, levelling, wards, death, quests and dialogue, pickups, unlocks, travel, consumables, save round-trip, enemy AI).
-- **PlayMode tests (7):** boot, every boss fight, win/lose, the fog wipe into the shop, buying, the Loom, champion persistence, and a Chronicle started, saved, quit and continued.
+- **EditMode tests (95):** the 18 progression tests (star ratings, bounties, each battle item, Marin's carry limit, the Gauntlet unlock, every realm's quest-giver, scattered quest items, The Last Rite, the hunt quests), the 16 Phase 3 ability tests (one per boss and champion kit), plus data parity with the JS, pixel parity of all 75 procedural sprites, map parity for all six regions, RNG/hash bit-exactness, battle rules, Loom grid and physics, saves, hotspot geometry, synth output, shop/navigation logic, and the Chronicle rules (movement, collision, casting, weaknesses, melee, levelling, wards, death, quests and dialogue, pickups, unlocks, travel, consumables, save round-trip, enemy AI).
+- **PlayMode tests (8):** boot, every boss fight, win/lose, the full Gauntlet and its bounty, the fog wipe into the shop, buying, the Loom, champion persistence, and a Chronicle started, saved, quit and continued.
 
 **End-to-end autopilot:** this plays through every screen with real injected
 mouse and keyboard events, saves screenshots and writes a PASS/FAIL log. It
@@ -98,7 +119,9 @@ blocked:
 Unity.exe -projectPath . -executeMethod SpiceTrip.EditorTools.AutopilotRunner.Run -autopilot Captures/autopilot -savedir Captures/autopilot/save
 ```
 
-In a build, run `SpiceTrip.exe -autopilot <dir> -savedir <dir>/save`.
+In a build, run `SpiceTrip.exe -autopilot <dir> -savedir <dir>/save`. The
+autopilot empties its `-savedir` before it starts, so always give it a folder
+of its own.
 
 ## Where the data comes from
 
@@ -110,6 +133,12 @@ node Tools~/export-source-data.mjs ../Chronicles-of-the-Spice-Trip Assets/_Proje
 node Tools~/pixel-parity.mjs       ../Chronicles-of-the-Spice-Trip Assets/_Project/Data/Source/pixel-hashes.json
 node Tools~/map-parity.mjs         ../Chronicles-of-the-Spice-Trip Assets/_Project/Data/Source/map-signatures.json
 ```
+
+Three files are written by hand rather than exported, because they hold new
+content: `abilities.json` (Phase 3 kits), `progression.json` (bounties, the
+Gauntlet, battle items) and `chronicle-extra.json` (the five realm quests,
+their NPCs and quest items). The importer merges `chronicle-extra.json` into
+the exported RPG data.
 
 Then run **Spice Trip ▸ Rebuild Project**. It regenerates the `GameDatabase`
 asset, the UI panel settings, the sprite materials and the Boot scene, so
@@ -123,7 +152,8 @@ Assets/_Project/
   Scripts/Data/      GameDatabase + tuning (generated from the JS)
   Scripts/Art/       PixelCanvas, PixelArt (port of PixelArt.js), icons, art loading
   Scripts/Hub/       menu, Path, corridor, shop, Loom, Changing Room, navigation
-  Scripts/Battle/    BattleSim (rules) + BossBattleView (rendering and input)
+  Scripts/Battle/    BattleSim (rules) + BossBattleView (rendering and input),
+                     Progression (stars, bounties, best times)
   Scripts/Rpg/       the Chronicle: ChronicleGame (Game.js), TileMap, Player/Enemy/Npc,
                      Magic/Combat/Quest systems, RpgView (renderer), RpgHud, BookPanels,
                      IntroCinematic, ChronicleController, ChronicleSave

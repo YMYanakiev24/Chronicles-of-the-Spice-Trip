@@ -48,7 +48,7 @@ namespace SpiceTrip.Rpg
         public class Pickup
         {
             public float x, y, bob;
-            public string type, item;
+            public string type, item, color;
         }
 
         public class Light
@@ -288,6 +288,29 @@ namespace SpiceTrip.Rpg
 
         public void RemovePickup(Pickup pk) => Pickups.Remove(pk);
 
+        /// <summary>
+        /// Scatters the realm's quest items (new content, after generation so the
+        /// original map stays identical). Deterministic per realm, like the rest.
+        /// </summary>
+        public void AddQuestPickups(IEnumerable<PickupDef> defs)
+        {
+            foreach (var d in defs)
+            {
+                if (d.region != Region.id) continue;
+                var rng = new Mulberry32(Hash.Str(Region.id + ":" + d.item));
+                int placed = 0, tries = 0;
+                while (placed < d.count && tries < d.count * 60)
+                {
+                    tries++;
+                    int tx = 2 + PixelCanvas.Trunc(rng.Next() * (W - 4)), ty = 2 + PixelCanvas.Trunc(rng.Next() * (H - 4));
+                    if (CellAt(tx, ty).solid) continue;
+                    if (Mathf.Abs(tx - Region.spawn.tx) + Mathf.Abs(ty - Region.spawn.ty) < 6) continue;   // make the player explore
+                    Pickups.Add(new Pickup { x = tx * TS + TS / 2f, y = ty * TS + TS / 2f, type = d.type, item = d.item, color = d.color, bob = (float)(rng.Next() * 7) });
+                    placed++;
+                }
+            }
+        }
+
         public void Update(float dt) => Time += dt;
 
         // =========================================================================
@@ -319,12 +342,21 @@ namespace SpiceTrip.Rpg
                     g.Rect(sx - 1, sy - 1, 2, 2, Css.C("#ffe8a0"));
                     g.Rect(sx, sy + 2, 1, 3, Css.C("#3a6d3a"));
                 }
-                else
+                else if (pk.type == "relicShard")
                 {
                     // relic shard
                     g.Rect(sx - 1, sy - 4, 2, 8, Css.C("#9fe0ff"));
                     g.Rect(sx - 1, sy - 4, 1, 8, Css.C("#eaffff"));
                     g.Rect(sx - 1, sy + 3, 2, 2, Css.C("#caa84d"));
+                }
+                else
+                {
+                    // a glowing quest gem in the item's colour (new realm quests)
+                    var c = Css.C(pk.color ?? "#ffffff");
+                    g.Glow(sx, sy, 9, new Color(c.r, c.g, c.b, 0.5f));
+                    g.Rect(sx - 2, sy - 3, 4, 6, c);
+                    g.Rect(sx - 3, sy - 1, 6, 2, c);
+                    g.Rect(sx - 1, sy - 3, 1, 2, Color.white);
                 }
             }
         }

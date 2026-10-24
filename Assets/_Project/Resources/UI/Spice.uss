@@ -544,3 +544,62 @@
 .bb-result-sub { color: rgba(233, 220, 191, 0.85); -unity-font-style: italic; margin-bottom: 18px; }
 .bb-result-btns { flex-direction: row; justify-content: center; }
 .bb-result-btns > * { margin: 0 6px; }
+
+/* ---- Progression: gold on the Path, ratings, the Gauntlet, battle wares ---- */
+.path-gold {
+    position: absolute;
+    top: 18px; left: 150px;
+    flex-direction: row; align-items: center;
+    background-color: rgba(8, 6, 14, 0.85);
+    border-width: 2px; border-color: var(--gold);
+    border-radius: 8px;
+    padding: 7px 14px;
+}
+.path-gold-text { color: var(--gold-bright); font-size: 14px; -unity-font-style: bold; }
+.gauntlet-row { position: absolute; left: 0; right: 0; top: 18px; align-items: center; }
+.gauntlet-btn {
+    flex-direction: row; align-items: center;
+    background-color: rgba(60, 14, 14, 0.9);
+    border-width: 2px; border-color: #d84a3a;
+    border-radius: 10px;
+    padding: 8px 18px;
+    transition-property: translate, border-color;
+    transition-duration: 0.15s;
+}
+.gauntlet-btn:hover { translate: 0 -2px; border-color: #ff8a6a; }
+.gauntlet-text { color: #ffd0c0; font-size: 15px; }
+.gauntlet-btn.locked { background-color: rgba(20, 16, 24, 0.85); border-color: rgba(202, 168, 77, 0.35); }
+.gauntlet-btn.locked:hover { translate: 0 0; }
+.gauntlet-btn.locked .gauntlet-text { color: rgba(233, 220, 191, 0.55); }
+.boss-rating { margin-top: 3px; }
+.boss-stars { flex-direction: row; margin-right: 6px; }
+.boss-best { color: rgba(255, 208, 192, 0.8); font-size: 9px; }
+.shop-item.battle { border-color: #d84a3a; }
+.shop-item.battle:hover { border-color: #ff8a6a; }
+.si-carried { margin-left: auto; font-size: 11px; color: rgba(233, 220, 191, 0.7); }
+
+/* Battle items in the arena (keys 1–3) */
+.bb-item {
+    position: absolute;
+    background-color: rgba(8, 6, 14, 0.8);
+    border-width: 2px; border-color: var(--gold);
+    border-radius: 6px;
+    align-items: center; justify-content: center;
+}
+.bb-item.empty { opacity: 0.35; }
+.bb-item-icon { align-items: center; justify-content: center; }
+.bb-item-key { position: absolute; top: 0; left: 2px; color: var(--gold-bright); -unity-font-style: bold; padding: 0; margin: 0; }
+.bb-item-count { position: absolute; bottom: -1px; right: 2px; color: #ffffff; font-size: 11px; -unity-font-style: bold; text-shadow: 0 1px 2px #000000; padding: 0; margin: 0; }
+.bb-stage-row { position: absolute; left: 0; right: 0; top: 40%; align-items: center; }
+.bb-stage-banner {
+    font-size: 34px; -unity-font-style: bold; letter-spacing: 4px;
+    color: #ffd0c0;
+    background-color: rgba(8, 6, 14, 0.8);
+    border-width: 2px; border-color: #d84a3a; border-radius: 12px;
+    padding: 12px 28px;
+    text-shadow: 0 0 18px rgba(255, 90, 74, 0.6);
+}
+.bb-stars { flex-direction: row; justify-content: center; margin-bottom: 8px; }
+.bb-star { margin: 0 6px; }
+.bb-result-reward { color: var(--gold-bright); font-size: 18px; -unity-font-style: bold; margin-bottom: 4px; }
+.bb-result-time { color: rgba(233, 220, 191, 0.8); font-size: 14px; margin-bottom: 16px; }

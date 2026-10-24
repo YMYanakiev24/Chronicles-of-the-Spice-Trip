@@ -72,6 +72,7 @@ namespace SpiceTrip.Battle
             public Vector2 aim;      // logical arena coords
             public bool shoot;
             public bool special;     // right-click / Q pressed this frame
+            public int itemSlot;     // 1–3: use that battle item this frame (0 = none)
         }
 
         public readonly BattleTuning T;
@@ -89,6 +90,15 @@ namespace SpiceTrip.Battle
         public bool? Won { get; private set; }
         public float Time { get; private set; }
         public int ShotsFired { get; private set; }
+        public float EndTime { get; private set; }
+
+        // Marin's battle items (slots 1–3), and their effects
+        public readonly List<BattleItemDef> ItemDefs = new List<BattleItemDef>();
+        public readonly List<int> ItemCounts = new List<int>();
+        public float SwiftT { get; private set; }
+        public int WardHits { get; private set; }
+        float _swiftBonus;
+        public event Action<int> OnItemUsed;
 
         /// <summary>The original single boss (the first body, or the last one standing).</summary>
         public Unit Boss => _primary;
@@ -199,18 +209,19 @@ namespace SpiceTrip.Battle
             if (DashT > 0 || RollT > 0)
             {
                 float mul = DashT > 0 ? K("speedMul", 3) : K("speedMul", 1.8f);
-                p.x = Mathf.Clamp(p.x + _moveDir.x * PlayerSpeed * mul * dt, T.playerEdge, T.arenaWidth - T.playerEdge);
-                p.y = Mathf.Clamp(p.y + _moveDir.y * PlayerSpeed * mul * dt, T.playerEdge, T.arenaHeight - T.playerEdge);
+                p.x = Mathf.Clamp(p.x + _moveDir.x * Speed * mul * dt, T.playerEdge, T.arenaWidth - T.playerEdge);
+                p.y = Mathf.Clamp(p.y + _moveDir.y * Speed * mul * dt, T.playerEdge, T.arenaHeight - T.playerEdge);
             }
             else
             {
                 float moveF = moving ? 1 : 0;
-                p.x = Mathf.Clamp(p.x + (mx / ml) * PlayerSpeed * dt * moveF, T.playerEdge, T.arenaWidth - T.playerEdge);
-                p.y = Mathf.Clamp(p.y + (my / ml) * PlayerSpeed * dt * moveF, T.playerEdge, T.arenaHeight - T.playerEdge);
+                p.x = Mathf.Clamp(p.x + (mx / ml) * Speed * dt * moveF, T.playerEdge, T.arenaWidth - T.playerEdge);
+                p.y = Mathf.Clamp(p.y + (my / ml) * Speed * dt * moveF, T.playerEdge, T.arenaHeight - T.playerEdge);
             }
 
             ChampionPassives(dt, moving);
             if (inp.special) TrySpecial(inp);
+            if (inp.itemSlot > 0) UseItem(inp.itemSlot - 1);
 
             // --- Player shooting (aim at mouse) ---
             _playerCd -= dt;
@@ -218,6 +229,7 @@ namespace SpiceTrip.Battle
             {
                 float cd = T.playerFireCooldown;
                 if (Nicotine > 0 && K("fireRateBonus") > 0) cd /= 1 + K("fireRateBonus");
+                if (SwiftT > 0) cd /= 1 + _swiftBonus;
                 _playerCd = cd;
                 float a = Mathf.Atan2(inp.aim.y - p.y, inp.aim.x - p.x);
                 if (WobbleT > 0) a += (_rand() - 0.5f) * 2 * K("wobble");
@@ -259,11 +271,9 @@ namespace SpiceTrip.Battle
                 if (ShieldT > 0 && Blocks(s)) { BossShots.RemoveAt(i); OnSfx?.Invoke("shield"); continue; }
                 if (!PlayerInvulnerable && Dist(s.x, s.y, p.x, p.y) < s.r + p.r)
                 {
-                    p.hp -= s.damage > 0 ? s.damage : T.bossShotDamage;
-                    p.hurt = T.playerHitInvuln;
-                    OnSfx?.Invoke("hurt");
+                    bool dead = HurtPlayer(s.damage > 0 ? s.damage : T.bossShotDamage, T.playerHitInvuln);
                     BossShots.RemoveAt(i);
-                    if (p.hp <= 0) { End(false); return; }
+                    if (dead) { End(false); return; }
                     continue;
                 }
                 if (OutOrExpired(s)) BossShots.RemoveAt(i);
@@ -273,10 +283,7 @@ namespace SpiceTrip.Battle
             if (ActiveBus != null && ActiveBus.driving && !ActiveBus.hit && !PlayerInvulnerable && BusHits(ActiveBus))
             {
                 ActiveBus.hit = true;
-                p.hp -= B("busDamage", 20);
-                p.hurt = T.contactInvuln;
-                OnSfx?.Invoke("hurt");
-                if (p.hp <= 0) { End(false); return; }
+                if (HurtPlayer(B("busDamage", 20), T.contactInvuln)) { End(false); return; }
             }
 
             // Coins (Gakev) heal when touched.
@@ -303,8 +310,7 @@ namespace SpiceTrip.Battle
                     continue;
                 }
                 if (PlayerInvulnerable) continue;
-                p.hp -= T.contactDamage; p.hurt = T.contactInvuln; OnSfx?.Invoke("hurt");
-                if (p.hp <= 0) { End(false); return; }
+                if (HurtPlayer(T.contactDamage, T.contactInvuln)) { End(false); return; }
             }
             ResolveDeaths();
         }
@@ -486,8 +492,65 @@ namespace SpiceTrip.Battle
         // =====================================================================
         // Champions
         // =====================================================================
+        float Speed => PlayerSpeed * (SwiftT > 0 ? 1 + _swiftBonus : 1);
+
+        /// <summary>Applies a hit (or lets a Warding Charm turn it aside). Returns true if the player died.</summary>
+        bool HurtPlayer(float damage, float invuln)
+        {
+            var p = Player;
+            p.hurt = invuln;
+            if (WardHits > 0)
+            {
+                WardHits--;
+                OnSfx?.Invoke("shield");
+                return false;
+            }
+            p.hp -= damage;
+            OnSfx?.Invoke("hurt");
+            return p.hp <= 0;
+        }
+
+        /// <summary>Gives the fight the player's battle items (one slot per definition).</summary>
+        public void LoadItems(IList<BattleItemDef> defs, IList<int> counts)
+        {
+            ItemDefs.Clear();
+            ItemCounts.Clear();
+            for (int i = 0; i < defs.Count; i++) { ItemDefs.Add(defs[i]); ItemCounts.Add(i < counts.Count ? counts[i] : 0); }
+        }
+
+        /// <summary>Uses the item in a slot (0-based). Returns false if there is none left.</summary>
+        public bool UseItem(int slot)
+        {
+            if (!Active || slot < 0 || slot >= ItemDefs.Count || ItemCounts[slot] <= 0) return false;
+            var def = ItemDefs[slot];
+            var p = Player;
+            switch (def.effect)
+            {
+                case "heal":
+                    if (p.hp >= p.maxHp) return false;   // don't waste a draught at full health
+                    p.hp = Mathf.Min(p.maxHp, p.hp + def.value);
+                    OnSfx?.Invoke("heal");
+                    break;
+                case "swift":
+                    SwiftT = def.duration;
+                    _swiftBonus = def.value;
+                    OnSfx?.Invoke("nature");
+                    break;
+                case "ward":
+                    WardHits += Mathf.RoundToInt(def.value);
+                    OnSfx?.Invoke("shield");
+                    break;
+                default:
+                    return false;
+            }
+            ItemCounts[slot]--;
+            OnItemUsed?.Invoke(slot);
+            return true;
+        }
+
         void TickChampionTimers(float dt)
         {
+            if (SwiftT > 0) SwiftT -= dt;
             if (SpecialCooldown > 0) SpecialCooldown -= dt;
             if (AuraT > 0) AuraT -= dt;
             if (ShieldT > 0) ShieldT -= dt;
@@ -673,6 +736,7 @@ namespace SpiceTrip.Battle
         void End(bool win)
         {
             Active = false;
+            EndTime = Time;
             Won = win;
             OnSfx?.Invoke(win ? "levelup" : "death");
             OnEnd?.Invoke(win);

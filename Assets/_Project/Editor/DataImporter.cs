@@ -20,6 +20,26 @@ namespace SpiceTrip.EditorTools
     {
         public const string DatabasePath = "Assets/_Project/Resources/Data/GameDatabase.asset";
         public const string AbilitiesPath = "Assets/_Project/Data/Source/abilities.json";
+        public const string ProgressionPath = "Assets/_Project/Data/Source/progression.json";
+        public const string ChronicleExtraPath = "Assets/_Project/Data/Source/chronicle-extra.json";
+
+        [System.Serializable]
+        class ChronicleExtraFile
+        {
+            public List<ItemDef> items = new List<ItemDef>();
+            public List<PickupDef> pickups = new List<PickupDef>();
+            public List<NpcDef> npcs = new List<NpcDef>();
+            public List<QuestDef> quests = new List<QuestDef>();
+            public List<string> questOrder = new List<string>();
+        }
+
+        [System.Serializable]
+        class ProgressionFile
+        {
+            public List<BountyDef> bounties = new List<BountyDef>();
+            public GauntletDef gauntlet = new GauntletDef();
+            public List<BattleItemDef> battleItems = new List<BattleItemDef>();
+        }
 
         [System.Serializable]
         class AbilityFile
@@ -103,6 +123,19 @@ namespace SpiceTrip.EditorTools
             var kits = JsonUtility.FromJson<AbilityFile>(File.ReadAllText(AbilitiesPath));
             db.bossKits = kits.bosses;
             db.championKits = kits.champions;
+
+            // New realm quests: appended after the original five so their order is unchanged.
+            var extra = JsonUtility.FromJson<ChronicleExtraFile>(File.ReadAllText(ChronicleExtraPath));
+            db.extraItems = extra.items;
+            db.questPickups = extra.pickups;
+            db.npcs.AddRange(extra.npcs);
+            db.quests.AddRange(extra.quests);
+            db.questOrder.AddRange(extra.questOrder);
+
+            var prog = JsonUtility.FromJson<ProgressionFile>(File.ReadAllText(ProgressionPath));
+            db.bounties = prog.bounties;
+            db.gauntlet = prog.gauntlet;
+            db.battleItems = prog.battleItems;
 
             if (create)
             {

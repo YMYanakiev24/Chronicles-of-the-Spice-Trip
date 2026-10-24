@@ -41,11 +41,13 @@ namespace SpiceTrip.Hub
 
         readonly Action _showMenu, _hideMenu;
         readonly Action<BossDef, CharacterDef> _startBattle;
+        readonly Action<CharacterDef> _startGauntlet;
         readonly IVisualElementScheduler _scheduler;
 
         public HubController(GameContext ctx, VisualElement sceneLayer, VisualElement modalLayer, VisualElement fogLayer,
-            Action showMenu, Action hideMenu, Action<BossDef, CharacterDef> startBattle)
+            Action showMenu, Action hideMenu, Action<BossDef, CharacterDef> startBattle, Action<CharacterDef> startGauntlet = null)
         {
+            _startGauntlet = startGauntlet;
             Ctx = ctx;
             _showMenu = showMenu;
             _hideMenu = hideMenu;
@@ -55,9 +57,9 @@ namespace SpiceTrip.Hub
             SelectedChar = ctx.Db.Character(ctx.Hub.selectedChar);
             if (SelectedChar == null || SelectedChar.empty) SelectedChar = ctx.Db.characters.Count > 0 ? ctx.Db.characters[0] : null;
 
-            Path = new PathScreen(ctx, FightBoss, () => { ctx.Audio.Sfx("ui"); EnterCorridor(); }, () => { ctx.Audio.Sfx("ui"); Back("menu"); });
+            Path = new PathScreen(ctx, FightBoss, () => { ctx.Audio.Sfx("ui"); EnterCorridor(); }, () => { ctx.Audio.Sfx("ui"); Back("menu"); }, FightGauntletAction);
             Corridor = new CorridorScreen(ctx, EnterShop, () => { ctx.Audio.Sfx("ui"); OpenCharacterSelect(); }, () => { ctx.Audio.Sfx("ui"); Back("path"); });
-            Shop = new ShopScreen(ctx, e => Buy(e.id, e.price), OpenTapestry, () => { ctx.Audio.Sfx("ui"); Back("corridor"); });
+            Shop = new ShopScreen(ctx, e => Buy(e.id, e.price), OpenTapestry, () => { ctx.Audio.Sfx("ui"); Back("corridor"); }, d => BuyBattleItem(d.id));
             sceneLayer.Add(Path.Root);
             sceneLayer.Add(Corridor.Root);
             sceneLayer.Add(Shop.Root);
@@ -98,6 +100,7 @@ namespace SpiceTrip.Hub
             Path.Show(true);
             Active = "path";
             Path.RefreshBossMarks(DefeatedBosses);
+            Path.RefreshProgress(Ctx.Hub, DefeatedBosses);
         }
 
         public void EnterCorridor()
@@ -134,6 +137,7 @@ namespace SpiceTrip.Hub
                 Path.Show(true);
                 Active = "path";
                 Path.RefreshBossMarks(DefeatedBosses);
+                Path.RefreshProgress(Ctx.Hub, DefeatedBosses);
             }
             else if (target == "corridor")
             {
@@ -173,6 +177,20 @@ namespace SpiceTrip.Hub
             Ctx.SaveHub();
         }
 
+        /// <summary>Starts the Gauntlet once every boss has fallen at least once.</summary>
+        public bool FightGauntlet()
+        {
+            Path.RefreshProgress(Ctx.Hub, DefeatedBosses);
+            if (!Path.GauntletUnlocked) { Ctx.Audio.Sfx("ui"); return false; }
+            Ctx.Audio.Sfx("quest");
+            HideAllScenes();
+            Active = "battle";
+            _startGauntlet?.Invoke(SelectedChar);
+            return true;
+        }
+
+        void FightGauntletAction() => FightGauntlet();
+
         // --- Character select (Changing Room) -------------------------------------
         public void OpenCharacterSelect() => CharSelect.Open(SelectedChar?.id);
 
@@ -202,6 +220,33 @@ namespace SpiceTrip.Hub
             Shop.SetGold(Wallet);
             var item = Ctx.Db.Item(itemId);
             Shop.SetMarinLine($"A fine choice — one {item?.name ?? itemId}. It will await you on the road.");
+            Ctx.Audio.Sfx("pickup");
+            return true;
+        }
+
+        /// <summary>Buys one of Marin's battle items into the battle satchel (up to its limit).</summary>
+        public bool BuyBattleItem(string id)
+        {
+            var def = Ctx.Db.BattleItem(id);
+            if (def == null) return false;
+            int have = Ctx.Hub.SatchelCount(id);
+            if (have >= def.max)
+            {
+                Shop.SetMarinLine($"You can only carry {def.max} of those, friend. Use some first.");
+                Ctx.Audio.Sfx("ui");
+                return false;
+            }
+            if (Wallet < def.price)
+            {
+                Shop.SetMarinLine("Not enough coin, friend. Come back richer.");
+                Ctx.Audio.Sfx("ui");
+                return false;
+            }
+            Ctx.Hub.SetSatchel(id, have + 1);
+            Wallet -= def.price;   // saves the hub
+            Shop.SetGold(Wallet);
+            Shop.RefreshCarried();
+            Shop.SetMarinLine($"One {def.name}, for the fights ahead. Press {Ctx.Db.battleItems.IndexOf(def) + 1} when you need it.");
             Ctx.Audio.Sfx("pickup");
             return true;
         }

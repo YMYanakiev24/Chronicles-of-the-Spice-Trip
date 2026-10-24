@@ -344,7 +344,7 @@ namespace SpiceTrip.Rpg
         {
             var t = Gold(richText);
             if (_interactText.text != t) _interactText.text = t;
-            Show(_interact, true);
+            Show(_interact, !DialogueOpen);
         }
 
         public void HideInteract() => Show(_interact, false);
@@ -361,6 +361,7 @@ namespace SpiceTrip.Rpg
         {
             _dlgSpeaker.text = npc.def.name;
             _dlgText.text = Gold(richText);
+            Show(_interact, false);
             _dlgChoices.Clear();
             foreach (var c in choices)
             {

@@ -91,8 +91,11 @@ namespace SpiceTrip.Tests
                 var sp = db.Region(id).spawn;
                 Assert.IsFalse(map.CellAt(sp.tx, sp.ty).solid, id);
             }
-            map.Load("mistwood");
-            foreach (var n in db.npcs) Assert.IsFalse(map.CellAt(n.tx, n.ty).solid, n.id);
+            foreach (var n in db.npcs)
+            {
+                map.Load(n.region);
+                Assert.IsFalse(map.CellAt(n.tx, n.ty).solid, n.id);
+            }
         }
     }
 

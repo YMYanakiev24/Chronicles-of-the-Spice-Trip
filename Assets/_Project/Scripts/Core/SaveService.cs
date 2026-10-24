@@ -25,12 +25,38 @@ namespace SpiceTrip.Core
     }
 
     [Serializable]
+    public class BossRecord
+    {
+        public string id;
+        public int wins, bestStars;
+        public float bestTime;   // seconds; 0 = none yet
+    }
+
+    [Serializable]
     public class HubData
     {
         public int gold;
         public List<StashEntry> stash = new List<StashEntry>();
         public List<string> defeated = new List<string>();
         public string selectedChar = "hero";
+        public List<BossRecord> records = new List<BossRecord>();      // per boss, plus "gauntlet"
+        public List<StashEntry> battleSatchel = new List<StashEntry>(); // Marin's battle items
+
+        public BossRecord Record(string id)
+        {
+            var r = records.Find(x => x.id == id);
+            if (r == null) { r = new BossRecord { id = id }; records.Add(r); }
+            return r;
+        }
+
+        public int SatchelCount(string id) => battleSatchel.Find(s => s.id == id)?.count ?? 0;
+
+        public void SetSatchel(string id, int count)
+        {
+            var e = battleSatchel.Find(s => s.id == id);
+            if (e == null) battleSatchel.Add(new StashEntry { id = id, count = count });
+            else e.count = count;
+        }
 
         public int StashCount(string id) => stash.Find(s => s.id == id)?.count ?? 0;
 
@@ -77,6 +103,8 @@ namespace SpiceTrip.Core
             if (hub == null) return new HubData { gold = startingGold };
             hub.stash ??= new List<StashEntry>();
             hub.defeated ??= new List<string>();
+            hub.records ??= new List<BossRecord>();
+            hub.battleSatchel ??= new List<StashEntry>();
             if (string.IsNullOrEmpty(hub.selectedChar)) hub.selectedChar = "hero";
             return hub;
         }

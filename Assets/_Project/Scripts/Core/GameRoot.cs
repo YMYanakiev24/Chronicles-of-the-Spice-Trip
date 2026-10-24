@@ -11,6 +11,7 @@
  * Command line (used by the automated checks):
  *   -savedir <dir>     keep saves somewhere other than persistentDataPath
  *   -autopilot <dir>   play through every screen, write screenshots + a log, quit
+ *                      (empties -savedir first, so every run starts fresh)
  * ----------------------------------------------------------------------------
  */
 
@@ -59,7 +60,12 @@ namespace SpiceTrip.Core
 
             if (FindAnyObjectByType<AudioListener>() == null) gameObject.AddComponent<AudioListener>();
             Audio = gameObject.AddComponent<AudioSynth>();
-            Ctx = new GameContext(db, new SaveService(SaveDirOverride ?? Arg("-savedir")), Audio);
+            var saveDir = SaveDirOverride ?? Arg("-savedir");
+            // The autopilot checks first-time things (bounties, quests), so it always
+            // starts from an empty save. Only its own -savedir, never the player's.
+            if (Arg("-autopilot") != null && saveDir != null && System.IO.Directory.Exists(saveDir))
+                System.IO.Directory.Delete(saveDir, true);
+            Ctx = new GameContext(db, new SaveService(saveDir), Audio);
             Audio.Apply(Ctx.Settings);
 
             BuildEventSystem();
@@ -129,7 +135,7 @@ namespace SpiceTrip.Core
                 id => Hub.MarkBossDefeated(id));
 
             Hub = new HubController(Ctx, sceneLayer, modalLayer, fogLayer,
-                ShowMainMenu, HideMainMenu, (boss, ch) => Battle.Begin(boss, ch));
+                ShowMainMenu, HideMainMenu, (boss, ch) => Battle.Begin(boss, ch), ch => Battle.BeginGauntlet(ch));
 
             var chronicleGo = new GameObject("Chronicle");
             chronicleGo.transform.SetParent(transform, false);

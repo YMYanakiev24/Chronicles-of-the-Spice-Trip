@@ -178,6 +178,45 @@ namespace SpiceTrip.Tests
         }
 
         [UnityTest]
+        public IEnumerator TheGauntletRunsAllFourBossesAndPaysOut()
+        {
+            foreach (var b in _g.Ctx.Db.bosses) _g.Hub.MarkBossDefeated(b.id);
+            _g.Hub.EnterPath();
+            int gold = _g.Ctx.Hub.gold;
+            Assert.IsTrue(_g.Hub.FightGauntlet());
+            yield return null;
+            var order = _g.Ctx.Db.gauntlet.order;
+            for (int stage = 0; stage < order.Count; stage++)
+            {
+                Assert.AreEqual(stage, _g.Battle.GauntletStage);
+                Assert.AreEqual(order[stage], _g.Battle.Sim.Def.id);
+                for (int frame = 0; frame < 200 && _g.Battle.Sim.Active; frame++)
+                {
+                    var sim = _g.Battle.Sim;
+                    sim.Player.hp = sim.Player.maxHp;
+                    foreach (var u in sim.Units)
+                    {
+                        u.hp = Mathf.Min(u.hp, 1);
+                        sim.PlayerShots.Add(new BattleSim.Shot { x = u.x, y = u.y, r = 5, life = 1 });
+                    }
+                    yield return null;
+                }
+                if (stage < order.Count - 1)
+                {
+                    Assert.IsTrue(_g.Battle.StageTransition, "a pause before the next boss");
+                    _g.Battle.SkipStageTransition();
+                    yield return null;
+                    yield return null;
+                }
+            }
+            Assert.IsTrue(_g.Battle.ResultShowing);
+            Assert.AreEqual("GAUNTLET CONQUERED", _g.Battle.ResultTitle);
+            Assert.AreEqual(gold + _g.Ctx.Db.gauntlet.first, _g.Ctx.Hub.gold, "first-clear bounty");
+            Assert.AreEqual(1, new SaveService(_dir).LoadHub(1450).Record(Progression.GauntletId).wins);
+            _g.Battle.Stop();
+        }
+
+        [UnityTest]
         public IEnumerator ChampionChoiceSurvivesAReload()
         {
             _g.Hub.EnterPath();

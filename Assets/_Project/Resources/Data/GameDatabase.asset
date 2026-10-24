@@ -875,12 +875,145 @@ MonoBehaviour:
       spell: greyward
       items:
       - cinderSigil
+  - id: tideOfBronze
+    title: The Drowned Watch
+    giver: nerissa
+    region: temple
+    summary: Nerissa asks you to break three of the Bronze Watchers that stalk the Drowned Temple.
+    lore: Bronze does not tire and does not forget its orders. It only rusts, and the sea is patient.
+    next: 
+    objectives:
+    - type: kill
+      creature: bronzeWatcher
+      spell: 
+      item: 
+      npc: 
+      loc: 
+      text: Destroy 3 Bronze Watchers
+      count: 3
+    rewards:
+      xp: 220
+      gold: 110
+      spell: 
+      items:
+      - nectarVial
+      - nectarVial
+  - id: namesOfTheFallen
+    title: Names of the Fallen
+    giver: damon
+    region: ruins
+    summary: Damon needs five Grave Tokens from the Hollow Reach so the city's shades can be named and put to rest.
+    lore: A shade without a name walks forever. Speak its name and it can finally lie down.
+    next: 
+    objectives:
+    - type: collect
+      creature: 
+      spell: 
+      item: graveToken
+      npc: 
+      loc: 
+      text: Find 5 Grave Tokens
+      count: 5
+    - type: talk
+      creature: 
+      spell: 
+      item: 
+      npc: damon
+      loc: 
+      text: Bring the tokens to Damon
+      count: 0
+    rewards:
+      xp: 260
+      gold: 120
+      spell: 
+      items:
+      - ambrosiaCake2
+  - id: lightTheUnderway
+    title: Light in the Underway
+    giver: ione
+    region: caves
+    summary: Ione can light the old path once four Hollow Hounds are dealt with.
+    lore: The hounds are hollow where their hearts should be. Light frightens them, and that is how they lose.
+    next: 
+    objectives:
+    - type: kill
+      creature: hollowHound
+      spell: 
+      item: 
+      npc: 
+      loc: 
+      text: Slay 4 Hollow Hounds
+      count: 4
+    rewards:
+      xp: 300
+      gold: 140
+      spell: 
+      items:
+      - ambrosiaCake
+      - ambrosiaCake
+  - id: thePaleWatch
+    title: The Pale Watch
+    giver: aster
+    region: citadel
+    summary: Captain Aster wants four Strix brought down from the Pale Citadel's towers.
+    lore: A strix's cry is an omen. Four fewer cries, four fewer omens.
+    next: 
+    objectives:
+    - type: kill
+      creature: strix
+      spell: 
+      item: 
+      npc: 
+      loc: 
+      text: Bring down 4 Strix
+      count: 4
+    rewards:
+      xp: 340
+      gold: 160
+      spell: 
+      items:
+      - nectarVial
+      - ambrosiaCake2
+  - id: theLastRite
+    title: The Last Rite
+    giver: herald
+    region: godreach
+    summary: The Herald needs three Star Embers to wake the Stormcrown, so a god can finally claim you.
+    lore: Every prophecy ends somewhere. This one ends at the Threshold, with starlight in your hands.
+    next: 
+    objectives:
+    - type: collect
+      creature: 
+      spell: 
+      item: starEmber
+      npc: 
+      loc: 
+      text: Gather 3 Star Embers
+      count: 3
+    - type: talk
+      creature: 
+      spell: 
+      item: 
+      npc: herald
+      loc: 
+      text: Bring the embers to the Herald
+      count: 0
+    rewards:
+      xp: 500
+      gold: 300
+      spell: stormcrownWrath
+      items: []
   questOrder:
   - awakening
   - stolenRelic
   - asphodel
   - trialBronze
   - cinderMaw
+  - tideOfBronze
+  - namesOfTheFallen
+  - lightTheUnderway
+  - thePaleWatch
+  - theLastRite
   npcs:
   - id: oracle
     name: Theira, the Last Oracle
@@ -926,6 +1059,87 @@ MonoBehaviour:
     lines:
     - 'Six realms lie beyond this wood: a drowned temple, a city of shades, the caves that go down to Nyxara, a citadel of cold light, and the Threshold of the gods themselves.'
     - The prophecy walks with you whether you will it or not. Grow strong here first. The hidden world does not forgive the unready.
+  - id: nerissa
+    name: Nerissa, Keeper of the Tide
+    region: temple
+    color: '#5ab0c0'
+    role: Priestess of Thalassar
+    greeting: Mind the water, Unmarked. It remembers every footstep.
+    tx: 10
+    ty: 28
+    lines:
+    - This temple was raised to the Deep Sovereign, but the bronze guardians Pyrrhon left here have forgotten which god they serve. They strike at anything that moves.
+    - Break three of the Bronze Watchers and the tide will settle. Thalassar does not forget a kindness.
+  - id: damon
+    name: Damon the Last Watchman
+    region: ruins
+    color: '#a090b0'
+    role: Keeper of the Hollow Reach
+    greeting: Another living face. It has been a long time.
+    tx: 32
+    ty: 28
+    lines:
+    - When the city fell, every family pressed its names into clay tokens. The shades still wander looking for them.
+    - Find five Grave Tokens among the ruins and bring them to me. I will read the names aloud, and the shades will finally sleep.
+  - id: ione
+    name: Ione the Lampbearer
+    region: caves
+    color: '#c8a0e0'
+    role: Guide of the Underway
+    greeting: Keep close to my lamp. The dark down here has teeth.
+    tx: 12
+    ty: 9
+    lines:
+    - The Hollow Hounds hunt in packs where the tunnels narrow. While they prowl, no lamp in the Underway stays lit for long.
+    - Thin the pack by four and I can light the old path down toward the Veiled Queen's gate.
+  - id: aster
+    name: Captain Aster
+    region: citadel
+    color: '#b0b8d8'
+    role: Captain of the Pale Guard
+    greeting: Halt. No, wait. You carry a god's light. Pass.
+    tx: 26
+    ty: 36
+    lines:
+    - My guard is three soldiers and a dog, and the Strix have taken the towers. They scream omens all night long.
+    - Bring down four of them, Unmarked, and the Pale Citadel will open its gates to you.
+  - id: herald
+    name: The Herald of the Theurgoi
+    region: godreach
+    color: '#ffe0a0'
+    role: Voice of the Sleeping Gods
+    greeting: So the prophecy walks on its own feet at last.
+    tx: 26
+    ty: 38
+    lines:
+    - The Theurgoi dream, and their dreams fall here as embers of starlight.
+    - Gather three Star Embers and bring them to me. With them I can wake the Stormcrown long enough for him to claim you.
+  extraItems:
+  - id: graveToken
+    name: Grave Token
+    type: quest
+    desc: A clay token pressed with a name. The shades of the Hollow Reach cannot rest until someone speaks it.
+    heal: 0
+    mana: 0
+    fireDamage: 0
+  - id: starEmber
+    name: Star Ember
+    type: quest
+    desc: A coal of fallen starlight from the Threshold. Warm, and humming with a god's half-remembered dream.
+    heal: 0
+    mana: 0
+    fireDamage: 0
+  questPickups:
+  - region: ruins
+    item: graveToken
+    type: graveToken
+    color: '#c8b8e8'
+    count: 5
+  - region: godreach
+    item: starEmber
+    type: starEmber
+    color: '#ffe08a'
+    count: 3
   bossKits:
   - id: goodPlaz
     params:
@@ -1180,3 +1394,58 @@ MonoBehaviour:
     ability: Blink
     special: teleport
     cooldown: 0.3
+  bounties:
+  - id: goodPlaz
+    first: 150
+    repeat: 40
+    par: 45
+  - id: badPlaz
+    first: 200
+    repeat: 50
+    par: 60
+  - id: mordekai
+    first: 180
+    repeat: 45
+    par: 50
+  - id: vlado
+    first: 250
+    repeat: 60
+    par: 70
+  gauntlet:
+    order:
+    - goodPlaz
+    - badPlaz
+    - mordekai
+    - vlado
+    first: 600
+    repeat: 150
+    par: 240
+    healBetween: 20
+  battleItems:
+  - id: healingDraught
+    name: Healing Draught
+    icon: draught
+    desc: 'Boss fights: restores 35 health. Press 1 to drink.'
+    effect: heal
+    price: 60
+    max: 3
+    value: 35
+    duration: 0
+  - id: swiftwingElixir
+    name: Swiftwing Elixir
+    icon: swift
+    desc: 'Boss fights: 40% faster feet and shots for 6 seconds. Press 2.'
+    effect: swift
+    price: 90
+    max: 3
+    value: 0.4
+    duration: 6
+  - id: wardingCharm
+    name: Warding Charm
+    icon: charm
+    desc: 'Boss fights: the next 3 hits are turned aside. Press 3.'
+    effect: ward
+    price: 120
+    max: 3
+    value: 3
+    duration: 0
