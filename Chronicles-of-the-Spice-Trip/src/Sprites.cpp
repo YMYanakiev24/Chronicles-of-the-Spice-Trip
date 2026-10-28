@@ -1,0 +1,94 @@
+// ============================================================================
+//  Sprites.cpp — loading + drawing of the dungeon pack animations.
+// ============================================================================
+#include "Sprites.h"
+#include "Render.h"
+#include "Common.h"
+#include <string>
+
+Sprites SPR;
+
+static Texture2D loadTexture(const char* file) {
+    std::string p = findAsset((std::string("dungeon/") + file).c_str());
+    if (p.empty()) return Texture2D{};
+    Texture2D t = LoadTexture(p.c_str());
+    SetTextureFilter(t, TEXTURE_FILTER_POINT);   // keep pixel art crisp
+    return t;
+}
+
+// Load a strip whose frames are `frameW` wide (frame height = image height).
+static Anim loadStrip(const char* file, int frameW) {
+    Anim a;
+    a.tex = loadTexture(file);
+    if (!a.ok()) return a;
+    a.fw = frameW; a.fh = a.tex.height;
+    a.frames = a.tex.width / frameW;
+    if (a.frames < 1) a.frames = 1;
+    return a;
+}
+
+static EnemyAnims loadEnemy(const char* prefix) {
+    EnemyAnims e;
+    std::string p = prefix;
+    e.idle = loadStrip((p + "_idle.png").c_str(), 32);
+    e.move = loadStrip((p + "_move.png").c_str(), 32);
+    e.attack = loadStrip((p + "_attack.png").c_str(), 32);
+    e.hurt = loadStrip((p + "_hurt.png").c_str(), 32);
+    e.death = loadStrip((p + "_death.png").c_str(), 32);
+    return e;
+}
+
+void Sprites::load() {
+    tileset = loadTexture("tileset.png");
+    peaks = loadStrip("peaks.png", 16);
+    chest = loadStrip("chest.png", 16);
+    chestOpen = loadStrip("chest_open.png", 16);
+    torch = loadStrip("torch.png", 16);
+    sideTorch = loadStrip("side_torch.png", 16);
+    candle = loadStrip("candlestick.png", 16);
+    candle2 = loadStrip("candlestick2.png", 16);
+    flaskRed = loadStrip("flask_red.png", 16);
+    flaskBlue = loadStrip("flask_blue.png", 16);
+    flag = loadStrip("flag.png", 16);
+    coin = loadStrip("coin.png", 16);
+    skull = loadStrip("skull.png", 16);
+    oracle = loadStrip("oracle.png", 16);
+    flame = loadStrip("flame.png", 32);
+    vapes = loadStrip("vapes.png", 32);
+    spellIcons = loadStrip("spell_icons.png", 32);
+    enemy[EK_SKELETON] = loadEnemy("skel1");
+    enemy[EK_SKELETON2] = loadEnemy("skel2");
+    enemy[EK_VAMPIRE] = loadEnemy("vamp");
+    enemy[EK_THIEF] = loadEnemy("thief");
+    enemy[EK_MELON] = loadEnemy("melon");
+}
+
+void Sprites::unload() {
+    auto un = [](Texture2D& t) { if (t.id) UnloadTexture(t); t = Texture2D{}; };
+    un(tileset);
+    for (Anim* a : { &peaks, &chest, &chestOpen, &torch, &sideTorch, &candle, &candle2,
+                     &flaskRed, &flaskBlue, &flag, &coin, &skull, &oracle, &flame, &vapes, &spellIcons })
+        un(a->tex);
+    for (auto& e : enemy)
+        for (Anim* a : { &e.idle, &e.move, &e.attack, &e.hurt, &e.death }) un(a->tex);
+}
+
+int animFrame(const Anim& a, float time, float fps, bool loop) {
+    int f = (int)(time * fps);
+    if (f < 0) f = 0;
+    if (loop) return f % a.frames;
+    return f >= a.frames ? a.frames - 1 : f;
+}
+
+void drawAnim(const Anim& a, int frame, Vector2 center, float scale, bool flipX, Color tint, float rotation) {
+    if (!a.ok()) return;
+    Rectangle src = { (float)(frame * a.fw), 0, flipX ? -(float)a.fw : (float)a.fw, (float)a.fh };
+    float w = a.fw * scale, h = a.fh * scale;
+    DrawTexturePro(a.tex, src, { center.x, center.y, w, h }, { w / 2, h / 2 }, rotation, tint);
+}
+
+void drawTile(int col, int row, float x, float y, Color tint) {
+    if (!SPR.tileset.id) return;
+    DrawTexturePro(SPR.tileset, { col * 16.0f, row * 16.0f, 16, 16 }, { x, y, (float)TILE, (float)TILE },
+        { 0, 0 }, 0, tint);
+}

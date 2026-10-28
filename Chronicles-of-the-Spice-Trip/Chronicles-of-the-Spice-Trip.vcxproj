@@ -151,6 +151,7 @@
     <ClCompile Include="src\World.cpp" />
     <ClCompile Include="src\Render.cpp" />
     <ClCompile Include="src\Rooms.cpp" />
+    <ClCompile Include="src\Sprites.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="include\Common.h" />
@@ -160,6 +161,7 @@
     <ClInclude Include="include\Render.h" />
     <ClInclude Include="include\Settings.h" />
     <ClInclude Include="include\Rooms.h" />
+    <ClInclude Include="include\Sprites.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
