@@ -1,4 +1,6 @@
+# Visual Studio and build output
 .vs/
+build/
 [Dd]ebug/
 [Rr]elease/
 x64/
@@ -12,4 +14,11 @@ x86/
 *.ilk
 *.user
 *.aps
+
+# Player files the game writes next to itself
 savegame.dat
+settings.dat
+profile.dat
+
+# Autopilot screenshots and logs
+autopilot/

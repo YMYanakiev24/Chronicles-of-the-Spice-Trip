@@ -1,145 +1,118 @@
-# The Mythic Chronicles: The Hidden World
+# Chronicles of the Spice Trip
 
-*(repo: Chronicles-of-the-Spice-Trip)*
+A dark pixel-art dungeon crawler written in C++ with [raylib](https://www.raylib.com/).
+Pick a champion, fight down through randomly built floors of the Mistwood
+Depths, and beat the boss at the bottom of each one: the four bosses from the
+Path in their painted arenas, then Pyraketh, the Cinder-Maw.
 
-A dark, retro **2D pixel-art Greek-mythology RPG** built from scratch with
-vanilla JavaScript and the HTML5 Canvas — no engine, no build step, and **no
-external art or audio files**. Every sprite and tile is generated procedurally
-as pixel art, every sound is synthesized at runtime, and the whole thing runs in
-a single browser tab.
+## Building and running
 
-> The Veil between the mortal world and the old one has thinned around you. You
-> are **Unmarked** — a demigod whose divine parent has not yet claimed you —
-> woken in the cursed **Mistwood** by the last Oracle. The sleeping gods, the
-> **Theurgoi**, are stirring, and an ancient prophecy walks with you.
+You need Visual Studio 2026 with the **Desktop development with C++** workload.
+raylib is included in `Chronicles-of-the-Spice-Trip/vendor/`, so there is
+nothing else to install.
 
-It plays like a lost late-90s RPG cartridge: fog-drowned forests, haunted ruins,
-drowned temples, shadowed caves and a pale citadel of cold light — all lit by
-candle, brazier and moon against a deep, mysterious dark.
+1. Open `Chronicles-of-the-Spice-Trip/Chronicles-of-the-Spice-Trip.slnx`.
+2. Pick **Release | x64** (or Debug) and press **F5**.
 
----
+From a Developer Command Prompt:
 
-## ▶ How to run
-
-The game uses ES modules, so it must be served over HTTP (opening `index.html`
-directly via `file://` will not load the modules). A tiny zero-dependency Node
-server is included — **no `npm install`, no internet required**:
-
-```bash
-node serve.mjs
-# then open http://localhost:8123
+```
+cd Chronicles-of-the-Spice-Trip
+msbuild Chronicles-of-the-Spice-Trip.vcxproj -p:Configuration=Release -p:Platform=x64
+build\x64\Release\ChroniclesOfTheSpiceTrip.exe
 ```
 
-Any other static server works too:
+Start the game from the `Chronicles-of-the-Spice-Trip` folder (Visual Studio
+already does), or from the build folder: it looks a few folders up for `assets/`.
+The build is not signed, so Windows SmartScreen or Smart App Control may stop it
+the first time it runs.
 
-```bash
-python -m http.server 8000      # then open http://localhost:8000
-npx serve .                     # Node alternative (needs internet the first time)
-```
-
-Open in a modern browser (Chrome, Edge or Firefox). Click once to enable audio.
-
----
-
-## 🎮 Controls
+## Controls
 
 | Input | Action |
 | --- | --- |
-| **W A S D** | Move (8-directional) |
-| **Mouse** | Aim spells & the blade |
-| **1 – 6** | Wield the god-power in that slot |
-| **Left Click** | Swing the godless blade (no-mana melee) |
-| **Right Click** | Cast the power in slot 1 |
-| **Shift** | Run |
-| **Space** | Dodge-roll (brief invulnerability) |
-| **E** | Talk to an NPC / interact (asphodel & shards auto-collect) |
-| **Tab** | Quest journal |
-| **I** | Satchel (inventory) |
-| **K** | Tome of powers |
-| **B** | Bestiary |
-| **M** | Map of the hidden world (fast-travel between unlocked realms) |
-| **Esc** | Pause / close menus |
+| W A S D | Move (Shift runs) |
+| Mouse | Aim |
+| Left click | Swing the blade |
+| Right click | Cast the selected power |
+| 1 / 2 / 3 | Emberhex (fire), Tidelash (water), Stormbolt (lightning) |
+| Q | Your champion's special |
+| Space | Dodge-roll |
+| E | Talk, trade, open chests |
+| Esc | Pause (save, controls, main menu) |
+| F11 | Fullscreen on/off |
 
----
+Movement, run, roll, interact and the special can be rebound in **Settings**.
 
-## ✦ Features
+## What's in the game
 
-- **Pixel-art everything, generated in code** — dithered terrain tilesets, gothic
-  props (dead trees, broken pillars, weathered statues, braziers, graves), and
-  animated hero/NPC/monster sprites, all rasterized procedurally. No image files.
-- **Dark, atmospheric lighting** — each region is plunged into gloom, then pools
-  of candle/brazier/moon light are carved back out, with drifting fog layers, a
-  player torch, glowing windows and a vignette. The dark is the point.
-- **A cinematic intro** — a moonlit, fog-drowned valley with the Pale Citadel
-  burning cold light on a black hill, framed by a dead-tree forest, while the
-  prophecy fades in. Click to begin.
-- **Six themed realms** — the cursed **Mistwood**, the **Drowned Temple**, the
-  haunted **Hollow Reach**, the **Underway** caves, the **Pale Citadel** and the
-  god-realm **Threshold** — each with its own palette, darkness, fog and monsters.
-- **Six divine powers** — Emberhex (fire), Tidelash (water/slow), Stormbolt
-  (chaining lightning), Wildmend (heal), Grey Ward (shield) and the AoE ultimate
-  **Stormcrown's Wrath** — all mouse-aimed, with particles, dynamic light,
-  screen-shake and synthesized sound. Powers upgrade as you level and quest.
-- **Monsters with AI & lore** — mistling shades, hollow hounds, serpentine
-  gorgythe, ranged strix, bronze automatons and the **Cinder-Maw** boss, each
-  with weaknesses, behaviors and bestiary entries.
-- **Quests, NPCs & dialogue** — an original chain of divine errands (a stolen
-  relic, asphodel for the dead, the Trial of Bronze, the Cinder-Maw) with a full
-  journal and quest-marker NPCs.
-- **Progression & UI** — XP, levels, gold, inventory (ambrosia & nectar), a
-  learnable tome and a fill-in bestiary, all wrapped in an "ancient tome" UI with
-  HUD bars, a spell hotbar, a live minimap, floating damage numbers and banners.
-- **Save system & settings** — localStorage saves, volume/sensitivity options, a
-  pause menu and a tutorial for new players.
+- **The dungeon.** Each floor is a grid of single-screen rooms. Doors stay
+  barred until a room is cleared. There are spike traps, chests, a start room
+  with Theira the Oracle, and Marin's Market, where potions, timed vape buffs
+  and permanent skills are sold for gold.
+- **Boss fights.** The last room of every floor holds a boss (see below).
+- **Champions.** Ten champions, each with a passive perk and a special on **Q**:
+  Arcane Surge, Aura of Calmness, Coin Dash, Mug-Shield, Melon Roll, Drink,
+  Bear Jump, Coin Barrage, Release the Koi and Blink.
+- **Boss Rush.** All five bosses back to back at level 5, timed. The best time
+  is kept.
+- **Saves.** Save from the pause menu and **Continue** from the main menu.
+  Records (deepest floor, bosses beaten, best Boss Rush) and settings are kept
+  between runs.
 
----
+### The bosses
 
-## 🗂 Project structure
+Each fight shows the boss's name, a health bar, and the spell school it's weak
+to (x1.6 damage).
+
+| Floor | Boss | How it fights |
+| --- | --- | --- |
+| 1 | The Good Plazmodium | 3-shot spreads, then splits into three copies; copies can leave tiny ones |
+| 2 | The Bad Plasmodium | The same, with 5-shot spreads and copies that fire 3 |
+| 3 | Mordekai | Fans of 7 feathers, and a dive at you every third volley |
+| 4 | Vlado | Spirals of 12 tickets, and a whistle that sends bus No.9 down your lane |
+| 5 | Pyraketh, the Cinder-Maw | Chases you, breathes rings of embers, and throws fireballs once wounded |
+
+Beating floor 5 completes the Spice Trip. You can keep descending; every cycle
+the bosses get 50% stronger. The numbers for each boss are at the top of
+`src/Bosses.cpp`.
+
+## Project layout
 
 ```
-index.html              Canvas + UI host + pixel font
-serve.mjs               Tiny zero-dependency static dev server
-css/style.css           The entire UI theme (HUD + ancient-tome panels)
-js/
-  main.js               Entry point / Canvas guard
-  core/
-    Game.js             Orchestrator: 2D loop, virtual buffer, state machine,
-                        camera, region loading, dialogue, spawning, travel
-    Input.js            Keyboard + mouse (absolute aim)
-    AudioManager.js     Procedural Web Audio music & SFX
-    SaveManager.js      localStorage save/load
-    Utils.js            Math, easing, seeded RNG, value noise, 2D helpers
-  world/
-    PixelArt.js         Procedural pixel sprites: tiles, props, characters, monsters
-    TileMap.js          Tile maps, collision, prop/pickup placement, lighting + fog
-  entities/
-    Player.js           Top-down controller, roll, melee, stats + progression
-    Enemy.js            Creature AI + health bars + hit flash
-    NPC.js              Quest-givers + dialogue triggers + markers
-  systems/
-    MagicSystem.js      Spells, 2D projectiles, chaining beams, effects, lights
-    CombatSystem.js     Damage arbitration, XP/loot
-    QuestSystem.js      Quest state machine & objectives
-  ui/
-    UI.js               HUD + minimap + all menu panels + dialogue
-  intro/
-    IntroScene.js       The pixel-painted cinematic opening
-  data/
-    GameData.js         All content: gods, prophecy, regions, spells, monsters,
-                        quests, NPCs, items
+Chronicles-of-the-Spice-Trip/
+  src/main.cpp        window setup and the frame loop
+  include/Game.h      all game state; the code is split across:
+    src/Game.cpp        runs, rooms, floors, records
+    src/Play.cpp        movement, combat, champions, enemies, loot
+    src/PlayDraw.cpp    the room, actors, HUD and overlays
+    src/Screens.cpp     menu, champion select, settings, intro
+  src/Bosses.cpp      the five bosses: table, attack patterns, drawing
+  src/Champions.cpp   the champion roster (perks and specials)
+  src/Rooms.cpp       floor generation, room layouts, collision, pathfinding
+  src/Render.cpp      hero, monsters and projectiles
+  src/Sprites.cpp     the dungeon sprite pack
+  src/Audio.cpp       sound effects and music, synthesised at runtime
+  src/Ui.cpp          the UI style: palette, text, panels, buttons, bars
+  src/Input.cpp       keyboard and mouse (real or scripted)
+  src/Save.cpp        savegame.dat, profile.dat, settings.dat
+  src/Autopilot.cpp   the automated play-through (see below)
+  assets/             art; assets/arenas/ holds the four painted boss arenas
+  vendor/raylib/      raylib headers and library
 ```
 
----
+## Automated play-through
 
-## 📜 A note on the setting
+`--autopilot <folder>` plays the whole game with scripted input. It clicks
+through the menus, fights a room, opens a chest, shops, beats all five bosses,
+completes a run, saves and continues, wins a Boss Rush, and tries every
+champion's special. It writes a PASS/FAIL line for each check to
+`<folder>/autopilot.log`, saves screenshots next to it, and exits with the
+number of failures:
 
-The pantheon (**the Theurgoi**), the demigod framing, the prophecy, the monsters
-and the sacred underworld flower (**asphodel**, tended for the restless dead) are
-entirely original inventions. They aim for the *feeling* of Greek-myth adventure
-fiction — a hidden world of gods, demigods, prophecies and beasts existing
-alongside the mortal one — **without reusing any real or fictional names,
-characters or locations**. It is worldbuilding and atmosphere, not realism.
+```
+build\x64\Release\ChroniclesOfTheSpiceTrip.exe --autopilot autopilot
+```
 
----
-
-*Built as a complete indie game prototype. No external assets — just code.*
+It uses its own save folder (`<folder>/save`, emptied first), so your saves are
+never touched. `--savedir <folder>` moves the normal saves too.

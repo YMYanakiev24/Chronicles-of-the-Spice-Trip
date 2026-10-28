@@ -99,6 +99,10 @@ namespace au {
         b.clear(); { float f[4] = { 523,659,784,1047 }; for (int i = 0; i < 4; ++i) renderTone(b, f[i], 0, TRI, 0.25f, 0.30f, i * 0.11f); } make("levelup", b);
         b.clear(); renderTone(b, 600, 0, SINE, 0.06f, 0.18f); make("ui", b);
         b.clear(); renderTone(b, 300, 60, SAW, 1.20f, 0.40f); make("death", b);
+        // Vlado's whistle: two sharp blasts. Then the bus: a low engine roar.
+        b.clear(); for (int i = 0; i < 2; ++i) { renderTone(b, 2100, 2000, SQUARE, 0.16f, 0.16f, i * 0.22f); renderNoise(b, 0.16f, 0.10f, 3200, 2.0f, 2, i * 0.22f); } make("whistle", b);
+        b.clear(); renderTone(b, 70, 110, SAW, 0.70f, 0.35f); renderNoise(b, 0.70f, 0.30f, 300, 0.6f, 0); make("bus", b);
+        b.clear(); renderTone(b, 1320, 1760, SQUARE, 0.08f, 0.12f); renderTone(b, 1760, 0, SINE, 0.20f, 0.18f, 0.06f); make("coin", b);
         return m;
     }
 
@@ -108,6 +112,7 @@ namespace au {
     void Music::setMood(const std::string& mood) {
         active = true;
         if (mood == "menu") { root = 130.81f; droneType = SINE; arpType = SINE; rate = 2.6f; }
+        else if (mood == "boss") { root = 110.0f; droneType = TRI; arpType = SQUARE; rate = 0.9f; }
         else { root = 130.81f; droneType = SINE; arpType = TRI; rate = 2.8f; } // mist
     }
 
