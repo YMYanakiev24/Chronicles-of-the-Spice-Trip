@@ -1,12 +1,12 @@
 /*
  * SaveService.cs
  * ----------------------------------------------------------------------------
- * Persists the same three stores as the web game's SaveManager.js, as JSON
- * files in Application.persistentDataPath instead of localStorage:
- *   save.json      the RPG chronicle (Phase 2)
- *   settings.json  volumes and options (survive a deleted save)
+ * Persists the game's stores as JSON files in Application.persistentDataPath
+ * (the web game's SaveManager.js used localStorage):
+ *   settings.json  volumes and mute
  *   hub.json       Marin's wallet, the stash of shop purchases, defeated
  *                  bosses and (new in Unity) the selected champion
+ * The Dungeon keeps its own two files next to these (DungeonSave).
  * ----------------------------------------------------------------------------
  */
 
@@ -73,14 +73,11 @@ namespace SpiceTrip.Core
     {
         public float musicVolume = 0.5f;
         public float sfxVolume = 0.7f;
-        public float mouseSensitivity = 1.0f;
-        public bool shadows = true;
         public bool muted = false;
     }
 
     public class SaveService
     {
-        public const string SaveFile = "save.json";
         public const string SettingsFile = "settings.json";
         public const string HubFile = "hub.json";
 
@@ -94,8 +91,6 @@ namespace SpiceTrip.Core
         public string Directory => _dir;
         string PathOf(string file) => Path.Combine(_dir, file);
 
-        public bool HasSave() => File.Exists(PathOf(SaveFile));
-        public void ClearSave() { try { File.Delete(PathOf(SaveFile)); } catch (Exception) { /* ignore */ } }
 
         public HubData LoadHub(int startingGold)
         {

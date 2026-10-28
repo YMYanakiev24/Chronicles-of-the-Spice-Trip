@@ -24,7 +24,7 @@ using UnityEngine.UIElements;
 
 namespace SpiceTrip.Core
 {
-    public class Autopilot : MonoBehaviour
+    public partial class Autopilot : MonoBehaviour
     {
         GameRoot _g;
         string _dir;
@@ -322,7 +322,7 @@ namespace SpiceTrip.Core
             yield return Wait(0.3f);
             Check("Leave returns to the main menu", _g.State == "menu");
 
-            yield return ChronicleTour();
+            yield return DungeonTour();
 
             _log.AppendLine(_failures == 0 ? "RESULT  all checks passed" : $"RESULT  {_failures} check(s) failed");
             File.WriteAllText(Path.Combine(_dir, "autopilot.log"), _log.ToString());
@@ -335,7 +335,7 @@ namespace SpiceTrip.Core
         }
 
         // =====================================================================
-        // The Chronicle (restored RPG)
+        // Keys
         // =====================================================================
         IEnumerator Press(params Key[] keys)
         {
@@ -355,170 +355,6 @@ namespace SpiceTrip.Core
             yield return Wait(seconds);
             InputSystem.QueueStateEvent(kb, new KeyboardState());
             yield return null;
-        }
-
-        IEnumerator ChronicleTour()
-        {
-            var ctx = _g.Ctx;
-            var ch = _g.Chronicle;
-            int stashed = ctx.Hub.StashCount(ctx.Db.shopStock[0].id);
-            Check("Marin's purchase is waiting in the stash", stashed >= 1);
-
-            yield return Click(Q("btn-new-chronicle"), "New Chronicle");
-            yield return Wait(1.0f);
-            Check("New Chronicle plays the intro", ch.Intro.Playing);
-            yield return Shot("intro");
-            yield return Click(Q("intro"), "skip intro");
-            yield return Wait(0.6f);
-            var game = ch.Game;
-            Check("the Chronicle starts in the Mistwood", !ch.Intro.Playing && game.Playing && game.CurrentRegion == "mistwood");
-            Check("the first quest is active", game.Quests.state["awakening"] == "active");
-            Check("Marin's wares are handed over", game.Player.ItemCount(ctx.Db.shopStock[0].id) >= stashed && ctx.Hub.stash.Count == 0);
-            Check("region music plays", _g.Audio.CurrentMood == "mist");
-            yield return Wait(1.2f);
-            yield return Shot("mistwood");
-
-            // walk with the keyboard
-            float x0 = game.Player.x;
-            yield return Hold(0.6f, Key.D);
-            Check("D walks the Unmarked right", game.Player.x > x0 + 20);
-
-            // cast Emberhex with key 1, aimed by the mouse
-            game.Enemies.Clear();
-            yield return MouseTo(new Vector2(Screen.width * 0.75f, Screen.height * 0.5f));
-            float mana = game.Player.mana;
-            yield return Press(Key.Digit1);
-            yield return Wait(0.05f);
-            Check("key 1 casts Emberhex", game.Player.mana < mana && (game.Magic.Projectiles.Count > 0 || game.Quests.progress["awakening"][0] == 1));
-            yield return Shot("emberhex");
-            Check("casting advances the quest", game.Quests.progress["awakening"][0] == 1);
-
-            // banish three mistlings
-            for (int i = 0; i < 3; i++)
-            {
-                var m = new Rpg.Enemy(game, ctx.Db.Creature("mistling"), game.Player.x + 30, game.Player.y);
-                game.Enemies.Add(m);
-                game.Combat.DamageEnemy(m, 999, "Fire");
-            }
-            yield return Wait(0.3f);
-            Check("three mistlings make the quest ready", game.Quests.state["awakening"] == "ready");
-
-            // talk to the Oracle with E and hand the quest in through the dialogue buttons
-            var oracle = game.Npcs.Find(n => n.def.id == "oracle");
-            game.Player.x = oracle.x + 12; game.Player.y = oracle.y;
-            yield return Wait(0.2f);
-            Check("the interact prompt appears near the Oracle", ch.Hud.InteractShowing);
-            yield return Press(Key.E);
-            yield return Wait(0.3f);
-            Check("E opens the dialogue", ch.Hud.DialogueOpen);
-            yield return Shot("dialogue");
-            for (int i = 0; i < 4 && ch.Hud.DialogueOpen; i++)
-            {
-                VisualElement first = null;
-                foreach (var c in ch.Hud.DialogueChoices) { first = c; break; }
-                yield return Click(first, "dialogue choice");
-                yield return Wait(0.25f);
-            }
-            Check("the quest is handed in", game.Quests.state["awakening"] == "completed");
-            Check("the reward gold is paid", game.Player.gold >= 20);
-            yield return Wait(0.3f);
-            yield return Shot("quest-complete");
-
-            // the book panels, opened with their hotkeys
-            (Key key, string panel, string shot)[] panels =
-            {
-                (Key.Tab, "quests", "journal"), (Key.I, "inventory", "satchel"), (Key.K, "skills", "spellbook"),
-                (Key.M, "map", "world-map"), (Key.B, "skills", "bestiary"),
-            };
-            foreach (var (key, panel, shot) in panels)
-            {
-                yield return Press(key);
-                yield return Wait(0.25f);
-                Check($"{key} opens the {shot}", ch.Book.ActivePanel == panel);
-                yield return Shot(shot);
-                yield return Press(Key.Escape);
-                yield return Wait(0.2f);
-                Check($"Esc closes the {shot}", ch.Book.ActivePanel == null);
-            }
-            Check("the satchel holds Marin's ware", game.Player.ItemCount(ctx.Db.shopStock[0].id) >= 1);
-
-            // pause → save → quit to title → continue
-            yield return Press(Key.Escape);
-            yield return Wait(0.25f);
-            Check("Esc pauses", ch.Book.ActivePanel == "pause");
-            yield return Shot("pause");
-            yield return Click(Q("pause-save"), "Save Chronicle");
-            yield return Wait(0.2f);
-            Check("saving writes save.json", File.Exists(Path.Combine(ctx.Save.Directory, SaveService.SaveFile)));
-            float sx = game.Player.x, sy = game.Player.y;
-            int level = game.Player.level;
-            yield return Click(Q("pause-quit"), "Quit to Title");
-            yield return Wait(0.4f);
-            Check("Quit to Title returns to the menu", _g.State == "menu" && !ch.Active);
-            yield return Click(Q("btn-continue-chronicle"), "Continue Chronicle");
-            yield return Wait(0.6f);
-            Check("Continue restores the Chronicle", ch.Active && game.Player != null && Mathf.Abs(game.Player.x - sx) < 1 && Mathf.Abs(game.Player.y - sy) < 1 && game.Player.level == level);
-            Check("the completed quest stays completed", game.Quests.state["awakening"] == "completed");
-
-            // death and respawn
-            game.Player.invuln = 0;
-            game.Player.TakeDamage(9999);
-            yield return Wait(0.3f);
-            Check("dying shows the death screen", ch.Hud.DeathShowing);
-            yield return Shot("death");
-            yield return Click(Q("respawn-btn"), "Return to the last shrine");
-            yield return Wait(0.3f);
-            Check("respawning restores the Unmarked", !game.Player.dead && !ch.Hud.DeathShowing);
-
-            // fast travel through the World Map
-            game.Player.level = 9;
-            yield return Wait(0.2f);
-            yield return Press(Key.M);
-            yield return Wait(0.25f);
-            yield return Click(Q("region-caves"), "the Underway");
-            yield return Wait(0.2f);
-            yield return Click(Q("travel-btn"), "Travel here");
-            yield return Wait(1.5f);
-            Check("fast travel reaches the Underway", game.CurrentRegion == "caves" && ch.Book.ActivePanel == null);
-            yield return Shot("underway");
-
-            // A new realm quest: Damon in the Hollow Reach
-            game.TravelTo("ruins");
-            yield return Wait(1.0f);
-            var damon = game.Npcs.Find(n => n.def.id == "damon");
-            Check("the Hollow Reach has its quest-giver", damon != null && game.Map.Pickups.FindAll(p => p.item == "graveToken").Count == 5);
-            game.Enemies.Clear();
-            game.Player.x = damon.x + 12; game.Player.y = damon.y;
-            yield return Wait(0.2f);
-            yield return Press(Key.E);
-            yield return Wait(0.3f);
-            Check("Damon talks", ch.Hud.DialogueOpen);
-            yield return Shot("damon");
-            for (int i = 0; i < 4 && ch.Hud.DialogueOpen; i++)
-            {
-                VisualElement first = null;
-                foreach (var c in ch.Hud.DialogueChoices) { first = c; break; }
-                yield return Click(first, "dialogue choice");
-                yield return Wait(0.25f);
-            }
-            Check("Names of the Fallen is accepted", game.Quests.state["namesOfTheFallen"] == "active");
-            foreach (var pk in game.Map.Pickups.FindAll(p => p.item == "graveToken"))
-            {
-                game.Player.x = pk.x; game.Player.y = pk.y;
-                yield return null;
-                yield return null;
-            }
-            Check("five Grave Tokens make it ready", game.Quests.state["namesOfTheFallen"] == "ready");
-            yield return Shot("grave-tokens");
-            game.TravelTo("citadel");
-            yield return Wait(1.5f);
-            yield return Shot("pale-citadel");
-
-            yield return Press(Key.Escape);
-            yield return Wait(0.25f);
-            yield return Click(Q("pause-quit"), "Quit to Title");
-            yield return Wait(0.4f);
-            Check("the Chronicle ends back at the menu", _g.State == "menu");
         }
 
         static IEnumerator WaitFor(Func<bool> cond, float timeout)

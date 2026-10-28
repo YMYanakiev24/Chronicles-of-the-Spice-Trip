@@ -63,26 +63,9 @@ namespace SpiceTrip.Data
         public List<CharacterDef> characters = new List<CharacterDef>();
         public List<ShopEntry> shopStock = new List<ShopEntry>();
         public List<string> tips = new List<string>();
-        public List<string> prophecy = new List<string>();
         public int hubStartingGold = 1450;
         public BattleTuning battle = new BattleTuning();
         public LoomTuning loom = new LoomTuning();
-
-        // The Chronicle (RPG) content
-        public List<GodDef> gods = new List<GodDef>();
-        public List<RegionDef> regions = new List<RegionDef>();
-        public List<string> regionOrder = new List<string>();
-        public List<SpellDef> spells = new List<SpellDef>();
-        public List<string> spellOrder = new List<string>();
-        public List<CreatureDef> creatures = new List<CreatureDef>();
-        public List<QuestDef> quests = new List<QuestDef>();
-        public List<string> questOrder = new List<string>();
-        public List<NpcDef> npcs = new List<NpcDef>();
-
-        // New Chronicle content (chronicle-extra.json): realm quest items and where to find them.
-        // Kept apart from `items` so the original GameData items stay exactly as exported.
-        public List<ItemDef> extraItems = new List<ItemDef>();
-        public List<PickupDef> questPickups = new List<PickupDef>();
 
         // Phase 3 abilities (from abilities.json)
         public List<BossKitDef> bossKits = new List<BossKitDef>();
@@ -99,15 +82,6 @@ namespace SpiceTrip.Data
         public BattleItemDef BattleItem(string id) => battleItems.Find(b => b.id == id);
         public ChampionKitDef ChampionKit(string id) => championKits.Find(k => k.id == id);
 
-        public RegionDef Region(string id) => regions.Find(r => r.id == id);
-        public SpellDef Spell(string id) => spells.Find(s => s.id == id);
-        public CreatureDef Creature(string id) => creatures.Find(c => c.id == id);
-        public QuestDef Quest(string id) => quests.Find(q => q.id == id);
-        public NpcDef Npc(string id) => npcs.Find(n => n.id == id);
-
-        /// <summary>xpForLevel(L) = floor(60 · L^1.5)</summary>
-        public static int XpForLevel(int level) => (int)Math.Floor(60 * Math.Pow(level, 1.5));
-
         public const string ResourcePath = "Data/GameDatabase";
 
         static GameDatabase _instance;
@@ -120,7 +94,7 @@ namespace SpiceTrip.Data
             }
         }
 
-        public ItemDef Item(string id) => items.Find(i => i.id == id) ?? extraItems.Find(i => i.id == id);
+        public ItemDef Item(string id) => items.Find(i => i.id == id);
         public BossDef Boss(string id) => bosses.Find(b => b.id == id);
         public CharacterDef Character(string id) => characters.Find(c => c.id == id);
     }

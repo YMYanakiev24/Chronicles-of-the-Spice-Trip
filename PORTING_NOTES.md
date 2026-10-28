@@ -56,52 +56,11 @@ unless they're listed below.
     caught by the end-to-end run's log; without it the game would have been
     silent.
 
-## Phase 2 (the Chronicle): differences and why
+## Phase 2 (the Chronicle): removed
 
-14. **The RPG has its own menu entries.** The web game's Play goes to the
-    Path, and the RPG can't be reached. It's restored as **New Chronicle** and
-    **Continue Chronicle** on the main menu, and Play is unchanged. Marin's hub
-    wallet stays separate from the Chronicle's gold, as it was in the web game
-    whenever no RPG run was active. Shop purchases are handed over when a
-    Chronicle starts, with the original toast.
-15. **The intro cinematic plays when a new Chronicle starts.** The web build
-    skipped `IntroScene` at boot. It's skippable on any key or click, and moves
-    on by itself after 26 seconds, as before.
-16. **Lighting reproduces the original's maths instead of using URP Light2D.**
-    The web game darkens the view with `rgba(5,6,14,darkness)`, cuts light
-    pools out with `destination-out` radial gradients (1 → 0.7 at 60% → 0),
-    then adds coloured glows and a vignette. URP's 2D lights multiply instead
-    and use different falloff curves, and the screen-blended fog would need a
-    custom lit shader. So the darkness layer is computed on the CPU at half the
-    virtual resolution, with the same formula, and drawn over the scene. Glows,
-    fog and vignette use the same blend modes as the canvas.
-17. **The paint order is kept exactly.** The renderer is immediate-mode
-    (`IWorldPainter`): each draw call gets the next sorting order. The original
-    y-sorted draw() methods are ported line by line rather than rewritten as
-    scene objects.
-18. **Pixel scale follows `Game._resize`.** It's an integer scale from the
-    window height (base 270, clamped 2–5), and the virtual screen fills the
-    window at that scale. The Pixel Perfect Camera component isn't used,
-    because it picks its zoom differently (it never rounds up), so it would
-    show a different area at some window sizes.
-19. **Timers run on game time.** `setTimeout` calls (the tutorial hint, the
-    staggered Stormcrown's Wrath strikes and its Reckoning repeat) now pause
-    with the game while a panel or dialogue is open.
-20. **Invulnerability blink after rolling.** In `Player.draw`, the blink test
-    is `!this.rolling`. `rolling` goes slightly negative after the first roll
-    and never returns to 0, so the player never blinked again after rolling
-    once. The port treats "not rolling" as `rolling <= 0`.
-21. **World Map orbs.** `openMap` reads `r.sky.top`, which regions don't have,
-    so the web orbs had no colour. Each region's light tint is used instead.
-22. **Unknown quest rewards are skipped with a warning** (see `TopChuk` below).
-    In the web game the item went into the satchel, and opening the satchel
-    then threw an error, because `ITEMS['TopChuk']` is undefined.
-23. **Emoji in the RPG UI** (school icons 🔥🌊⚡🌿🛡️☀️, book tabs, ✔/◇ in the
-    tracker) are pixel icons, as in Phase 1. Quest markers (! ? ✔) above NPCs
-    are drawn as pixel glyphs.
-24. **Settings that do nothing in the web game** ("Shadows", "Mouse
-    Sensitivity") are kept and saved, and still do nothing, as before.
-    `Game.applyQuality` was empty in the web version too.
+The restored RPG was removed on 2026-10-28 at your request, with its data,
+procedural tiles, monsters and NPCs, tests and realm quests. Notes 14–24 that
+described it are in the git history.
 
 ## Phase 3: abilities from the art (approved design)
 
@@ -128,8 +87,7 @@ New content, not in the web game. It was built from the approved design table:
 None of this is in the web game. It was added on request, after Phase 3.
 
 - **Where the gold goes.** Bounties and battle items use the hub wallet
-  (Marin's gold), the same one the Apothecary already used. The Chronicle keeps
-  its own gold, as before.
+  (Marin's gold), the same one the Apothecary already used.
 - **Stars.** One for the win, one for ending with half your health or more, and
   one for that plus beating par. Being fast but badly hurt earns one star, so
   speed can't stand in for skill. The best rating and best time are kept
@@ -138,23 +96,37 @@ None of this is in the web game. It was added on request, after Phase 3.
   fights the player keeps their health and gets 20 back. The score is the total
   fight time, not counting the pauses between stages. Fleeing ends the run with
   nothing recorded.
-- **Battle items** are kept in `hub.json` (`battleSatchel`), separate from the
-  Chronicle satchel. A Healing Draught isn't used up at full health. A ward
+- **Battle items** are kept in `hub.json` (`battleSatchel`). A Healing Draught isn't used up at full health. A ward
   absorbs any hit, including contact and bus №9.
-- **Realm quests** live in `chronicle-extra.json` and are appended after the
-  original five-quest chain, so the original chain and its order are
-  unchanged. Each NPC stands in their realm's cleared spawn area. Quest items
-  are placed after the original map is generated, from their own seed, so
-  `MapParityTests` still match the JavaScript.
-- **The Last Rite** (the Threshold) rewards a Stormcrown's Wrath upgrade
-  instead of an item. Every other quest gives XP, Chronicle gold and existing
-  consumables.
+## The Dungeon (the C++ game): differences and why
+
+- **One game, two modes.** The Dungeon is the second entry on the main menu.
+  Its lobby picks the champion, and the choice is shared with the Changing
+  Room. Its gold is its own, like the C++ game's.
+- **The UI uses the Unity game's look.** The HUD, lobby and panels use UI
+  Toolkit with the same serif font, gold edges and violet panels as the rest of
+  the game, instead of raylib's pixel font. The layout follows the C++ HUD.
+- **The art is shared.** The dungeon sprite pack is copied into
+  `StreamingAssets/assets/dungeon`. The painted arenas and boss sheets are the
+  same files the Path uses, so replacing an arena changes both games.
+- **The hero walks.** The C++ hero is a block with a sword. Here it is the pixel
+  hero from `PixelArt.js`, facing the way it walks, in the champion's colours.
+- **Saves are JSON** (`dungeon.json` and `dungeon-profile.json` next to the
+  other saves) instead of raw binary structs.
+- **The rules are a separate class** (`DungeonGame`), so the EditMode tests
+  play it without rendering, with a seeded random generator.
+
+## The player's look on the Path
+
+The web game drew the champion's portrait card as the player. The arena now
+uses the walking pixel hero in the champion's colours, so the player faces the
+way they move. The portraits are still shown in the Changing Room and the
+Dungeon lobby.
 
 ## Problems found in the web source
 
-1. **`TopChuk`:** the `asphodel` quest rewards item `'TopChuk'`, which doesn't
-   exist in `ITEMS`. Quests are Phase 2. The port will log a warning and skip
-   unknown reward items. *What should TopChuk be?*
+1. **`TopChuk`:** a Chronicle quest rewarded an item that doesn't exist. The
+   Chronicle has been removed, so this no longer matters.
 2. **The README is out of date.** It describes the RPG as the main game and
    says there are no external assets, but Play goes to the Path and the
    painted art is in `assets/`. This project has its own README.
@@ -169,5 +141,5 @@ None of this is in the web game. It was added on request, after Phase 3.
    `coridor.jpg` = `corridor.jpg`, `wizardroom.jpg` = `shop.jpg`). Only one
    copy of each was brought over.
 6. **The RPG can't be reached.** `startNewGame` / `continueGame` have no menu
-   entry, so the web game today is only the Path and the hub. Phase 2 restores
-   the RPG as a separate menu mode.
+   entry, so the web game today is only the Path and the hub. Phase 2 restored
+   it as a separate menu mode; it has since been removed again.

@@ -138,7 +138,6 @@
     justify-content: flex-start;
     margin: 0; padding: 0;
 }
-.castle-hotspot:hover { background-color: rgba(255, 215, 107, 0.06); }
 .castle-label {
     flex-direction: row;
     align-items: center;
@@ -203,12 +202,11 @@
 .door-hotspot {
     position: absolute;
     background-color: rgba(0, 0, 0, 0);
-    border-width: 2px; border-color: rgba(0, 0, 0, 0);
+    border-width: 0;
     border-radius: 8px;
     margin: 0; padding: 0;
     overflow: visible;
 }
-.door-hotspot:hover { border-color: rgba(255, 235, 150, 0.8); background-color: rgba(255, 235, 150, 0.12); }
 .door-wizard { left: 9%; top: 19%; width: 25%; height: 60%; }
 .door-changing { left: 65%; top: 24%; width: 26%; height: 54%; }
 .door-label {
@@ -438,14 +436,10 @@
     position: absolute;
     width: 16%; height: 28%;
     background-color: rgba(0, 0, 0, 0);
-    border-width: 2px; border-color: rgba(0, 0, 0, 0);
-    border-radius: 12px;
+    border-width: 0;
     margin: 0; padding: 0;
     overflow: visible;
-    transition-property: border-color, background-color;
-    transition-duration: 0.15s;
 }
-.boss-hotspot:hover { border-color: rgba(255, 90, 90, 0.85); background-color: rgba(255, 90, 90, 0.12); }
 .boss-tip {
     position: absolute;
     bottom: 100%;
@@ -475,13 +469,11 @@
     position: absolute;
     right: 1%; top: 4%; width: 17%; height: 44%;
     background-color: rgba(0, 0, 0, 0);
-    border-width: 2px; border-color: rgba(255, 215, 107, 0.25);
-    border-radius: 10px;
+    border-width: 0;
     margin: 0; padding: 0;
     justify-content: flex-end;
     align-items: center;
 }
-.path-castle:hover { border-color: rgba(255, 215, 107, 0.85); background-color: rgba(255, 215, 107, 0.08); }
 .path-castle-label {
     flex-direction: row;
     align-items: center;

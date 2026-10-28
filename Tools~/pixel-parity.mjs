@@ -81,7 +81,6 @@ class Canvas {
 globalThis.document = { createElement: () => new Canvas() };
 
 const pa = await import(pathToFileURL(path.join(repo, 'js/world/PixelArt.js')).href);
-const gd = await import(pathToFileURL(path.join(repo, 'js/data/GameData.js')).href);
 
 function fnv(c) {
   let h = 2166136261;
@@ -94,16 +93,6 @@ const hero = pa.hero();
 for (const dir of ['down', 'up', 'left', 'right']) hero[dir].forEach((c, f) => { hashes[`hero.${dir}.${f}`] = fnv(c); });
 for (let f = 0; f < 3; f++) hashes[`flame.${f}`] = fnv(pa.flame(f));
 for (const name of ['deadTree', 'pine', 'pillar', 'statue', 'brazier', 'grave', 'altar', 'rubble', 'bush', 'candle']) hashes[`prop.${name}`] = fnv(pa.prop(name));
-for (const ts of ['forest', 'temple', 'ruins', 'cave', 'citadel', 'godreach']) {
-  for (const kind of ['floor', 'path', 'wall', 'water']) hashes[`tile.${ts}.${kind}.0`] = fnv(pa.getTile(ts, kind, 0));
-  hashes[`tile.${ts}.floor.3`] = fnv(pa.getTile(ts, 'floor', 3));
-}
-for (const id of Object.keys(gd.NPCS)) {
-  const set = pa.npc(gd.NPCS[id].color);
-  hashes[`npc.${id}.down.0`] = fnv(set.down[0]);
-  hashes[`npc.${id}.left.1`] = fnv(set.left[1]);
-}
-for (const id of Object.keys(gd.CREATURES)) pa.monster(gd.CREATURES[id]).forEach((c, f) => { hashes[`monster.${id}.${f}`] = fnv(c); });
 
 fs.mkdirSync(path.dirname(out), { recursive: true });
 fs.writeFileSync(out, JSON.stringify(hashes, null, 2) + '\n');

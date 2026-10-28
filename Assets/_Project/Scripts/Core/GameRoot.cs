@@ -34,11 +34,11 @@ namespace SpiceTrip.Core
         public HubController Hub { get; private set; }
         public BossBattleView Battle { get; private set; }
         public MainMenuScreen Menu { get; private set; }
-        public Rpg.ChronicleController Chronicle { get; private set; }
+        public Dungeon.DungeonController Dungeon { get; private set; }
         public LoadingScreen Loading { get; private set; }
         public VisualElement UiRoot { get; private set; }
         public bool Booted { get; private set; }
-        public string State { get; private set; } = "loading";   // loading | menu | hub | chronicle
+        public string State { get; private set; } = "loading";   // loading | menu | hub | dungeon
 
         float _time;
 
@@ -103,24 +103,22 @@ namespace SpiceTrip.Core
             var docRoot = doc.rootVisualElement;
             var sheet = Resources.Load<StyleSheet>("UI/Spice");
             if (sheet != null) docRoot.styleSheets.Add(sheet);
-            var rpgSheet = Resources.Load<StyleSheet>("UI/Rpg");
-            if (rpgSheet != null) docRoot.styleSheets.Add(rpgSheet);
+            var dungeonSheet = Resources.Load<StyleSheet>("UI/Dungeon");
+            if (dungeonSheet != null) docRoot.styleSheets.Add(dungeonSheet);
             UiRoot = UiKit.El("root", "ui");
             docRoot.Add(UiRoot);
             UiFonts.Apply(UiRoot);
 
             var menuLayer = Layer("menu-layer");
             var sceneLayer = Layer("scene-layer");
-            var rpgLayer = Layer("rpg-layer");
+            var dungeonLayer = Layer("dungeon-layer");
             var fogLayer = Layer("fog-layer");
             var battleLayer = Layer("battle-layer");
             var modalLayer = Layer("modal-layer");
 
             Loading = new LoadingScreen(Ctx);
             Menu = new MainMenuScreen(Ctx, () => Hub.EnterPath(),
-                () => { HideMainMenu(); State = "chronicle"; Chronicle.StartNew(); },
-                () => { HideMainMenu(); State = "chronicle"; Chronicle.ContinueSaved(); },
-                () => Chronicle != null && Chronicle.HasSave);
+                () => { HideMainMenu(); State = "dungeon"; Dungeon.OpenLobby(); });
             menuLayer.Add(Menu.Root);
             menuLayer.Add(Loading.Root);
 
@@ -137,13 +135,12 @@ namespace SpiceTrip.Core
             Hub = new HubController(Ctx, sceneLayer, modalLayer, fogLayer,
                 ShowMainMenu, HideMainMenu, (boss, ch) => Battle.Begin(boss, ch), ch => Battle.BeginGauntlet(ch));
 
-            var chronicleGo = new GameObject("Chronicle");
-            chronicleGo.transform.SetParent(transform, false);
-            Chronicle = chronicleGo.AddComponent<Rpg.ChronicleController>();
-            Chronicle.Init(Ctx, Audio, UiRoot, rpgLayer,
+            var dungeonGo = new GameObject("Dungeon");
+            dungeonGo.transform.SetParent(transform, false);
+            Dungeon = dungeonGo.AddComponent<Dungeon.DungeonController>();
+            Dungeon.Init(Ctx, UiRoot, dungeonLayer,
                 Resources.Load<Material>("Materials/SpriteAlpha"),
                 Resources.Load<Material>("Materials/SpriteAdditive"),
-                Resources.Load<Material>("Materials/SpriteScreen"),
                 ShowMainMenu);
         }
 

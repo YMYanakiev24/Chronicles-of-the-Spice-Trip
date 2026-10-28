@@ -147,37 +147,6 @@ namespace SpiceTrip.Tests
         }
 
         [UnityTest]
-        public IEnumerator ChronicleStartsSavesQuitsAndContinues()
-        {
-            _g.Ctx.Hub.AddToStash("nectarVial");
-            var ch = _g.Chronicle;
-            ch.StartNew(skipIntro: true);
-            yield return null;
-            yield return null;
-            Assert.IsTrue(ch.Active && ch.Game.Playing, "playing");
-            Assert.AreEqual("mistwood", ch.Game.CurrentRegion);
-            Assert.AreEqual(1, ch.Game.Player.ItemCount("nectarVial"), "Marin's stash is handed over");
-            Assert.AreEqual(0, _g.Ctx.Hub.stash.Count);
-            Assert.AreEqual("mist", _g.Audio.CurrentMood);
-
-            ch.Game.Player.gold = 77;
-            ch.Game.Player.x += 20;
-            float x = ch.Game.Player.x;
-            ch.QuitToTitle();   // saves first, like the web game
-            yield return null;
-            Assert.IsFalse(ch.Active);
-            Assert.AreEqual("menu", _g.State);
-            Assert.IsTrue(ch.HasSave);
-
-            ch.ContinueSaved();
-            yield return null;
-            Assert.IsTrue(ch.Game.Playing);
-            Assert.AreEqual(77, ch.Game.Player.gold);
-            Assert.AreEqual(x, ch.Game.Player.x, 0.01);
-            ch.QuitToTitle();
-        }
-
-        [UnityTest]
         public IEnumerator TheGauntletRunsAllFourBossesAndPaysOut()
         {
             foreach (var b in _g.Ctx.Db.bosses) _g.Hub.MarkBossDefeated(b.id);
@@ -214,6 +183,41 @@ namespace SpiceTrip.Tests
             Assert.AreEqual(gold + _g.Ctx.Db.gauntlet.first, _g.Ctx.Hub.gold, "first-clear bounty");
             Assert.AreEqual(1, new SaveService(_dir).LoadHub(1450).Record(Progression.GauntletId).wins);
             _g.Battle.Stop();
+        }
+
+        [UnityTest]
+        public IEnumerator TheDungeonRunsFromTheLobbyToABossAndBackToTheMenu()
+        {
+            var dc = _g.Dungeon;
+            dc.AutoPause = false;
+            dc.OpenLobby();
+            Assert.IsTrue(dc.InLobby);
+            dc.NewRun();
+            yield return null;
+            var game = dc.Game;
+            Assert.IsTrue(dc.Playing && game.Room.isStart);
+            Assert.IsTrue(dc.View.Camera.enabled, "the dungeon camera draws the room");
+
+            // walk into the boss room and finish the boss and its copies
+            for (int i = 0; i < game.Floor.rooms.Length; i++)
+                if (game.Floor.rooms[i].isBoss) { game.Floor.cx = i % Dungeon.Geo.FloorSize; game.Floor.cy = i / Dungeon.Geo.FloorSize; }
+            game.EnterRoom();
+            Assert.IsTrue(game.Fight.Active);
+            Assert.AreEqual("caves", _g.Audio.CurrentMood, "boss music");
+            for (int frame = 0; frame < 300 && !game.Room.cleared; frame++)
+            {
+                game.Player.invuln = 1;
+                foreach (var e in game.Enemies) e.hp = 0;
+                yield return null;
+            }
+            Assert.IsTrue(game.Room.cleared && game.StairsOpen);
+
+            dc.SaveRun();
+            Assert.IsTrue(dc.HasSave);
+            dc.QuitToMenu();
+            yield return null;
+            Assert.AreEqual("menu", _g.State);
+            Assert.IsFalse(dc.View.Camera.enabled);
         }
 
         [UnityTest]

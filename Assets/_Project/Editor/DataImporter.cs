@@ -21,17 +21,6 @@ namespace SpiceTrip.EditorTools
         public const string DatabasePath = "Assets/_Project/Resources/Data/GameDatabase.asset";
         public const string AbilitiesPath = "Assets/_Project/Data/Source/abilities.json";
         public const string ProgressionPath = "Assets/_Project/Data/Source/progression.json";
-        public const string ChronicleExtraPath = "Assets/_Project/Data/Source/chronicle-extra.json";
-
-        [System.Serializable]
-        class ChronicleExtraFile
-        {
-            public List<ItemDef> items = new List<ItemDef>();
-            public List<PickupDef> pickups = new List<PickupDef>();
-            public List<NpcDef> npcs = new List<NpcDef>();
-            public List<QuestDef> quests = new List<QuestDef>();
-            public List<string> questOrder = new List<string>();
-        }
 
         [System.Serializable]
         class ProgressionFile
@@ -104,33 +93,13 @@ namespace SpiceTrip.EditorTools
             foreach (var s in src.shopStock) db.shopStock.Add(new ShopEntry { id = s.id, price = s.price });
 
             db.tips = new List<string>(src.tips);
-            db.prophecy = new List<string>(src.prophecy);
             db.hubStartingGold = src.hubStartingGold;
             db.battle = new BattleTuning();
             db.loom = new LoomTuning();
 
-            var rpg = SourceData.LoadRpg();
-            db.gods = src.gods;
-            db.regions = src.regions;
-            db.regionOrder = src.regionOrder;
-            db.spells = src.spells;
-            db.spellOrder = src.spellOrder;
-            db.creatures = rpg.creatures;
-            db.quests = src.quests;
-            db.questOrder = src.questOrder;
-            db.npcs = rpg.npcs;
-
             var kits = JsonUtility.FromJson<AbilityFile>(File.ReadAllText(AbilitiesPath));
             db.bossKits = kits.bosses;
             db.championKits = kits.champions;
-
-            // New realm quests: appended after the original five so their order is unchanged.
-            var extra = JsonUtility.FromJson<ChronicleExtraFile>(File.ReadAllText(ChronicleExtraPath));
-            db.extraItems = extra.items;
-            db.questPickups = extra.pickups;
-            db.npcs.AddRange(extra.npcs);
-            db.quests.AddRange(extra.quests);
-            db.questOrder.AddRange(extra.questOrder);
 
             var prog = JsonUtility.FromJson<ProgressionFile>(File.ReadAllText(ProgressionPath));
             db.bounties = prog.bounties;
@@ -145,7 +114,6 @@ namespace SpiceTrip.EditorTools
             EditorUtility.SetDirty(db);
             AssetDatabase.SaveAssets();
             Debug.Log($"GameDatabase: {db.items.Count} items, {db.bosses.Count} bosses, {db.characters.Count} characters, {db.shopStock.Count} shop entries, " +
-                $"{db.regions.Count} regions, {db.spells.Count} spells, {db.creatures.Count} creatures, {db.quests.Count} quests, {db.npcs.Count} NPCs, " +
                 $"{db.bossKits.Count} boss kits, {db.championKits.Count} champion kits");
             return db;
         }

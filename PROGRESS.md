@@ -30,35 +30,12 @@ UI Toolkit).
 - **The built `.exe` was not launched** because of Smart App Control. The same
   code was exercised in the editor's Play mode.
 
-## Phase 2: the Chronicle (restored RPG) ✅ (Checkpoint B, 2026-10-23)
+## Phase 2: the Chronicle (restored RPG): removed on 2026-10-28
 
-| Area | Status | Verified by |
-| --- | --- | --- |
-| RPG data (gods, regions, spells, creatures, quests, NPCs) | ✅ | Imported from `source-data.json` |
-| Map generation for all six regions | ✅ | `MapParityTests`: walls, props, pickups and lights hash-identical to `TileMap.js` |
-| Player: walk/run, collision and sliding, roll, blade, casting, regen, levelling | ✅ | `ChronicleRulesTests` + autopilot (real keys) |
-| Spells: projectiles, chaining beam, heal, ward, ultimate, upgrades, lights | ✅ | Tests (weakness one-shot, ward absorb) + screenshots |
-| Enemies: wander/chase/attack, melee + ranged, weakness, hit flash, bars, Cinder-Maw, drip respawn | ✅ | Tests + screenshots |
-| Quests, NPC markers, data-driven dialogue, rewards, chaining | ✅ | Tests + autopilot (E to talk, dialogue buttons, hand-in) |
-| Darkness, light pools, fog, glows, vignette (original maths) | ✅ | Screenshots of the Mistwood, the Underway and the Pale Citadel |
-| HUD: vitals, hotbar + cooldowns, minimap, tracker, toasts, banners, damage numbers, hint, vignette, shake | ✅ | Screenshots |
-| Book: Satchel (use items), Spellbook, Bestiary, World Map (travel), Journal (track), Settings, Pause | ✅ | Autopilot opens each with its hotkey + screenshots |
-| Death screen and respawn | ✅ | Tests + autopilot |
-| Saves: save, quit to title, continue (position, stats, quests, regions, bestiary) | ✅ | Save round-trip test, PlayMode test, autopilot |
-| Region unlocks and fast travel | ✅ | Tests + autopilot through the World Map |
-| Intro cinematic + title card (skippable) | ✅ | Autopilot + screenshot |
-| Marin's stash handed to a new Chronicle | ✅ | PlayMode + autopilot |
-
-**Test results:** EditMode 61/61, PlayMode 7/7, autopilot 66/66 checks (hub +
-Chronicle, real input in the editor's Play mode). Windows build: 0 errors, 0
-warnings.
-
-**Not verified:**
-- **Sound** was not listened to; it is still checked numerically only.
-- **The built `.exe`** still can't be launched on this PC (Smart App Control).
-- **Balance over a full playthrough.** The tests cover each system and the
-  first quest end to end, but nobody has played all five quests and six realms
-  by hand.
+The restored RPG (New / Continue Chronicle) was built and tested on
+2026-10-23. It was removed at your request, together with its data, art,
+tests and the realm quests added for it. It is still in the git history (commit
+`d430755` and the later Phase 3 and "More things to do" commits).
 
 ## Phase 3: abilities from the art ✅ (built 2026-10-23, design approved)
 
@@ -83,23 +60,48 @@ from the design table; tune them in `abilities.json` after playing.
 | Boss bounties (first win / repeat), 1–3 star ratings, best times on the Path | ✅ | `BountyTests`, autopilot (bounty paid, Path shows the ratings) + screenshots |
 | Marin's battle wares (Healing Draught, Swiftwing Elixir, Warding Charm), carry limit 3 each, keys 1–3 in fights | ✅ | `BattleItemTests`, `MarinBattleWaresTests`, autopilot (buys a draught, drinks it with a real key 1 press) |
 | The Gauntlet: unlocks after all four, back to back, stage banners, health carried over, own bounty and best time | ✅ | `MarinBattleWaresTests`, PlayMode `TheGauntletRunsAllFourBossesAndPaysOut`, autopilot + screenshots |
-| A quest-giver and quest in each realm beyond the Mistwood (Nerissa, Damon, Ione, Captain Aster, the Herald) | ✅ | `RealmQuestTests` (all five), autopilot talks to Damon and gathers the Grave Tokens |
-| Quest items (Grave Tokens, Star Embers) scattered by a fixed seed, at least 6 tiles from spawn | ✅ | `RealmQuestTests`; the map-parity hashes still match because they're added after the original map is built |
-| The "E — Speak with…" prompt no longer shows through an open dialogue | ✅ | Screenshot |
+| A quest in each realm beyond the Mistwood | removed with the Chronicle | |
 | The autopilot empties its own `-savedir` first, so "first win" checks hold on every run | ✅ | Passes when run over the previous run's save |
 
 **Test results:** EditMode 95/95, PlayMode 8/8, autopilot 84/84 checks.
 Windows build: 0 errors, 0 warnings.
 
 **Not verified:** the new prices, bounties and par times haven't been
-play-tested by hand. They are all in `progression.json` and
-`chronicle-extra.json`, ready to tune.
+play-tested by hand. They are all in `progression.json`, ready to tune.
+
+## The Dungeon (the C++ game) ✅ (built 2026-10-28)
+
+The C++ raylib game from the GitHub repo (`boss-fights` branch), ported as a
+second game on the main menu.
+
+| Area | Status | Verified by |
+| --- | --- | --- |
+| Floors: rooms joined by doors, the start room, Marin's Market in a dead end, the boss farthest away; room layouts, spike traps, chests | ✅ | `DungeonTests` (40 seeded floors, 200 layouts), autopilot |
+| Movement, wall sliding, doors barred until a room is cleared, flow-field pathfinding | ✅ | `DungeonTests`, autopilot (real D key) |
+| The blade, the three powers, weaknesses (x1.6), the five monster kinds, loot, levelling | ✅ | `DungeonTests`, autopilot (spells clear a room) |
+| The five bosses: splitting Plasmodia, Mordekai's feathers and dive, Vlado's tickets and bus No.9, the Cinder-Maw's embers; painted arenas; round tokens; boss bar | ✅ | `DungeonTests` (each attack), autopilot + screenshots of every boss |
+| Completing the Spice Trip, then descending with stronger bosses | ✅ | `DungeonTests`, autopilot |
+| Ten champions: perks and Q specials | ✅ | One `DungeonTests` case each; Aura of Calmness with a real Q press |
+| Marin's Market, the oracle, pause / save / continue, records | ✅ | `DungeonTests`, PlayMode, autopilot |
+| Boss Rush with a best time | ✅ | `DungeonTests`, autopilot |
+
+## Changes on 2026-10-28
+
+| Change | Verified by |
+| --- | --- |
+| No squares when hovering the castle, the corridor doors, the bosses on the Path or the Path's castle (the labels and the boss tooltip stay) | Screenshot of the Path with a boss hovered |
+| The player is the pixel hero in their champion's colours, walking in four directions, in the boss arena and in the Dungeon | Screenshots |
+| The Chronicle removed (see Phase 2 above) | All tests and the autopilot pass without it |
+
+**Test results:** EditMode 99/99, PlayMode 8/8, autopilot 97/97 checks.
+
+**Not verified:** nobody has played the Dungeon by hand in Unity, so its
+balance and feel are untested. No new Windows build was made.
 
 ## Open questions for you
 
-1. What is the `TopChuk` quest reward?
-2. Should the menu art's painted "GOLD: 1450" be covered with the live gold?
-3. Which name: *Chronicles of the Spice Trip* or *The Mythic Chronicles*?
-4. May I download the OFL fonts Press Start 2P and VT323 from Google Fonts?
-5. Smart App Control: do you want to sign builds, play in the editor, or run
+1. Should the menu art's painted "GOLD: 1450" be covered with the live gold?
+2. Which name: *Chronicles of the Spice Trip* or *The Mythic Chronicles*?
+3. May I download the OFL fonts Press Start 2P and VT323 from Google Fonts?
+4. Smart App Control: do you want to sign builds, play in the editor, or run
    builds on another machine?

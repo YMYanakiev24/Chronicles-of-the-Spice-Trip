@@ -37,18 +37,8 @@ const data = {
   characters: arrayConst(scenesSrc, 'CHARACTERS'),
   shopStock: arrayConst(scenesSrc, 'SHOP_STOCK'),
   tips: gd.TIPS,
-  prophecy: gd.PROPHECY,
   hubStartingGold: Number(hubDefault[1]),
-  // The RPG content (Phase 2) is exported now so its assets can be checked too.
-  gods: asList(gd.GODS),
-  regions: asList(gd.REGIONS),
-  regionOrder: gd.REGION_ORDER,
-  spells: asList(gd.SPELLS),
-  spellOrder: gd.SPELL_ORDER,
-  creatures: asList(gd.CREATURES),
-  quests: asList(gd.QUESTS).map((q) => ({ ...q, rewards: { xp: 0, gold: 0, items: [], spell: '', ...q.rewards } })),
-  questOrder: gd.QUEST_ORDER,
-  npcs: asList(gd.NPCS),
+  // The level curve (60 · L^1.5), shared by the Dungeon's levels.
   xpForLevel: Array.from({ length: 30 }, (_, i) => gd.xpForLevel(i + 1)),
 };
 

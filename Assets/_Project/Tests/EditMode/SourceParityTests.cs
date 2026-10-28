@@ -93,7 +93,6 @@ namespace SpiceTrip.Tests
         {
             Assert.AreEqual(1450, _db.hubStartingGold);
             CollectionAssert.AreEqual(_src.tips, _db.tips);
-            CollectionAssert.AreEqual(_src.prophecy, _db.prophecy);
         }
 
         [Test]
@@ -168,18 +167,17 @@ namespace SpiceTrip.Tests
         public void EverySpriteMatchesTheJavaScriptPixelForPixel()
         {
             var expected = LoadHashes();
-            Assert.Greater(expected.Count, 70);
-            var src = SourceData.Load();
+            Assert.Greater(expected.Count, 20);
             var failures = new List<string>();
             foreach (var kv in expected)
             {
-                var actual = Render(kv.Key, src)?.Fingerprint();
+                var actual = Render(kv.Key)?.Fingerprint();
                 if (actual != kv.Value) failures.Add($"{kv.Key}: expected {kv.Value}, got {actual}");
             }
             Assert.IsEmpty(failures, string.Join("\n", failures));
         }
 
-        static PixelCanvas Render(string key, SourceData src)
+        static PixelCanvas Render(string key)
         {
             var p = key.Split('.');
             switch (p[0])
@@ -187,14 +185,6 @@ namespace SpiceTrip.Tests
                 case "hero": return PixelArt.Hero()[p[1]][int.Parse(p[2])];
                 case "flame": return PixelArt.Flame(int.Parse(p[1]));
                 case "prop": return PixelArt.Prop(p[1]);
-                case "tile": return PixelArt.GetTile(p[1], p[2], int.Parse(p[3]));
-                case "npc":
-                    var n = src.npcs.Find(x => x.id == p[1]);
-                    return PixelArt.Npc(n.color)[p[2]][int.Parse(p[3])];
-                case "monster":
-                    var c = src.creatures.Find(x => x.id == p[1]);
-                    var look = new PixelArt.MonsterLook { id = c.id, body = c.body, color = c.color, size = c.size, boss = c.boss };
-                    return PixelArt.Monster(look)[int.Parse(p[2])];
             }
             return null;
         }

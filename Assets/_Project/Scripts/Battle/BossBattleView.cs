@@ -519,17 +519,9 @@ namespace SpiceTrip.Battle
             _bossHasArt = _bossSprite != null;
             BuildKitHud();
 
-            // Player art: the champion's crop, or the procedural hero facing up.
-            Sprite playerSprite = null;
-            if (ch != null && !string.IsNullOrEmpty(ch.img)) playerSprite = ArtLibrary.Crop(ch.img, ch.portraitRect);
-            if (playerSprite == null)
-            {
-                var heroTex = PixelArt.Hero()["up"][0].ToTexture();
-                playerSprite = Sprite.Create(heroTex, new UnityEngine.Rect(0, 0, heroTex.width, heroTex.height), new Vector2(0.5f, 0.5f), PxPerUnit);
-                _playerIsHero = true;
-            }
-            else _playerIsHero = false;
-            _playerSr.sprite = playerSprite;
+            // The player walks as the pixel hero in the champion's colours, facing the way they move.
+            _hero = HeroSprites.For(ch?.id);
+            _playerSr.sprite = _hero.Frame(new Vector2(0, -1), false, 0);    // facing the boss
 
             SetBackdrop(boss);
             _ctx.Audio.PlayMusic("caves");   // tense bed
@@ -537,7 +529,7 @@ namespace SpiceTrip.Battle
             Render();
         }
 
-        bool _playerIsHero;
+        HeroSprites _hero;
 
         public void Stop()
         {
@@ -792,10 +784,10 @@ namespace SpiceTrip.Battle
                 float k = Mathf.Sin(Mathf.PI * (1 - Sim.JumpT / Mathf.Max(0.01f, _kit.P("duration", 0.6f))));
                 lift = 22 * k; grow = 1 + 0.3f * k;
             }
+            _playerSr.sprite = _hero.Frame(Sim.Moving ? Sim.MoveDir : Sim.FacingAim, Sim.Moving, Sim.Time);
             _playerSr.transform.localPosition = W(p.x, p.y - lift);
             _playerSr.transform.localRotation = Quaternion.Euler(0, 0, Sim.RollT > 0 ? Sim.RollT * 900 : 0);
-            if (_playerIsHero) Size(_playerSr, PixelArt.HeroW * T.heroSpriteScale * grow, PixelArt.HeroH * T.heroSpriteScale * grow);
-            else Size(_playerSr, T.playerSpriteSize * grow, T.playerSpriteSize * grow);
+            Size(_playerSr, HeroSprites.W * T.heroSpriteScale * grow, HeroSprites.H * T.heroSpriteScale * grow);
             _playerShadow.transform.localPosition = W(p.x, p.y + 16);
             Size(_playerShadow, 28 / grow, 10 / grow);
 

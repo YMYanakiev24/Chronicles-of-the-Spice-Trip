@@ -109,6 +109,9 @@ namespace SpiceTrip.Battle
         public float CoinPower, Drunk, Nicotine, Dust;
         public float PlayerSpeed { get; private set; }
         public Vector2 FacingAim { get; private set; }
+        /// <summary>Is the player walking (or dashing/rolling) this frame, and which way (y down)?</summary>
+        public bool Moving { get; private set; }
+        public Vector2 MoveDir => _moveDir;
 
         public event Action<string> OnSfx;
         public event Action<bool> OnEnd;
@@ -205,6 +208,7 @@ namespace SpiceTrip.Battle
             bool moving = mx != 0 || my != 0;
             if (ml == 0) ml = 1;
             if (moving) _moveDir = new Vector2(mx / ml, my / ml);
+            Moving = moving || DashT > 0 || RollT > 0;
             FacingAim = (inp.aim - new Vector2(p.x, p.y)).normalized;
             if (DashT > 0 || RollT > 0)
             {

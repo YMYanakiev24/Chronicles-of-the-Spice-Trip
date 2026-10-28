@@ -1,5 +1,5 @@
 // "More things to do": boss bounties and star ratings, Marin's battle items,
-// the Gauntlet unlock, and the new quests in the five realms beyond the Mistwood.
+// and the Gauntlet unlock.
 
 using System;
 using System.Collections.Generic;
@@ -10,7 +10,6 @@ using SpiceTrip.Battle;
 using SpiceTrip.Core;
 using SpiceTrip.Data;
 using SpiceTrip.Hub;
-using SpiceTrip.Rpg;
 using UnityEngine;
 using UnityEngine.UIElements;
 
@@ -147,78 +146,6 @@ namespace SpiceTrip.Tests
             foreach (var b in _ctx.Db.bosses) _hub.MarkBossDefeated(b.id);
             Assert.IsTrue(_hub.FightGauntlet());
             Assert.AreEqual("battle", _hub.Active);
-        }
-    }
-
-    public class RealmQuestTests
-    {
-        static readonly string[] NewQuests = { "tideOfBronze", "namesOfTheFallen", "lightTheUnderway", "thePaleWatch", "theLastRite" };
-
-        [Test]
-        public void EveryRealmBeyondTheMistwoodHasAQuestGiver()
-        {
-            var db = GameDatabase.Instance;
-            foreach (var region in db.regionOrder.Where(r => r != "mistwood"))
-            {
-                var npc = db.npcs.FirstOrDefault(n => n.region == region);
-                Assert.IsNotNull(npc, region);
-                Assert.IsTrue(db.quests.Any(q => q.giver == npc.id), npc.id);
-            }
-            CollectionAssert.IsSubsetOf(NewQuests, db.questOrder);
-            Assert.AreEqual("awakening", db.questOrder[0], "the original chain still comes first");
-        }
-
-        [Test]
-        public void QuestItemsAreScatteredInTheirRealms()
-        {
-            var g = new ChronicleGame(GameDatabase.Instance, new NullAudio(), new NullUi(), seed: 3);
-            g.StartNewGame();
-            g.Player.level = 9;
-            g.Tick(0.016f, RpgInput.None);
-            g.TravelTo("ruins");
-            Assert.AreEqual(5, g.Map.Pickups.Count(p => p.item == "graveToken"));
-            Assert.IsTrue(g.Npcs.Any(n => n.def.id == "damon"));
-            g.TravelTo("godreach");
-            Assert.AreEqual(3, g.Map.Pickups.Count(p => p.item == "starEmber"));
-        }
-
-        [Test]
-        public void TheLastRiteCompletesAndDeepensTheStormcrown()
-        {
-            var ui = new NullUi();
-            var g = new ChronicleGame(GameDatabase.Instance, new NullAudio(), ui, seed: 4);
-            g.StartNewGame();
-            g.Player.AddXP(1100);   // reach level 5 properly, which teaches Stormcrown's Wrath
-            g.Player.level = 9;     // and open the Threshold
-            g.Tick(0.016f, RpgInput.None);
-            g.TravelTo("godreach");
-            g.Quests.Accept("theLastRite");
-            g.Enemies.Clear();
-            foreach (var pk in g.Map.Pickups.Where(p => p.item == "starEmber").ToList())
-            {
-                g.Player.x = pk.x; g.Player.y = pk.y;
-                g.Tick(0.016f, RpgInput.None);
-            }
-            Assert.AreEqual("ready", g.Quests.state["theLastRite"]);
-            int tier = g.Player.spellLevels["stormcrownWrath"];
-            g.Quests.OnTalk("herald");
-            Assert.AreEqual("completed", g.Quests.state["theLastRite"]);
-            Assert.AreEqual(tier + 1, g.Player.spellLevels["stormcrownWrath"]);
-            Assert.Contains("QUEST COMPLETE", ui.Banners);
-        }
-
-        [TestCase("tideOfBronze", "bronzeWatcher", 3)]
-        [TestCase("lightTheUnderway", "hollowHound", 4)]
-        [TestCase("thePaleWatch", "strix", 4)]
-        public void HuntQuestsCompleteThroughTheirGiver(string quest, string creature, int count)
-        {
-            var g = new ChronicleGame(GameDatabase.Instance, new NullAudio(), new NullUi(), seed: 5);
-            g.StartNewGame();
-            g.Quests.Accept(quest);
-            for (int i = 0; i < count; i++) g.Quests.OnKill(creature);
-            Assert.AreEqual("ready", g.Quests.state[quest]);
-            g.Quests.OnTalk(g.Db.Quest(quest).giver);
-            Assert.AreEqual("completed", g.Quests.state[quest]);
         }
     }
 }
