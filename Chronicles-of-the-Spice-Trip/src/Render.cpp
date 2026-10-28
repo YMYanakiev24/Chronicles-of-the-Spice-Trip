@@ -1,8 +1,9 @@
 // ============================================================================
-//  Render.cpp — procedural pixel sprites (rectangles/circles, no image files).
+//  Render.cpp — procedural pixel sprites + sprite-sheet enemies.
 // ============================================================================
 #include "Render.h"
 #include "Common.h"
+#include "Sprites.h"
 #include <cmath>
 
 void drawShadow(Vector2 p, float r) {
@@ -23,25 +24,47 @@ void drawHero(Vector2 p, Vector2 facing, float meleeAnim, bool flash) {
     DrawLineEx(hilt, tip, 3.0f, meleeAnim > 0 ? Color{ 234, 255, 255, 255 } : Color{ 180,190,205,255 });
 }
 
+// Sprite scale per enemy kind (frames are 32px; the creature fills ~16px).
+static float enemyScale(const Enemy& e) {
+    if (e.boss) return 3.2f;
+    if (e.kind == EK_SKULL) return 2.0f;
+    if (e.kind == EK_THIEF || e.kind == EK_MELON) return 1.05f;   // these fill ~28px of the frame
+    return e.kind == EK_SKELETON2 ? 1.9f : 1.7f;
+}
+
 void drawEnemy(const Enemy& e) {
-    drawShadow(e.pos, e.r);
-    Color c = e.hitFlash > 0 ? Color{ 255,255,255,255 } : e.color;
-    float w = sinf(e.wobble) * 2.0f;
-    if (e.boss) {
-        DrawCircle((int)e.pos.x, (int)e.pos.y, e.r, c);
-        DrawCircle((int)e.pos.x, (int)(e.pos.y - e.r * 0.3f), e.r * 0.5f, { 255, 90, 30, 255 });
-        DrawCircle((int)e.pos.x, (int)(e.pos.y - e.r * 0.3f), e.r * 0.25f, { 255, 220, 120, 255 });
+    bool hasSprite = e.kind == EK_SKULL ? SPR.skull.ok() : SPR.enemy[e.kind].idle.ok();
+    if (hasSprite) {
+        float sc = enemyScale(e);
+        Vector2 at = { e.pos.x, e.pos.y - e.r * 0.6f };
+        if (!e.dying) drawShadow(e.pos, e.r);
+        if (e.kind == EK_SKULL) {
+            // floating wisp: bob up and down, flash white when struck
+            at.y += sinf(e.wobble) * 3.0f - 6.0f;
+            Color tint = e.dying ? Fade(WHITE, 1.0f - e.deathT / 0.5f) : (e.hitFlash > 0 ? Color{ 255,160,160,255 } : WHITE);
+            drawAnim(SPR.skull, animFrame(SPR.skull, e.animT, 8, true), at, sc, e.flip, tint);
+        }
+        else {
+            const EnemyAnims& A = SPR.enemy[e.kind];
+            const Anim* a = &A.idle; float t = e.animT; float fps = 8; bool loop = true;
+            if (e.dying) { a = &A.death; t = e.deathT; fps = 14; loop = false; }
+            else if (e.hitFlash > 0) { a = &A.hurt; t = 0.12f - e.hitFlash; fps = 40; loop = false; }
+            else if (e.atkAnim > 0) { a = &A.attack; t = A.attack.length(16) - e.atkAnim; fps = 16; loop = false; }
+            else if (e.moving) { a = &A.move; fps = 12; }
+            drawAnim(*a, animFrame(*a, t, fps, loop), at, sc, e.flip);
+        }
     }
     else {
+        drawShadow(e.pos, e.r);
+        Color c = e.hitFlash > 0 ? Color{ 255,255,255,255 } : e.color;
+        float w = sinf(e.wobble) * 2.0f;
         DrawRectangle((int)(e.pos.x - e.r), (int)(e.pos.y - e.r + w), (int)(e.r * 2), (int)(e.r * 2), c);
         DrawCircle((int)e.pos.x, (int)(e.pos.y - e.r + w), e.r * 0.7f, c);
-        DrawCircle((int)(e.pos.x - e.r * 0.4f), (int)(e.pos.y - e.r * 0.8f + w), 2, { 200,255,220,255 });
-        DrawCircle((int)(e.pos.x + e.r * 0.4f), (int)(e.pos.y - e.r * 0.8f + w), 2, { 200,255,220,255 });
     }
-    if (e.hp < e.maxHp) {
-        float bw = e.r * 2.4f;
-        DrawRectangle((int)(e.pos.x - bw / 2), (int)(e.pos.y - e.r - 12), (int)bw, 4, { 20,10,10,200 });
-        DrawRectangle((int)(e.pos.x - bw / 2), (int)(e.pos.y - e.r - 12), (int)(bw * (e.hp / e.maxHp)), 4, { 200,60,60,255 });
+    if (!e.dying && e.hp < e.maxHp) {
+        float bw = e.r * 2.4f, top = e.pos.y - e.r * (e.boss ? 2.6f : 2.0f) - 6;
+        DrawRectangle((int)(e.pos.x - bw / 2), (int)top, (int)bw, 4, { 20,10,10,200 });
+        DrawRectangle((int)(e.pos.x - bw / 2), (int)top, (int)(bw * (e.hp / e.maxHp)), 4, { 200,60,60,255 });
     }
 }
 

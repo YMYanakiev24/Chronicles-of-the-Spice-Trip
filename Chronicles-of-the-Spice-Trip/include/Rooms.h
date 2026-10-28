@@ -12,6 +12,9 @@ constexpr int DUNGEON_G = 9;     // dungeon is DUNGEON_G x DUNGEON_G rooms
 constexpr int ROOM_TW = 21;     // room width  in tiles (incl. 1-tile walls)
 constexpr int ROOM_TH = 11;     // room height in tiles
 
+// Interior tile kinds for a room's layout.
+enum RoomTile : unsigned char { RT_FLOOR = 0, RT_WALL = 1, RT_SPIKES = 2 };
+
 // Door direction bits.
 enum Dir { DIR_N = 1, DIR_E = 2, DIR_S = 4, DIR_W = 8 };
 
@@ -21,7 +24,14 @@ struct Room {
     bool cleared = false;     // enemies defeated -> doors open
     bool isStart = false;
     bool isBoss = false;
+    bool isShop = false;      // Marin's market: no enemies, no clutter
     int  doors = 0;           // bitmask of neighbours that exist
+    unsigned char tiles[ROOM_TH][ROOM_TW] = {};   // interior layout (RoomTile)
+    bool hasChest = false, chestOpened = false;
+    int  chestTx = 0, chestTy = 0;
+
+    void buildLayout();       // walls, traps and maybe a chest
+    bool isFloor(int tx, int ty) const;   // walkable, trap-free interior tile
 };
 
 struct Dungeon {
@@ -40,6 +50,20 @@ constexpr float ROOM_PX_H = ROOM_TH * TILE;
 // Is tile (tx,ty) a solid wall for this room? Open door cells are passable
 // only when doorsOpen is true.
 bool roomWallSolid(const Room& r, int tx, int ty, bool doorsOpen);
+
+// Is world point p standing on a spike trap tile?
+bool onSpikes(const Room& r, Vector2 p);
+
+// Path distances (in tile steps) from every tile to the target tile. Walls
+// are -1; raised-spike tiles cost extra so chasers route around traps.
+using FlowField = int[ROOM_TH][ROOM_TW];
+void buildFlowField(const Room& r, Vector2 target, bool avoidSpikes, FlowField& out);
+
+// Can a circle of radius r slide straight from a to b without touching a wall?
+bool lineClear(const Room& r, Vector2 a, Vector2 b, float radius);
+
+// Where a chaser at `from` should head next to reach the flow field's target.
+Vector2 nextWaypoint(const Room& r, const FlowField& f, Vector2 from);
 
 // Move a circle within a room, sliding along walls (axis-separated).
 Vector2 moveInRoom(Vector2 pos, Vector2 delta, float radius, const Room& r, bool doorsOpen);
