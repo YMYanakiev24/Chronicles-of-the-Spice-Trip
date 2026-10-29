@@ -15,6 +15,7 @@ using System.Linq;
 using SpiceTrip.Dungeon;
 using UnityEngine;
 using UnityEngine.InputSystem;
+using UnityEngine.UIElements;
 using static SpiceTrip.Dungeon.Geo;
 
 namespace SpiceTrip.Core
@@ -201,6 +202,8 @@ namespace SpiceTrip.Core
             yield return Click(Q("dg-champ-momiche"), "Momiche");
             yield return Wait(0.3f);
             Check("Momiche is in the Dungeon lobby", _g.Ctx.Hub.selectedChar == "momiche");
+            var turn = Q("dungeon-lobby").Q(className: "turnaround");
+            Check("the lobby shows Momiche from all four sides", turn != null && turn.childCount == 4 && turn.Q("turn-up").resolvedStyle.backgroundImage.sprite.texture.name == "walk-momiche");
             yield return Shot("dungeon-lobby-momiche");
             yield return Click(Q("dg-boss-rush"), "Boss Rush");
             yield return Wait(0.4f);

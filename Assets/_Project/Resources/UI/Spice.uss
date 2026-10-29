@@ -427,7 +427,13 @@
     -unity-background-scale-mode: scale-and-crop;
     margin-bottom: 6px;
 }
+.char-thumb.char-thumb-figure { -unity-background-scale-mode: scale-to-fit; }
 .char-soon { font-size: 32px; color: rgba(233, 220, 191, 0.4); }
+.char-turn { margin-bottom: 4px; }
+
+/* A champion seen from every side (UiKit.Turnaround) */
+.turnaround { flex-direction: row; justify-content: center; align-items: flex-end; flex-shrink: 0; }
+.turnaround-figure { flex-shrink: 0; margin: 0 1px; -unity-background-scale-mode: scale-to-fit; }
 .char-name { font-size: 13px; -unity-text-align: middle-center; color: var(--gold-bright); white-space: normal; }
 .char-card.empty .char-name { color: rgba(233, 220, 191, 0.5); }
 

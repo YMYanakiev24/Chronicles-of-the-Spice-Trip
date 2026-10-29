@@ -120,3 +120,14 @@ and cooldown (3 s, every 8 s) may need tuning. No new Windows build was made.
 3. May I download the OFL fonts Press Start 2P and VT323 from Google Fonts?
 4. Smart App Control: do you want to sign builds, play in the editor, or run
    builds on another machine?
+
+### Follow-up: the four sides on the character select screens
+
+You only saw the four sides in fights and in the Dungeon, so the selection
+screens now show them too.
+
+| Change | Verified by |
+| --- | --- |
+| Every Changing Room card shows the champion walking from the front, the left, the back and the right; the Dungeon lobby shows the hovered or picked champion the same way, larger. Spellwoven's card shows the new figure instead of the old icon | `ChampionFigureTests.TheTurnaroundShowsEachChampionFromEverySide`, autopilot (every card has four walking figures; the lobby shows Momiche's sheet frames), screenshots |
+
+**Test results:** EditMode 109/109, autopilot 109/109 checks. PlayMode was not rerun (no PlayMode code changed).

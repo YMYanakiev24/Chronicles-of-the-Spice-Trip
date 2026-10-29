@@ -276,9 +276,11 @@ namespace SpiceTrip.Hub
                     else if (ch.portraitCard) SetBackground(thumb, ArtLibrary.Crop(ch.img, ch.portraitRect));
                     else SetBackground(thumb, tex);
                 }
-                else thumb.Add(Icon("hero", side * 0.45f));
+                else { thumb.AddToClassList("char-thumb-figure"); SetBackground(thumb, HeroSprites.For(ch.id).Frame("down", 0)); }
                 thumb.pickingMode = PickingMode.Ignore;
                 card.Add(thumb);
+                // ...and the figure they walk as, from every side
+                if (!ch.empty) card.Add(Turnaround(ch.id, (side - 8) / 4 * HeroSprites.H / HeroSprites.W, "char-turn"));
                 var name = Lbl(ch.name, "char-name");
                 name.pickingMode = PickingMode.Ignore;
                 card.Add(name);

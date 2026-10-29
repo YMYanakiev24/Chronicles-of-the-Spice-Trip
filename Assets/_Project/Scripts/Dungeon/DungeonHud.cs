@@ -62,7 +62,7 @@ namespace SpiceTrip.Dungeon
         // panels
         Label _shopGold, _shopMsg, _saveMsg, _completeStats, _rushTitle, _rushLine, _rushBest, _records;
         readonly List<(VisualElement row, ClickEl buy, Label owned)> _shopRows = new List<(VisualElement, ClickEl, Label)>();
-        VisualElement _lobbyGrid, _lobbyDetailArt, _completeTokens, _pauseKit;
+        VisualElement _lobbyGrid, _lobbyDetailArt, _lobbyTurn, _completeTokens, _pauseKit;
         Label _lobbyName, _lobbyPerk, _lobbySpecial;
         ClickEl _continueBtn;
         float _saveMsgT;
@@ -117,6 +117,8 @@ namespace SpiceTrip.Dungeon
             body.Add(detail);
             _lobbyDetailArt = El("dg-detail-art");
             detail.Add(_lobbyDetailArt);
+            _lobbyTurn = El("dg-detail-turn");
+            detail.Add(_lobbyTurn);
             _lobbyName = Lbl("", "dg-detail-name");
             detail.Add(_lobbyName);
             detail.Add(Lbl("Perk", "dg-detail-head"));
@@ -166,6 +168,8 @@ namespace SpiceTrip.Dungeon
             _lobbySpecial.text = $"{kit.special}: {kit.specialDesc}";
             _lobbyDetailArt.Clear();
             _lobbyDetailArt.Add(PortraitEl(kit.id, "dg-detail-portrait"));
+            _lobbyTurn.Clear();
+            _lobbyTurn.Add(Turnaround(kit.id, 64));
             foreach (var card in _lobbyGrid.Children())
                 card.EnableInClassList("chosen", card.name == "dg-champ-" + _ctx.Hub.selectedChar);
         }
@@ -176,7 +180,15 @@ namespace SpiceTrip.Dungeon
             e.pickingMode = PickingMode.Ignore;
             var s = _view.Art.Portrait(id);
             if (s != null) SetBackground(e, s);
-            else { e.AddToClassList("drawn"); e.Add(Icon("hero", 48)); }
+            else
+            {
+                e.AddToClassList("drawn");
+                var figure = El("turnaround-figure");
+                figure.style.height = 64;
+                figure.style.width = 64 * HeroSprites.W / HeroSprites.H;
+                SetBackground(figure, HeroSprites.For(id).Frame("down", 0));
+                e.Add(figure);
+            }
             return e;
         }
 

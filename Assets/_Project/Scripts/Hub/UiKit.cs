@@ -79,6 +79,38 @@ namespace SpiceTrip.Hub
             return e;
         }
 
+        /// <summary>The order a turnaround shows a champion in: front, left side, back, right side.</summary>
+        public static readonly string[] TurnaroundOrder = { "down", "left", "up", "right" };
+
+        /// <summary>
+        /// A champion's walking figure from every side (front, left, back, right) in a row,
+        /// walking in place, `figureHeight` panel pixels tall.
+        /// </summary>
+        public static VisualElement Turnaround(string championId, float figureHeight, string classes = null)
+        {
+            var hero = HeroSprites.For(championId);
+            var row = El("turnaround");
+            Classes(row, classes);
+            row.pickingMode = PickingMode.Ignore;
+            var figures = new VisualElement[TurnaroundOrder.Length];
+            for (int i = 0; i < figures.Length; i++)
+            {
+                var f = figures[i] = El("turnaround-figure");
+                f.name = "turn-" + TurnaroundOrder[i];
+                f.pickingMode = PickingMode.Ignore;
+                f.style.height = figureHeight;
+                f.style.width = figureHeight * HeroSprites.W / HeroSprites.H;
+                SetBackground(f, hero.Frame(TurnaroundOrder[i], 0));
+                row.Add(f);
+            }
+            row.schedule.Execute(() =>
+            {
+                for (int i = 0; i < figures.Length; i++)
+                    SetBackground(figures[i], hero.Walk(TurnaroundOrder[i], Time.unscaledTime));
+            }).Every(125);
+            return row;
+        }
+
         public static void Classes(VisualElement e, string classes)
         {
             if (string.IsNullOrEmpty(classes)) return;

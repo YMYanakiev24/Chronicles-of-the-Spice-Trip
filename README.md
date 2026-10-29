@@ -74,7 +74,9 @@ In the Dungeon:
 | E | Talk, trade, open chests |
 | Esc | Pause (save, controls, main menu) |
 
-The champion picked in the Changing Room or the Dungeon lobby is used in both
+Every card in the Changing Room shows the champion walking from the front, the
+left, the back and the right, and the Dungeon lobby shows the hovered or
+picked champion the same way. The champion picked in either place is used in both
 games.
 
 ### Momiche😨
@@ -165,9 +167,9 @@ Unity.exe -batchmode -nographics -projectPath . -runTests -testPlatform EditMode
 Unity.exe -batchmode -projectPath . -runTests -testPlatform PlayMode -testResults Logs/playmode-results.xml
 ```
 
-- **EditMode (108):**
+- **EditMode (109):**
   - The Dungeon (31): floor generation, room layouts, collision and pathfinding, combat and weaknesses, the market, every boss attack, run completion and the stronger cycle, Boss Rush, every champion's special and the perks, Momiche's scare on monsters and bosses, Gakev's coins, and saving and continuing.
-  - The walking champions (4): every character from all four sides, a look of their own, Momiche's sheet.
+  - The walking champions (5): every character from all four sides, a look of their own, Momiche's sheet, the turnaround on the cards.
   - Bounties, stars and battle items.
   - The 17 ability tests for the Path (Momiche's scare included).
   - Data and pixel parity with the JavaScript.
@@ -178,7 +180,7 @@ Unity.exe -batchmode -projectPath . -runTests -testPlatform PlayMode -testResult
   - A Dungeon run from the lobby to a beaten boss and back to the menu.
 
 **End-to-end autopilot:** this plays through every screen with real injected
-mouse and keyboard events, saves screenshots and writes a PASS/FAIL log (106
+mouse and keyboard events, saves screenshots and writes a PASS/FAIL log (109
 checks: the Path and hub, Momiche walking and scaring a boss, then a full
 Dungeon run and a Boss Rush as Momiche). Enter and Q are pressed as real
 keys. It runs in the editor's Play mode:

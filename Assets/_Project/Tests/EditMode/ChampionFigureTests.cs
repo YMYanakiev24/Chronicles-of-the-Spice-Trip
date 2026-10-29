@@ -6,6 +6,7 @@ using System.Linq;
 using NUnit.Framework;
 using SpiceTrip.Art;
 using SpiceTrip.Data;
+using SpiceTrip.Hub;
 using UnityEngine;
 
 namespace SpiceTrip.Tests
@@ -80,6 +81,24 @@ namespace SpiceTrip.Tests
             for (float t = 0; t < 1; t += 1 / 16f) steps.Add(h.Frame(Vector2.right, true, t));
             Assert.AreEqual(4, steps.Count, "walking steps through the four walk frames");
             Assert.IsFalse(steps.Contains(h.Frame("right", 0)), "and not the standing one");
+        }
+
+        [Test]
+        public void TheTurnaroundShowsEachChampionFromEverySide()
+        {
+            CollectionAssert.AreEquivalent(ChampionFigures.Directions, UiKit.TurnaroundOrder);
+            foreach (var id in Playable)
+            {
+                var hero = HeroSprites.For(id);
+                var row = UiKit.Turnaround(id, 40);
+                Assert.AreEqual(4, row.childCount, id);
+                for (int i = 0; i < row.childCount; i++)
+                {
+                    var figure = row[i];
+                    Assert.AreSame(hero.Frame(UiKit.TurnaroundOrder[i], 0), figure.style.backgroundImage.value.sprite, $"{id} {UiKit.TurnaroundOrder[i]}");
+                    Assert.AreEqual(30f, figure.style.width.value.value, 0.01f, "3:4 like the frames");
+                }
+            }
         }
 
         [Test]

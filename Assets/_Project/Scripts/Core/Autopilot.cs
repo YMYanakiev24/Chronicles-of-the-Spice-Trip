@@ -223,6 +223,11 @@ namespace SpiceTrip.Core
             yield return Click(hub.Corridor.ChangingDoor, "Changing Room");
             yield return Wait(0.3f);
             Check("Changing Room opens character select", hub.CharSelect.IsOpen);
+            var turns = Q("char-grid").Query(className: "turnaround").ToList();
+            Check("every champion's card shows them from all four sides", turns.Count == ctx.Db.characters.FindAll(c => !c.empty).Count && turns.TrueForAll(t => t.childCount == 4));
+            var walkFrom = Q("char-gakev").Q("turn-left").resolvedStyle.backgroundImage.sprite;
+            yield return Wait(0.3f);
+            Check("the figures on the cards walk", Q("char-gakev").Q("turn-left").resolvedStyle.backgroundImage.sprite != walkFrom);
             yield return Shot("changing-room");
             yield return Click(Q("char-atanas"), "Atanas");
             yield return Wait(0.5f);

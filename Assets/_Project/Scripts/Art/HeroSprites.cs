@@ -128,10 +128,14 @@ namespace SpiceTrip.Art
         public int FrameCount => _frames["down"].Length;
 
         /// <summary>The frame for a direction (y down): standing, or stepping through the walk cycle at 8 frames a second.</summary>
-        public Sprite Frame(Vector2 dir, bool walking, float time)
+        public Sprite Frame(Vector2 dir, bool walking, float time) =>
+            walking ? Walk(Facing(dir), time) : _frames[Facing(dir)][0];
+
+        /// <summary>The walk-cycle frame for a facing ("down", "up", "left", "right") at 8 frames a second.</summary>
+        public Sprite Walk(string facing, float time)
         {
-            var frames = _frames[Facing(dir)];
-            return walking ? frames[1 + (int)(time * 8) % (frames.Length - 1)] : frames[0];
+            var frames = _frames[facing];
+            return frames[1 + (int)(time * 8) % (frames.Length - 1)];
         }
 
         /// <summary>A frame by facing ("down", "up", "left", "right") and index (0 = standing), for galleries and tests.</summary>
