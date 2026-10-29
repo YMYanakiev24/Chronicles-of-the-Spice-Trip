@@ -15,6 +15,7 @@ namespace ui {
 
     void beginFrame() { g_hand = false; g_hits.clear(); }
     void handCursor() { g_hand = true; }
+    bool wantsHand() { return g_hand; }
     void track(const char* label, Rectangle r) { g_hits.push_back({ label, r }); }
     const std::vector<Hit>& hits() { return g_hits; }
 

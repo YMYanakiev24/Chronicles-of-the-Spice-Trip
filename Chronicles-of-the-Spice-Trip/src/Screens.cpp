@@ -202,13 +202,13 @@ void Game::settingsScreen() {
     // --- screen ---
     y += 112;
     ui::text("Screen", x, y, 20, ui::ACCENT);
-    bool full = IsWindowState(FLAG_BORDERLESS_WINDOWED_MODE);
+    bool full = isFullscreen();
     if (ui::button({ x, y + 32, 220, 40 }, "Fullscreen", full ? ui::Style::Good : ui::Style::Normal)) {
-        if (!full) ToggleBorderlessWindowed();
+        setFullscreen(true);
         settings.fullscreen = true; play("ui");
     }
     if (ui::button({ x + 236, y + 32, 220, 40 }, "Window 1280x720", !full ? ui::Style::Good : ui::Style::Normal)) {
-        if (full) ToggleBorderlessWindowed();
+        setFullscreen(false);
         SetWindowSize(1280, 720);
         int mon = GetCurrentMonitor();
         SetWindowPosition((GetMonitorWidth(mon) - 1280) / 2, (GetMonitorHeight(mon) - 720) / 2);

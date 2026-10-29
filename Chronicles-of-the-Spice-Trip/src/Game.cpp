@@ -18,13 +18,40 @@ static Texture2D loadArt(const char* file) {
     return t;
 }
 
+// Fullscreen is a borderless window one pixel taller than the monitor. A window that
+// exactly covers the monitor gets Windows' fullscreen fast path, and screen shares
+// (Discord, OBS window capture) then freeze on the last frame they saw.
+static bool g_fullscreen = false;
+static Vector2 g_winPos{};
+static int g_winW = SCREEN_W, g_winH = SCREEN_H;
+
+bool isFullscreen() { return g_fullscreen; }
+
+void setFullscreen(bool on) {
+    if (on == g_fullscreen) return;
+    if (on) {
+        g_winPos = GetWindowPosition(); g_winW = GetScreenWidth(); g_winH = GetScreenHeight();
+        int mon = GetCurrentMonitor();
+        Vector2 mp = GetMonitorPosition(mon);
+        SetWindowState(FLAG_WINDOW_UNDECORATED);
+        SetWindowSize(GetMonitorWidth(mon), GetMonitorHeight(mon) + 1);
+        SetWindowPosition((int)mp.x, (int)mp.y);
+    }
+    else {
+        ClearWindowState(FLAG_WINDOW_UNDECORATED);
+        SetWindowSize(g_winW, g_winH);
+        SetWindowPosition((int)g_winPos.x, (int)g_winPos.y);
+    }
+    g_fullscreen = on;
+}
+
 void Game::init(bool windowed) {
     settings = save::readSettings();
     profile = save::readProfile();
     if (profile.champion < 0 || profile.champion >= CHAMPION_COUNT) profile.champion = 0;
     player.champion = profile.champion;
     hasSave = save::hasRun();
-    if (settings.fullscreen && !windowed) ToggleBorderlessWindowed();
+    if (settings.fullscreen && !windowed) setFullscreen(true);
 
     sounds = au::buildSfx();
     music.init();
@@ -65,13 +92,29 @@ void Game::play(const char* sfx) {
     PlaySound(it->second);
 }
 
+// The game draws its own cursor so it is always visible, including in screen shares
+// and captures that leave out the system pointer.
+static void drawCursor() {
+    if (!IsCursorOnScreen()) return;
+    if (!IsCursorHidden()) HideCursor();
+    Vector2 m = in::mouse();
+    if (ui::wantsHand()) {
+        DrawCircleV(m, 7, Fade(BLACK, 0.6f));
+        DrawCircleV(m, 5, { 240, 200, 90, 255 });
+        return;
+    }
+    Vector2 tip = m, l = { m.x, m.y + 18 }, r = { m.x + 12, m.y + 13 };
+    DrawTriangle({ tip.x - 1, tip.y - 2 }, { l.x - 2, l.y + 2 }, { r.x + 3, r.y + 1 }, BLACK);
+    DrawTriangle(tip, l, r, RAYWHITE);
+}
+
 void Game::frame() {
     float dt = fminf(GetFrameTime(), 0.05f);
     t += dt; clock += dt;
 
     if (in::pressed(KEY_F11)) {
-        ToggleBorderlessWindowed();
-        settings.fullscreen = IsWindowState(FLAG_BORDERLESS_WINDOWED_MODE);
+        setFullscreen(!isFullscreen());
+        settings.fullscreen = isFullscreen();
         save::writeSettings(settings);
     }
     music.vol = 0.5f * settings.musicVol;
@@ -87,6 +130,7 @@ void Game::frame() {
     case Screen::Intro:     introScreen(); break;
     case Screen::Play:      playScreen(); break;
     }
+    drawCursor();
     if (!pendingShot.empty()) {            // the autopilot's screenshot, taken before the buffers swap
         rlDrawRenderBatchActive();
         Image shot = LoadImageFromScreen();

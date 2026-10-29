@@ -30,6 +30,10 @@ struct Popup { const Anim* anim; Vector2 pos; float t; };        // a flask risi
 struct Coin { Vector2 pos, vel; float t; };                       // loot that flies to you
 struct FloatText { Vector2 pos; float t; int value; Color color; };  // damage numbers
 
+// Share-friendly borderless fullscreen (see Game.cpp).
+bool isFullscreen();
+void setFullscreen(bool on);
+
 struct Game {
     // ---------------------------------------------------------------- lifetime
     void init(bool windowed);

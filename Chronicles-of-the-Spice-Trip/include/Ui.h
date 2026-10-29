@@ -31,6 +31,7 @@ namespace ui {
     void beginFrame();
     void endFrame();
     void handCursor();                   // show the pointing hand this frame
+    bool wantsHand();                    // a button asked for the hand this frame
 
     // Every button and card drawn this frame, by label, so the autopilot can click them.
     struct Hit { std::string label; Rectangle rect; };
