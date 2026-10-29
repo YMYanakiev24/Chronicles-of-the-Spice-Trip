@@ -39,8 +39,10 @@ struct Dungeon {
     int  cx = DUNGEON_G / 2;     // current room
     int  cy = DUNGEON_G / 2;
 
-    void  generate();
+    void  generate();          // a fresh floor: start room, combat rooms, Marin, the boss
+    void  generateArena();     // a single sealed boss room (Boss Rush)
     Room& cur() { return grid[cy][cx]; }
+    const Room& cur() const { return grid[cy][cx]; }
 };
 
 // Pixel size of a room (world units).

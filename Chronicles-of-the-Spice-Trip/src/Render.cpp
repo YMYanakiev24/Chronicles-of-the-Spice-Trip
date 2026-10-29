@@ -1,5 +1,5 @@
 // ============================================================================
-//  Render.cpp — procedural pixel sprites + sprite-sheet enemies.
+//  Render.cpp — the procedural hero, sprite-sheet enemies and projectiles.
 // ============================================================================
 #include "Render.h"
 #include "Common.h"
@@ -10,11 +10,12 @@ void drawShadow(Vector2 p, float r) {
     DrawEllipse((int)p.x, (int)(p.y + r * 0.7f), r * 0.9f, r * 0.45f, { 0,0,0,90 });
 }
 
-void drawHero(Vector2 p, Vector2 facing, float meleeAnim, bool flash) {
-    drawShadow(p, PLAYER_R);
-    Color cloak = flash ? Color{ 255,255,255,255 } : Color{ 70, 96, 120, 255 };
-    DrawRectangle((int)p.x - 8, (int)p.y - 10, 16, 20, cloak);
-    DrawRectangle((int)p.x - 8, (int)p.y - 10, 16, 4, { 159, 208, 255, 255 });
+void drawHero(Vector2 p, Vector2 facing, float meleeAnim, bool flash, Color cloak, float lift) {
+    drawShadow(p, PLAYER_R * (1 - lift * 0.02f));
+    p.y -= lift;                                   // Bear Jump lifts the hero off the ground
+    Color body = flash ? Color{ 255,255,255,255 } : cloak;
+    DrawRectangle((int)p.x - 8, (int)p.y - 10, 16, 20, body);
+    DrawRectangle((int)p.x - 8, (int)p.y - 10, 16, 4, ColorBrightness(cloak, 0.55f));
     DrawRectangle((int)p.x - 5, (int)p.y - 20, 10, 10, { 224, 196, 168, 255 });
     DrawRectangle((int)p.x - 6, (int)p.y - 22, 12, 4, { 40,30,46,255 });
     float ang = atan2f(facing.y, facing.x);
@@ -39,7 +40,7 @@ void drawEnemy(const Enemy& e) {
         Vector2 at = { e.pos.x, e.pos.y - e.r * 0.6f };
         if (!e.dying) drawShadow(e.pos, e.r);
         if (e.kind == EK_SKULL) {
-            // floating wisp: bob up and down, flash white when struck
+            // floating wisp: bob up and down, flash when struck
             at.y += sinf(e.wobble) * 3.0f - 6.0f;
             Color tint = e.dying ? Fade(WHITE, 1.0f - e.deathT / 0.5f) : (e.hitFlash > 0 ? Color{ 255,160,160,255 } : WHITE);
             drawAnim(SPR.skull, animFrame(SPR.skull, e.animT, 8, true), at, sc, e.flip, tint);
@@ -61,24 +62,73 @@ void drawEnemy(const Enemy& e) {
         DrawRectangle((int)(e.pos.x - e.r), (int)(e.pos.y - e.r + w), (int)(e.r * 2), (int)(e.r * 2), c);
         DrawCircle((int)e.pos.x, (int)(e.pos.y - e.r + w), e.r * 0.7f, c);
     }
-    if (!e.dying && e.hp < e.maxHp) {
-        float bw = e.r * 2.4f, top = e.pos.y - e.r * (e.boss ? 2.6f : 2.0f) - 6;
+    // Bosses show their health in the big bar at the top of the screen instead.
+    if (!e.dying && !e.boss && e.hp < e.maxHp) {
+        float bw = e.r * 2.4f, top = e.pos.y - e.r * 2.0f - 6;
         DrawRectangle((int)(e.pos.x - bw / 2), (int)top, (int)bw, 4, { 20,10,10,200 });
         DrawRectangle((int)(e.pos.x - bw / 2), (int)top, (int)(bw * (e.hp / e.maxHp)), 4, { 200,60,60,255 });
     }
 }
 
-void drawTree(int tx, int ty) {
-    float x = tx * (float)TILE, y = ty * (float)TILE;
-    DrawEllipse((int)(x + TILE / 2), (int)(y + TILE - 4), TILE * 0.4f, TILE * 0.2f, { 0,0,0,80 });
-    DrawRectangle((int)(x + TILE / 2 - 3), (int)(y + 8), 6, TILE - 10, { 30, 22, 18, 255 });
-    DrawCircle((int)(x + TILE / 2), (int)(y + 8), TILE * 0.42f, { 18, 34, 24, 255 });
-    DrawCircle((int)(x + TILE / 2 - 6), (int)(y + 6), TILE * 0.28f, { 26, 46, 32, 255 });
+// raylib fills only counter-clockwise triangles; accept either winding.
+static void fillTriangle(Vector2 a, Vector2 b, Vector2 c, Color col) {
+    float cross = (b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x);
+    if (cross > 0) DrawTriangle(a, c, b, col); else DrawTriangle(a, b, c, col);
+}
+
+void drawProjectile(const Projectile& p, float t) {
+    float ang = atan2f(p.vel.y, p.vel.x);
+    switch (p.kind) {
+    case ShotKind::Spell:
+        if (SPR.flame.ok() && p.school && TextIsEqual(p.school, "Fire")) {
+            // Emberhex flies as an animated fireball, rotated along its path
+            DrawCircleV(p.pos, p.r + 5, Fade(p.glow, 0.25f));
+            drawAnim(SPR.flame, animFrame(SPR.flame, 1.4f - p.life, 14, true), p.pos, 1.3f, false, WHITE, ang * RAD2DEG + 180.0f);
+        }
+        else { DrawCircleV(p.pos, p.r + 3, Fade(p.glow, 0.4f)); DrawCircleV(p.pos, p.r, p.color); }
+        break;
+    case ShotKind::Coin:
+        if (SPR.coin.ok()) drawAnim(SPR.coin, animFrame(SPR.coin, t + p.pos.x * 0.01f, 14, true), p.pos, 1.2f);
+        else DrawCircleV(p.pos, p.r, { 245, 215, 120, 255 });
+        break;
+    case ShotKind::Koi: {
+        Vector2 d = fromAngle(ang), side = { -d.y, d.x };
+        float wag = sinf(t * 14 + p.pos.x * 0.05f) * 3;
+        Vector2 tail = Vector2Add(Vector2Subtract(p.pos, Vector2Scale(d, 10)), Vector2Scale(side, wag));
+        fillTriangle(tail, Vector2Add(tail, Vector2Add(Vector2Scale(d, -6), Vector2Scale(side, 5))),
+            Vector2Add(tail, Vector2Add(Vector2Scale(d, -6), Vector2Scale(side, -5))), { 255, 150, 60, 255 });
+        DrawEllipse((int)p.pos.x, (int)p.pos.y, 8, 6, { 255, 130, 50, 255 });
+        DrawCircleV(Vector2Add(p.pos, Vector2Scale(d, 3)), 3, { 255, 240, 230, 255 });
+        break;
+    }
+    case ShotKind::Orb:
+        DrawCircleV(p.pos, p.r * 2.0f, Fade(p.color, 0.25f));
+        DrawCircleV(p.pos, p.r, p.color);
+        DrawCircleV({ p.pos.x - p.r * 0.3f, p.pos.y - p.r * 0.3f }, p.r * 0.35f, Fade(WHITE, 0.7f));
+        break;
+    case ShotKind::Feather: {
+        Vector2 d = Vector2Scale(fromAngle(ang), 9);
+        DrawLineEx(Vector2Subtract(p.pos, d), Vector2Add(p.pos, d), 4, Fade({ 30, 40, 70, 255 }, 0.9f));
+        DrawLineEx(Vector2Subtract(p.pos, d), Vector2Add(p.pos, d), 2, { 170, 200, 255, 255 });
+        break;
+    }
+    case ShotKind::Ticket: {
+        float spin = t * 6 * RAD2DEG + p.pos.x;
+        DrawRectanglePro({ p.pos.x, p.pos.y, 14, 9 }, { 7, 4.5f }, spin, { 236, 226, 196, 255 });
+        DrawRectanglePro({ p.pos.x, p.pos.y, 14, 2 }, { 7, 1 }, spin, { 200, 60, 60, 255 });
+        break;
+    }
+    case ShotKind::Ember:
+        DrawCircleV(p.pos, p.r * 2.2f, Fade({ 255, 110, 40, 255 }, 0.25f));
+        DrawCircleV(p.pos, p.r, { 255, 150, 60, 255 });
+        DrawCircleV(p.pos, p.r * 0.5f, { 255, 236, 180, 255 });
+        break;
+    }
 }
 
 std::string findAsset(const char* file) {
     // Images live in the project's assets/ folder. Try several relative depths
-    // so it works whether the cwd is the project dir (VS) or x64/Debug (exe).
+    // so it works whether the cwd is the project dir (VS) or the build folder (exe).
     const char* roots[] = { "assets/", "../assets/", "../../assets/",
                             "../../../assets/", "../../../../assets/" };
     for (auto r : roots) { std::string p = std::string(r) + file; if (FileExists(p.c_str())) return p; }

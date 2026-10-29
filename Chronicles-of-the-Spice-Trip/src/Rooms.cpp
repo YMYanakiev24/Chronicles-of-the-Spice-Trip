@@ -25,12 +25,9 @@ void Dungeon::generate() {
         int rx = GetRandomValue(0, DUNGEON_G - 1);
         int ry = GetRandomValue(0, DUNGEON_G - 1);
         if (!grid[ry][rx].exists) continue;
+        static const int stepX[4] = { 0, 1, 0, -1 }, stepY[4] = { -1, 0, 1, 0 };   // N, E, S, W
         int dir = GetRandomValue(0, 3);
-        int dx = (dir == DIR_E ? 1 : dir == DIR_W ? -1 : 0); // note: dir is 0..3 below
-        // map 0..3 -> N/E/S/W deltas
-        dx = 0; int dy = 0;
-        if (dir == 0) dy = -1; else if (dir == 1) dx = 1; else if (dir == 2) dy = 1; else dx = -1;
-        int nx = rx + dx, ny = ry + dy;
+        int nx = rx + stepX[dir], ny = ry + stepY[dir];
         if (nx < 0 || ny < 0 || nx >= DUNGEON_G || ny >= DUNGEON_G) continue;
         if (grid[ny][nx].exists) continue;
         if (GetRandomValue(0, 100) < 55) { grid[ny][nx].exists = true; count++; }
@@ -90,6 +87,14 @@ void Dungeon::generate() {
     for (int y = 0; y < DUNGEON_G; ++y)
         for (int x = 0; x < DUNGEON_G; ++x)
             if (grid[y][x].exists) grid[y][x].buildLayout();
+}
+
+void Dungeon::generateArena() {
+    for (auto& row : grid) for (auto& r : row) r = Room{};
+    cx = cy = DUNGEON_G / 2;
+    Room& arena = grid[cy][cx];
+    arena.exists = arena.isBoss = arena.visited = true;   // no doors: the only way out is through
+    arena.buildLayout();
 }
 
 bool Room::isFloor(int tx, int ty) const {
