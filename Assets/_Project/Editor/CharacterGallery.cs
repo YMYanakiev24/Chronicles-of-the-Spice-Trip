@@ -4,8 +4,11 @@
  * Spice Trip ▸ Export Character Gallery: one picture with every playable
  * character's walking frames (front, back, left, right; standing then the walk
  * cycle), to check the figures at a glance. Writes Captures/characters.png.
+ * Spice Trip ▸ Export Walk Sheets writes each champion's frames as a walk sheet
+ * for the C++ game (Captures/walk-sheets/).
  *
  *   Unity.exe -batchmode -quit -projectPath . -executeMethod SpiceTrip.EditorTools.CharacterGallery.Export
+ *   Unity.exe -batchmode -quit -projectPath . -executeMethod SpiceTrip.EditorTools.CharacterGallery.ExportWalkSheets
  * ----------------------------------------------------------------------------
  */
 
@@ -47,6 +50,45 @@ namespace SpiceTrip.EditorTools
             File.WriteAllBytes(path, tex.EncodeToPNG());
             Object.DestroyImmediate(tex);
             Debug.Log($"Character gallery ({ids.Count} characters) written to {path}");
+        }
+
+        /// <summary>
+        /// Spice Trip ▸ Export Walk Sheets: every champion's walking frames as a PNG in the
+        /// walk-sheet layout (rows down, up, right; the standing frame then the walk cycle),
+        /// plus the fearful face, into Captures/walk-sheets/. The C++ game loads these, so
+        /// both games show the same figures.
+        /// </summary>
+        [MenuItem("Spice Trip/Export Walk Sheets")]
+        public static void ExportWalkSheets()
+        {
+            var dir = Path.GetFullPath("Captures/walk-sheets");
+            Directory.CreateDirectory(dir);
+            string[] rows = { "down", "up", "right" };
+            foreach (var id in GameDatabase.Instance.characters.Where(c => !c.empty).Select(c => c.id))
+            {
+                var file = Path.Combine(dir, $"walk-{id}.png");
+                var hero = HeroSprites.For(id);
+                if (hero.FromSheet)         // already a walk sheet: ship it as it is
+                {
+                    File.Copy(Path.Combine(ArtLibrary.Folder, $"walk-{id}.png"), file, true);
+                    continue;
+                }
+                const int w = ChampionFigures.W, h = ChampionFigures.H;
+                var sheet = new Texture2D(hero.FrameCount * w, rows.Length * h, TextureFormat.RGBA32, false);
+                for (int r = 0; r < rows.Length; r++)
+                    for (int f = 0; f < hero.FrameCount; f++)
+                    {
+                        var s = hero.Frame(rows[r], f);
+                        // texture rows run bottom-up: sheet row r (0 = the top) starts at y = height - (r + 1) * h
+                        sheet.SetPixels32(f * w, sheet.height - (r + 1) * h, w, h, s.texture.GetPixels32());
+                    }
+                File.WriteAllBytes(file, sheet.EncodeToPNG());
+                Object.DestroyImmediate(sheet);
+            }
+            var fear = ChampionFigures.FearFace().ToTexture();
+            File.WriteAllBytes(Path.Combine(dir, "fear.png"), fear.EncodeToPNG());
+            Object.DestroyImmediate(fear);
+            Debug.Log($"Walk sheets written to {dir}");
         }
 
         // Nearest-neighbour copy of a sprite into a cell, alpha-blended over the backdrop (top-left origin).

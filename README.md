@@ -158,7 +158,10 @@ background), note where each frame sits in a layout file like
 `powershell -File Tools~/cut-walk-sheet.ps1 Tools~/walk-layouts/<id>.json`.
 It removes the background, scales every frame to one height and writes the
 PNG. **Spice Trip ▸ Export Character Gallery** saves every champion's frames
-to `Captures/characters.png`.
+to `Captures/characters.png`. **Spice Trip ▸ Export Walk Sheets** writes each
+champion's frames as a walk sheet (and the fearful face) to
+`Captures/walk-sheets/`; the C++ game loads those from its `assets/walk/`, so
+both games show the same figures.
 
 ## Tests
 
