@@ -193,9 +193,23 @@ void Game::drawActors() {
     };
     for (auto& c : corpses) drawBody(c);
     for (auto& e : enemies) drawBody(e);
+    for (auto& e : enemies) {               // a fearful face bobs over everyone Momiche scared
+        if (e.dying) continue;
+        if (e.bossForm >= 0) {
+            float top = e.pos.y - e.r * 0.4f, radius = e.r * 1.3f;    // where drawBossBody puts the token
+            drawFear(e.pos.x, top - radius - 16, top + radius + 16, 26);
+        }
+        else drawFear(e.pos.x, e.pos.y - e.r * 2 - 14, e.pos.y + e.r + 10, 16);
+    }
     for (auto& c : coins) drawAnim(SPR.coin, animFrame(SPR.coin, c.t, 12, true), c.pos, 1.4f);
 
     // the hero, with their champion's effects
+    if (scareT > SCARE_TIME - 0.6f)         // the scream: two rings racing outward
+        for (int i = 0; i < 2; ++i) {
+            float k = Clamp((SCARE_TIME - scareT - i * 0.12f) / 0.6f, 0, 1);
+            float r = (30 + 300 * k) / 2;
+            if (k > 0 && k < 1) DrawRing(player.pos, r - 2, r, 0, 360, 48, Fade({ 166, 191, 255, 255 }, 0.7f * (1 - k)));
+        }
     float lift = player.jumpT > 0 ? sinf((1 - player.jumpT / 0.6f) * PI) * 22 : 0;
     if (player.auraT > 0) {
         float pulse = 34 + sinf(clock * 6) * 3;
@@ -204,7 +218,9 @@ void Game::drawActors() {
     }
     if (player.dashT > 0 || player.rollAtkT > 0)
         DrawCircleV(player.pos, PLAYER_R + 4, Fade(player.rollAtkT > 0 ? Color{ 110, 200, 80, 255 } : Color{ 245, 210, 110, 255 }, 0.35f));
-    drawHero(player.pos, player.facing, player.meleeAnim, player.hitFlash > 0, champ().cloak, lift);
+    // walking as their own figure, facing the way they walk (or aim, standing still)
+    drawChampion(walk[player.champion], player.pos, heroMoving ? heroMoveDir : player.facing, heroMoving, clock,
+        player.facing, player.meleeAnim, player.hitFlash > 0, champ().cloak, lift);
     if (player.shieldT > 0) {
         DrawCircleV({ player.pos.x, player.pos.y - 6 }, 22, Fade({ 230, 190, 120, 255 }, 0.18f));
         DrawCircleLinesV({ player.pos.x, player.pos.y - 6 }, 22, Fade({ 250, 220, 150, 255 }, 0.9f));
@@ -266,12 +282,12 @@ void Game::drawHud() {
         Texture2D tx = champTex[player.champion];
         ui::drawContain(tx, { c.crop.x * tx.width, c.crop.y * tx.height, c.crop.width * tx.width, c.crop.height * tx.height }, pic);
     }
-    else drawHero({ pic.x + pic.width / 2, pic.y + pic.height / 2 + 10 }, { 0, 1 }, 0, false, c.cloak);
+    else drawFigureIn(walk[player.champion], FACE_DOWN, 0, { pic.x + 8, pic.y + 4, pic.width - 16, pic.height - 8 });
     DrawRectangleLinesEx(pic, 2, ui::ACCENT);
     ui::text(TextFormat("Lv %d", player.level), pic.x + 4, pic.y + pic.height - 14, 10, ui::ACCENT);
 
     float bx = box.x + 100, bw = box.width - 116;
-    ui::text(c.name, bx, box.y + 12, 10, ui::ACCENT);
+    drawName(player.champion, bx, box.y + 12, 10, ui::ACCENT);
     ui::bar({ bx, box.y + 28, bw, 18 }, player.hp / player.maxHp, ui::HP, TextFormat("%d / %d", (int)ceilf(fmaxf(0, player.hp)), (int)player.maxHp));
     ui::bar({ bx, box.y + 54, bw, 14 }, player.mana / player.maxMana, ui::MANA, TextFormat("%d / %d", (int)player.mana, (int)player.maxMana));
     ui::bar({ bx, box.y + 76, bw, 6 }, (float)player.xp / player.xpNext, ui::XP);
@@ -364,7 +380,7 @@ void Game::drawHud() {
 
     // --- a reminder of the controls, in the first room only ---
     if (r.isStart && mode == Mode::Run && floor == 1)
-        ui::textCentered(TextFormat("WASD move   LMB blade   RMB cast   1-3 power   %s special   %s roll   %s interact   Esc pause",
+        ui::textCentered(TextFormat("WASD move   LMB blade   RMB/Enter cast   1-3 power   %s special   %s roll   %s interact   Esc pause",
             keyName(settings.keys.special), keyName(settings.keys.roll), E), sw / 2.0f, sh - 18.0f, 10, Fade(ui::MUTED, 0.9f));
 }
 
@@ -486,7 +502,7 @@ void Game::drawPause() {
     const char* rows[][2] = {
         { TextFormat("%s %s %s %s", keyName(k.up), keyName(k.left), keyName(k.down), keyName(k.right)), "move" },
         { keyName(k.run), "run" }, { keyName(k.roll), "dodge-roll" }, { keyName(k.interact), "talk, trade, open" },
-        { "LMB", "swing the blade" }, { "RMB", "cast the selected power" }, { "1 2 3", "choose a power" },
+        { "LMB", "swing the blade" }, { "RMB / Enter", "cast the selected power" }, { "1 2 3", "choose a power" },
         { keyName(k.special), c.special },
     };
     float ry = card.y + 48;
@@ -537,4 +553,26 @@ void Game::drawRushOver() {
     float bw = 220, by = p.y + ph - 76;
     if (ui::button({ p.x + pw / 2 - bw - 10, by, bw, 50 }, "Try again", ui::Style::Primary)) { play("ui"); startBossRush(); }
     if (ui::button({ p.x + pw / 2 + 10, by, bw, 50 }, "Main menu", ui::Style::Normal)) { play("ui"); toMenu(); }
+}
+
+// ------------------------------------------------------------ Momiche's scare
+// The fearful face over a scared enemy: above it, or below when that would run into the top wall.
+void Game::drawFear(float x, float above, float below, float size) const {
+    if (scareT <= 0 || !fearTex.id) return;
+    float y = (above < TILE * 2 ? below : above) + sinf(clock * 8 + x) * 2;
+    DrawTexturePro(fearTex, { 0, 0, (float)fearTex.width, (float)fearTex.height },
+        { x - size / 2, y - size / 2, size, size }, { 0, 0 }, 0, WHITE);
+}
+
+// A champion's name, with the fearful face after it for Momiche😨 (the pixel font has no emoji).
+void Game::drawName(int champion, float x, float y, int size, Color color, bool centred) const {
+    const ChampionDef& c = CHAMPIONS[champion];
+    float w = (float)ui::measure(c.name, size);
+    float face = c.fearFace && fearTex.id ? size * 1.2f : 0;
+    float total = w + (face > 0 ? face + 3 : 0);
+    float x0 = centred ? x - total / 2 : x;
+    ui::text(c.name, x0, y, size, color);
+    if (face > 0)
+        DrawTexturePro(fearTex, { 0, 0, (float)fearTex.width, (float)fearTex.height },
+            { x0 + w + 3, y + (size - face) / 2, face, face }, { 0, 0 }, 0, WHITE);
 }

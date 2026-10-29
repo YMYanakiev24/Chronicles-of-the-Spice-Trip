@@ -4,6 +4,7 @@
 #include "Sprites.h"
 #include "Render.h"
 #include "Common.h"
+#include <cmath>
 #include <string>
 
 Sprites SPR;
@@ -91,4 +92,49 @@ void drawTile(int col, int row, float x, float y, Color tint) {
     if (!SPR.tileset.id) return;
     DrawTexturePro(SPR.tileset, { col * 16.0f, row * 16.0f, 16, 16 }, { x, y, (float)TILE, (float)TILE },
         { 0, 0 }, 0, tint);
+}
+
+Facing facingOf(Vector2 dir) {
+    if (fabsf(dir.x) > fabsf(dir.y)) return dir.x > 0 ? FACE_RIGHT : FACE_LEFT;
+    return dir.y < 0 ? FACE_UP : FACE_DOWN;
+}
+
+void WalkSheet::load(const char* file) {
+    std::string p = findAsset((std::string("walk/") + file).c_str());
+    if (p.empty()) return;
+    tex = LoadTexture(p.c_str());
+    fh = tex.height / 3;
+    fw = fh * 3 / 4;
+    frames = fw > 0 ? tex.width / fw : 0;
+    if (frames < 2) {
+        TraceLog(LOG_WARNING, "%s is not a walk sheet (three rows of 3:4 frames)", p.c_str());
+        unload();
+        return;
+    }
+    // The drawn figures are tiny pixel art: keep them crisp. A sheet cut from a big
+    // painting (Momiche's) is drawn far smaller than it is, so give it mipmaps.
+    if (fh > 64) { GenTextureMipmaps(&tex); SetTextureFilter(tex, TEXTURE_FILTER_TRILINEAR); }
+    else SetTextureFilter(tex, TEXTURE_FILTER_POINT);
+}
+
+void WalkSheet::unload() {
+    if (tex.id) UnloadTexture(tex);
+    *this = WalkSheet{};
+}
+
+int WalkSheet::frameAt(bool walking, float time) const {
+    if (!walking || frames < 2) return 0;
+    return 1 + (int)(time * 8) % (frames - 1);
+}
+
+void WalkSheet::draw(Facing facing, int frame, Rectangle dst, Color tint, bool flash) const {
+    if (!ok()) return;
+    int row = facing == FACE_DOWN ? 0 : facing == FACE_UP ? 1 : 2;
+    Rectangle src = { (float)(frame * fw), (float)(row * fh), facing == FACE_LEFT ? -(float)fw : (float)fw, (float)fh };
+    DrawTexturePro(tex, src, dst, { 0, 0 }, 0, tint);
+    if (flash) {
+        BeginBlendMode(BLEND_ADDITIVE);
+        DrawTexturePro(tex, src, dst, { 0, 0 }, 0, WHITE);
+        EndBlendMode();
+    }
 }

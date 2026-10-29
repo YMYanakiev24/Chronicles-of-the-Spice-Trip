@@ -34,7 +34,7 @@ the first time it runs.
 | W A S D | Move (Shift runs) |
 | Mouse | Aim |
 | Left click | Swing the blade |
-| Right click | Cast the selected power |
+| Right click, or Enter | Cast the selected power (hold Enter to keep casting) |
 | 1 / 2 / 3 | Emberhex (fire), Tidelash (water), Stormbolt (lightning) |
 | Q | Your champion's special |
 | Space | Dodge-roll |
@@ -51,9 +51,11 @@ Movement, run, roll, interact and the special can be rebound in **Settings**.
   with Theira the Oracle, and Marin's Market, where potions, timed vape buffs
   and permanent skills are sold for gold.
 - **Boss fights.** The last room of every floor holds a boss (see below).
-- **Champions.** Ten champions, each with a passive perk and a special on **Q**:
+- **Champions.** Eleven champions, each with a passive perk and a special on **Q**:
   Arcane Surge, Aura of Calmness, Coin Dash, Mug-Shield, Melon Roll, Drink,
-  Bear Jump, Coin Barrage, Release the Koi and Blink.
+  Bear Jump, Coin Barrage, Release the Koi, Blink and Scare. Each one walks as
+  their own figure, seen from the front, the back and both sides, and the
+  champion select shows every champion from all four sides.
 - **Boss Rush.** All five bosses back to back at level 5, timed. The best time
   is kept.
 - **Saves.** Save from the pause menu and **Continue** from the main menu.
@@ -77,6 +79,22 @@ Beating floor 5 completes the Spice Trip. You can keep descending; every cycle
 the bosses get 50% stronger. The numbers for each boss are at the top of
 `src/Bosses.cpp`.
 
+### Momiche, Gakev and the walking figures
+
+- **Momiche😨** walks with the frames cut from her own sprite sheet. Her
+  special, **Scare** (Q, 8 s cooldown), makes every monster and boss run from
+  her for 3 seconds. While scared they don't shoot and can't hurt her by touch
+  (a bus that's already coming still drives). A fearful face bobs over each of
+  them. Her perk is +3 blade damage.
+- **Gakev**'s kills drop three extra coins.
+- **The walking figures** are the same as in the Unity version of the game.
+  They live in `assets/walk/walk-<champion>.png`: rows facing down, up and
+  right (left is the right row mirrored), each the standing frame and then
+  four walk frames, all 3:4. They are exported from the Unity project with
+  **Spice Trip > Export Walk Sheets**, which writes them (and `fear.png`) to
+  its `Captures/walk-sheets/`. Copy them into `assets/walk/` after changing a
+  figure there. A missing sheet falls back to the hero drawn in code.
+
 ## Project layout
 
 ```
@@ -88,16 +106,17 @@ Chronicles-of-the-Spice-Trip/
     src/PlayDraw.cpp    the room, actors, HUD and overlays
     src/Screens.cpp     menu, champion select, settings, intro
   src/Bosses.cpp      the five bosses: table, attack patterns, drawing
-  src/Champions.cpp   the champion roster (perks and specials)
+  src/Champions.cpp   the champion roster (art, walking figures, perks and specials)
   src/Rooms.cpp       floor generation, room layouts, collision, pathfinding
-  src/Render.cpp      hero, monsters and projectiles
-  src/Sprites.cpp     the dungeon sprite pack
+  src/Render.cpp      the champions' figures, monsters and projectiles
+  src/Sprites.cpp     the dungeon sprite pack and the champions' walk sheets
   src/Audio.cpp       sound effects and music, synthesised at runtime
   src/Ui.cpp          the UI style: palette, text, panels, buttons, bars
   src/Input.cpp       keyboard and mouse (real or scripted)
   src/Save.cpp        savegame.dat, profile.dat, settings.dat
   src/Autopilot.cpp   the automated play-through (see below)
-  assets/             art; assets/arenas/ holds the four painted boss arenas
+  assets/             art; assets/arenas/ holds the four painted boss arenas,
+                      assets/walk/ the champions' walk sheets
   vendor/raylib/      raylib headers and library
 ```
 
@@ -106,7 +125,8 @@ Chronicles-of-the-Spice-Trip/
 `--autopilot <folder>` plays the whole game with scripted input. It clicks
 through the menus, fights a room, opens a chest, shops, beats all five bosses,
 completes a run, saves and continues, wins a Boss Rush, and tries every
-champion's special. It writes a PASS/FAIL line for each check to
+champion's special, Momiche's scare on a boss, Gakev's coins and casting with
+Enter. It writes a PASS/FAIL line for each check (69) to
 `<folder>/autopilot.log`, saves screenshots next to it, and exits with the
 number of failures:
 

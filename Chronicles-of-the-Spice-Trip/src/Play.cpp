@@ -9,7 +9,7 @@
 
 static const char* ORACLE_LINES[] = {
     "So. The Veil spat you out at last.",
-    "Press 1 and right-click to loose an Emberhex. Q calls your champion's gift.",
+    "Press 1 and right-click (or Enter) to loose an Emberhex. Q calls your champion's gift.",
     "Clear a room to open its doors. Something old waits at the bottom of every floor.",
 };
 static constexpr int ORACLE_COUNT = (int)(sizeof ORACLE_LINES / sizeof ORACLE_LINES[0]);
@@ -50,6 +50,7 @@ void Game::updatePlay(float dt) {
                           &player.specialCd, &player.auraT, &player.shieldT, &player.wobbleT })
         *timer = fmaxf(0, *timer - dt);
     player.meleeAnim = fmaxf(0, player.meleeAnim - dt * 4);
+    scareT = fmaxf(0, scareT - dt);
     player.mana = fminf(player.maxMana, player.mana + (player.has(SK_ARCANE) ? 14.4f : 9.0f) * dt);
     if (c.kind == Special::Blink) player.charge = fminf(DUST_MAX, player.charge + DUST_REGEN * dt);
     for (int v = 0; v < VP_COUNT; ++v) {
@@ -73,7 +74,8 @@ void Game::updatePlay(float dt) {
         if (in::down(K.left))  mv.x -= 1;
         if (in::down(K.right)) mv.x += 1;
     }
-    if (mv.x || mv.y) { mv = Vector2Normalize(mv); player.facing = mv; }
+    if (mv.x || mv.y) { mv = Vector2Normalize(mv); player.facing = mv; heroMoveDir = mv; }
+    heroMoving = mv.x || mv.y || player.roll > 0 || player.dashT > 0 || player.rollAtkT > 0;
     Vector2 aim = Vector2Subtract(mouseWorld(), player.pos);
     if (Vector2Length(aim) > 1) player.facing = Vector2Normalize(aim);
     if (!talking && in::pressed(K.roll) && player.rollCd <= 0 && (mv.x || mv.y)) {
@@ -116,10 +118,12 @@ void Game::updatePlay(float dt) {
     if (nearMerchant && !talking && in::pressed(K.interact)) { overlay = Overlay::Shop; play("ui"); }
 
     // --- attacks ---
-    if (!talking && in::mousePressed(MOUSE_BUTTON_RIGHT)) castSpell();
+    bool castKey = in::mousePressed(MOUSE_BUTTON_RIGHT) || in::down(KEY_ENTER) || in::down(KEY_KP_ENTER);   // hold Enter to keep casting
+    if (!talking && castKey) castSpell();
     if (!talking && in::mousePressed(MOUSE_BUTTON_LEFT)) swingBlade();
 
     updateShots(dt);
+    fight.scared = scareT > 0;
     fight.update(dt, player.pos, enemies, enemyShots, room, slow);
     updateEnemies(dt, slow);
     updateEnemyShots(dt, slow);
@@ -297,6 +301,12 @@ void Game::useSpecial(Vector2 mv) {
         play("shield");
         break;
     }
+    case Special::Scare:
+        scareT = SCARE_TIME;
+        burst(parts, player.pos, 18, 160, 0.5f, { 170, 190, 255, 255 });
+        shake = fmaxf(shake, 0.15f);
+        play("scare");
+        break;
     }
     player.specialCd = c.cooldown;
 }
@@ -396,6 +406,7 @@ void Game::updateEnemies(float dt, float slow) {
     Room& room = dungeon.cur();
     bool doorsOpen = room.cleared;
     bool untouchable = player.invuln > 0 || player.jumpT > 0;
+    bool scared = scareT > 0;               // Momiche's scare: everyone runs, nobody bites
     // One flow field per frame: every monster reads its next step from it, so
     // they path around pillars and (while it's cheaper) around spike traps.
     buildFlowField(room, player.pos, true, flow);
@@ -411,7 +422,14 @@ void Game::updateEnemies(float dt, float slow) {
         Vector2 to = Vector2Subtract(player.pos, e.pos);
         float d = Vector2Length(to);
 
-        if (e.bossForm < 0) {       // boss bodies are moved by the BossFight
+        if (e.bossForm < 0 && scared) {
+            if (fabsf(to.x) > 2) e.flip = to.x > 0;            // facing away, running
+            e.moving = true;
+            e.lunge = 0; e.atkAnim = 0;
+            Vector2 away = d > 0.01f ? Vector2Scale(to, -1.0f / d) : Vector2{ 1, 0 };
+            e.pos = moveInRoom(e.pos, Vector2Scale(away, e.speed * FLEE_SPEED * edt), e.r, room, doorsOpen);
+        }
+        else if (e.bossForm < 0) {  // boss bodies are moved by the BossFight
             if (fabsf(to.x) > 2) e.flip = to.x < 0;
             e.moving = d > 1 && e.atkAnim <= 0;        // plant feet while swinging
             e.lunge = fmaxf(0, e.lunge - edt);
@@ -457,7 +475,7 @@ void Game::updateEnemies(float dt, float slow) {
         }
 
         // touch damage
-        if (d < e.r + PLAYER_R + 4 && e.atkCd <= 0 && !untouchable) {
+        if (d < e.r + PLAYER_R + 4 && e.atkCd <= 0 && !untouchable && !scared) {
             hurtPlayer((float)e.dmg, 0.4f);
             e.atkCd = 1.0f;
             if (e.kind != EK_SKULL && e.bossForm < 0) e.atkAnim = SPR.enemy[e.kind].attack.length(16);

@@ -103,6 +103,8 @@ namespace au {
         b.clear(); for (int i = 0; i < 2; ++i) { renderTone(b, 2100, 2000, SQUARE, 0.16f, 0.16f, i * 0.22f); renderNoise(b, 0.16f, 0.10f, 3200, 2.0f, 2, i * 0.22f); } make("whistle", b);
         b.clear(); renderTone(b, 70, 110, SAW, 0.70f, 0.35f); renderNoise(b, 0.70f, 0.30f, 300, 0.6f, 0); make("bus", b);
         b.clear(); renderTone(b, 1320, 1760, SQUARE, 0.08f, 0.12f); renderTone(b, 1760, 0, SINE, 0.20f, 0.18f, 0.06f); make("coin", b);
+        // Momiche's scream: a shriek up, a wail down, and a breathy rush
+        b.clear(); renderTone(b, 600, 1500, SQUARE, 0.16f, 0.12f); renderTone(b, 1500, 380, SAW, 0.48f, 0.12f, 0.14f); renderNoise(b, 0.50f, 0.12f, 2400, 0.4f, 2); make("scare", b);
         return m;
     }
 

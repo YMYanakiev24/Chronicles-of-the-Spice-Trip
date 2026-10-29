@@ -17,11 +17,13 @@ enum class Special {
     CoinBarrage,   // Daniil & Vasil: charged by hits, a ring of coins
     Koi,           // the Storyteller: three homing koi
     Blink,         // the Fairy: teleport to the cursor, paid in fairy dust
+    Scare,         // Momiche: every enemy runs from you and can't attack
 };
 
 struct ChampionDef {
     const char* name;
-    const char* art;          // character sheet in assets/ (nullptr = the procedural hero)
+    const char* art;          // character sheet in assets/ (nullptr = no sheet: the walking figure stands in)
+    const char* walk;         // walking figure from every side, in assets/walk/ (see README)
     Rectangle   crop;         // the portrait inside the sheet, as fractions of the image
     Color       cloak;        // colour of the hero's cloak in the dungeon
     const char* perk;         // the passive, in one line
@@ -29,6 +31,7 @@ struct ChampionDef {
     const char* specialDesc;
     Special     kind;
     float       cooldown;     // seconds between uses of the special
+    bool        fearFace = false;   // the name ends in a fearful face (Momiche😨)
 
     // Passive numbers.
     float hpBonus = 0;        // extra max health
@@ -41,7 +44,7 @@ struct ChampionDef {
     float spellHoming = 0;    // spells curve toward enemies (rad/s)
 };
 
-inline constexpr int CHAMPION_COUNT = 10;
+inline constexpr int CHAMPION_COUNT = 11;
 extern const ChampionDef CHAMPIONS[CHAMPION_COUNT];
 
 // Coin Barrage and Blink run on a meter instead of only a cooldown.
@@ -50,3 +53,7 @@ inline constexpr float COIN_POWER_PER_HIT = 6;
 inline constexpr float DUST_MAX = 50;            // refills over time
 inline constexpr float DUST_REGEN = 4;
 inline constexpr float DUST_PER_BLINK = 10;
+
+// Momiche's scare: how long everyone runs, and how much faster than they walk.
+inline constexpr float SCARE_TIME = 3;
+inline constexpr float FLEE_SPEED = 1.3f;

@@ -36,6 +36,11 @@ void Game::init(bool windowed) {
     shopTex = loadArt("shop.png");
     for (int i = 0; i < CHAMPION_COUNT; ++i)
         if (CHAMPIONS[i].art) champTex[i] = loadArt(CHAMPIONS[i].art);
+    for (int i = 0; i < CHAMPION_COUNT; ++i) walk[i].load(CHAMPIONS[i].walk);
+    if (std::string p = findAsset("walk/fear.png"); !p.empty()) {
+        fearTex = LoadTexture(p.c_str());
+        SetTextureFilter(fearTex, TEXTURE_FILTER_POINT);
+    }
     SPR.load();
     bossArt.load();
     fight.sfx = [this](const char* s) { play(s); };
@@ -47,6 +52,8 @@ void Game::shutdown() {
     for (Texture2D* tx : { &menuBg, &castleTex, &marinTex, &shopTex })
         if (tx->id) UnloadTexture(*tx);
     for (auto& tx : champTex) if (tx.id) UnloadTexture(tx);
+    for (auto& w : walk) w.unload();
+    if (fearTex.id) UnloadTexture(fearTex);
     for (auto& [name, s] : sounds) UnloadSound(s);
     music.unload();
 }
@@ -112,7 +119,7 @@ void Game::startRun() {
     player.pos = ROOM_CENTER;
     dungeon.generate();
     floor = 1; kills = 0; runTime = 0;
-    dialogue.clear(); overlay = Overlay::None;
+    dialogue.clear(); overlay = Overlay::None; scareT = 0;
     screen = Screen::Play; t = 0;
     enterRoom();
     showBanner("The Mistwood Depths", std::string(currentBoss().name) + " waits at the bottom of floor 1", 3.0f);
@@ -125,7 +132,7 @@ void Game::startBossRush() {
     dungeon.generateArena();
     floor = 1; kills = 0;
     rushStage = 0; rushTime = 0; rushNextT = -1; rushWon = rushRecord = false;
-    dialogue.clear(); overlay = Overlay::None;
+    dialogue.clear(); overlay = Overlay::None; scareT = 0;
     screen = Screen::Play; t = 0;
     enterRoom();
 }
@@ -136,7 +143,7 @@ bool Game::continueRun() {
     mode = Mode::Run;
     player = run.player; dungeon = run.dungeon;
     floor = run.floor; kills = run.kills; runTime = run.runTime;
-    dialogue.clear(); overlay = Overlay::None;
+    dialogue.clear(); overlay = Overlay::None; scareT = 0;
     screen = Screen::Play; t = 0;
     enterRoom();
     showBanner(TextFormat("Floor %d", floor), "Welcome back", 2.0f);
