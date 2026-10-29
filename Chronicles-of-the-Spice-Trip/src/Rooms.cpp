@@ -84,15 +84,36 @@ void Dungeon::generate() {
         if (sx >= 0) { grid[sy][sx].isShop = true; grid[sy][sx].cleared = true; }
     }
 
+    // The boss key waits in one random combat room.
+    {
+        int kx = -1, ky = -1, n = 0;
+        for (int y = 0; y < DUNGEON_G; ++y)
+            for (int x = 0; x < DUNGEON_G; ++x) {
+                const Room& rm = grid[y][x];
+                if (!rm.exists || rm.isStart || rm.isBoss || rm.isShop) continue;
+                if (GetRandomValue(0, n++) == 0) { kx = x; ky = y; }
+            }
+        if (kx >= 0) grid[ky][kx].hasKey = true;
+        keyFound = kx < 0;
+    }
+
     for (int y = 0; y < DUNGEON_G; ++y)
         for (int x = 0; x < DUNGEON_G; ++x)
             if (grid[y][x].exists) grid[y][x].buildLayout();
+}
+
+bool Dungeon::bossDoorLocked(int dir) const {
+    if (keyFound || !(cur().doors & dir)) return false;
+    int nx = cx + (dir == DIR_E) - (dir == DIR_W), ny = cy + (dir == DIR_S) - (dir == DIR_N);
+    if (nx < 0 || ny < 0 || nx >= DUNGEON_G || ny >= DUNGEON_G) return false;
+    return grid[ny][nx].isBoss;
 }
 
 void Dungeon::generateArena() {
     for (auto& row : grid) for (auto& r : row) r = Room{};
     cx = cy = DUNGEON_G / 2;
     Room& arena = grid[cy][cx];
+    keyFound = true;                                      // nothing to unlock in the arena
     arena.exists = arena.isBoss = arena.visited = true;   // no doors: the only way out is through
     arena.buildLayout();
 }
@@ -280,7 +301,7 @@ bool lineClear(const Room& r, Vector2 a, Vector2 b, float radius) {
     return true;
 }
 
-Vector2 nextWaypoint(const Room& r, const FlowField& f, Vector2 from) {
+Vector2 nextWaypoint(const Room& r, const FlowField& f, Vector2 from, float radius) {
     int tx = (int)floorf(from.x / TILE), ty = (int)floorf(from.y / TILE);
     int bestX = tx, bestY = ty;
     int best = (tx >= 0 && ty >= 0 && tx < ROOM_TW && ty < ROOM_TH && f[ty][tx] >= 0) ? f[ty][tx] : (1 << 30);
@@ -291,5 +312,8 @@ Vector2 nextWaypoint(const Room& r, const FlowField& f, Vector2 from) {
         if (k >= 4 && (!walkable(r, tx + dx[k], ty) || !walkable(r, tx, ty + dy[k]))) continue;
         if (f[ny][nx] < best) { best = f[ny][nx]; bestX = nx; bestY = ny; }
     }
-    return { bestX * (float)TILE + TILE / 2.0f, bestY * (float)TILE + TILE / 2.0f };
+    Vector2 step = { bestX * (float)TILE + TILE / 2.0f, bestY * (float)TILE + TILE / 2.0f };
+    if (radius > 0 && !lineClear(r, from, step, radius))
+        return { tx * (float)TILE + TILE / 2.0f, ty * (float)TILE + TILE / 2.0f };
+    return step;
 }

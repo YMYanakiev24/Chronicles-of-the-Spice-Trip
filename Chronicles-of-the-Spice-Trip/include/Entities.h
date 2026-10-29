@@ -61,6 +61,8 @@ struct Enemy {
     float   deathT = 0;                // time since death (death animation)
     bool    dying = false, flip = false, moving = false;
     int     lastRollHit = -1;          // Pupesh's roll hits each enemy once per roll
+    int     stolen = 0;                // Toshko: gold he snatched and is running off with
+    float   fleeT = 0;                 // Toshko: seconds spent running away
 
     // Boss bodies (bossForm >= 0) are moved and fired by the BossFight.
     int     bossForm = -1;             // 0 = the boss, 1 = a copy, 2 = a tiny copy

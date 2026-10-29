@@ -52,6 +52,17 @@ void Game::playScreen() {
 }
 
 // ----------------------------------------------------------------- the room
+// The boss key: the pack's spinning gold key, or a drawn one if the sprite is missing.
+static void drawKey(Vector2 c, float s) {
+    if (SPR.key.ok()) { drawAnim(SPR.key, animFrame(SPR.key, (float)GetTime(), 6, true), c, 2.0f * s); return; }
+    Color gold = { 240, 200, 80, 255 }, dark = { 120, 80, 20, 255 };
+    DrawRing(c, 4 * s, 7.5f * s, 0, 360, 16, dark);
+    DrawRing(c, 3 * s, 6 * s, 0, 360, 16, gold);
+    DrawRectangleRec({ c.x + 5 * s, c.y - 1.5f * s, 12 * s, 3 * s }, gold);
+    DrawRectangleRec({ c.x + 12 * s, c.y + 1.5f * s, 2.5f * s, 4 * s }, gold);
+    DrawRectangleRec({ c.x + 16 * s, c.y + 1.5f * s, 2.5f * s, 3 * s }, gold);
+}
+
 void Game::drawRoom() {
     Room& r = dungeon.cur();
     Texture2D arena = r.isBoss ? bossArt.arena[currentBossIndex()] : Texture2D{};
@@ -91,7 +102,7 @@ void Game::drawRoom() {
             }
             if ((!border || isDoor) && !innerWall) {
                 drawTile(6 + h % 4, (h >> 4) % 3, px, py);                 // stone floor variants
-                if (isDoor && !r.cleared) drawTile(8, 3, px, py);           // barred door
+                if (isDoor && (!r.cleared || dungeon.bossDoorLocked(dir))) drawTile(8, 3, px, py);   // barred door
                 else if (!border && r.tiles[ty][tx] == RT_SPIKES)
                     drawAnim(SPR.peaks, spikeFrame, { px + TILE / 2.0f, py + TILE / 2.0f }, 2.0f);
                 if (ty == 1 && tx == 1 && !r.isBoss) drawTile(4, 6, px, py);              // cobwebs
@@ -145,6 +156,12 @@ void Game::drawActors() {
             DrawRectangle((int)sx - 26 + i * 3, (int)sy - 18 + i * 11, 52 - i * 6, 9,
                 { (unsigned char)(78 - i * 14), (unsigned char)(74 - i * 14), (unsigned char)(96 - i * 16), 255 });
         DrawRectangleLinesEx({ sx - 30, sy - 24, 60, 48 }, 2, { 150, 140, 90, 255 });
+    }
+
+    if (r.hasKey && r.cleared && !dungeon.keyFound) {      // the boss key, bobbing and glinting
+        Vector2 k = { ROOM_CENTER.x, ROOM_CENTER.y - 6 + sinf(clock * 3) * 3 };
+        drawShadow({ ROOM_CENTER.x, ROOM_CENTER.y + 8 }, 8);
+        drawKey(k, 1.0f);
     }
 
     if (r.hasChest) {
@@ -295,6 +312,7 @@ void Game::drawHud() {
     // gold, floor and run clock under the panel
     drawAnim(SPR.coin, 0, { box.x + 14, box.y + box.height + 22 }, 1.3f);
     ui::text(TextFormat("%d", player.gold), box.x + 28, box.y + box.height + 12, 20, ui::ACCENT);
+    if (mode == Mode::Run && dungeon.keyFound) drawKey({ box.x + 72, box.y + box.height + 22 }, 0.8f);
     const char* where = mode == Mode::Run ? TextFormat("Floor %d   %s", floor, ui::clock(runTime))
                                           : TextFormat("Boss Rush %d/%d   %s", rushStage + 1, BOSS_COUNT, ui::clock(rushTime));
     ui::text(where, box.x + 100, box.y + box.height + 16, 10, ui::MUTED);
