@@ -92,6 +92,13 @@ void Game::updatePlay(float dt) {
     if (spikesUp && !airborne && player.roll <= 0 && player.invuln <= 0 && onSpikes(room, player.pos))
         hurtPlayer(8, 0.6f);
 
+    // --- the boss key (lies in the middle once its room is safe) ---
+    if (room.hasKey && room.cleared && !dungeon.keyFound && Vector2Distance(player.pos, ROOM_CENTER) < 26) {
+        dungeon.keyFound = true; play("levelup");
+        showBanner("Boss key found", "The lair is open", 2.2f);
+        burst(parts, ROOM_CENTER, 16, 100, 0.7f, { 245, 215, 120, 255 });
+    }
+
     // --- chest (only once the room is safe) ---
     Vector2 chestPos = { room.chestTx * (float)TILE + 16, room.chestTy * (float)TILE + 16 };
     bool nearChest = room.hasChest && !room.chestOpened && room.cleared && Vector2Distance(player.pos, chestPos) < 40;
@@ -401,6 +408,26 @@ void Game::updateShots(float dt) {
 }
 
 // ------------------------------------------------------------------- enemies
+// A gentle push away from nearby walls, so monsters round corners instead of
+// scraping along them and snagging.
+static Vector2 wallAvoid(const Room& room, Vector2 pos, float r, bool doorsOpen) {
+    Vector2 push{};
+    float reach = r + 10;
+    int tx0 = (int)floorf((pos.x - reach) / TILE), tx1 = (int)floorf((pos.x + reach) / TILE);
+    int ty0 = (int)floorf((pos.y - reach) / TILE), ty1 = (int)floorf((pos.y + reach) / TILE);
+    for (int ty = ty0; ty <= ty1; ++ty)
+        for (int tx = tx0; tx <= tx1; ++tx) {
+            if (!roomWallSolid(room, tx, ty, doorsOpen)) continue;
+            Vector2 c = { Clamp(pos.x, tx * (float)TILE, (tx + 1) * (float)TILE),
+                          Clamp(pos.y, ty * (float)TILE, (ty + 1) * (float)TILE) };
+            Vector2 off = Vector2Subtract(pos, c);
+            float d = Vector2Length(off);
+            if (d < 0.01f || d >= reach) continue;
+            push = Vector2Add(push, Vector2Scale(off, (reach - d) / reach / d));
+        }
+    return push;
+}
+
 void Game::updateEnemies(float dt, float slow) {
     static FlowField flow;          // path distances to the player, rebuilt each frame
     Room& room = dungeon.cur();
@@ -429,15 +456,32 @@ void Game::updateEnemies(float dt, float slow) {
             Vector2 away = d > 0.01f ? Vector2Scale(to, -1.0f / d) : Vector2{ 1, 0 };
             e.pos = moveInRoom(e.pos, Vector2Scale(away, e.speed * FLEE_SPEED * edt), e.r, room, doorsOpen);
         }
+        else if (e.kind == EK_TOSHKO && e.stolen > 0) {
+            // got the gold: run from the player, and after a few seconds he's gone with it
+            e.fleeT += edt;
+            if (fabsf(to.x) > 2) e.flip = to.x > 0;
+            e.moving = true;
+            Vector2 away = d > 0.01f ? Vector2Scale(to, -1.0f / d) : Vector2{ 1, 0 };
+            Vector2 side = { -away.y, away.x };
+            away = Vector2Normalize(Vector2Add(away, Vector2Scale(side, sinf(e.wobble) * 0.5f)));
+            e.pos = moveInRoom(e.pos, Vector2Scale(away, e.speed * edt), e.r, room, doorsOpen);
+            if (e.fleeT > 4.0f) {
+                e.alive = false;
+                burst(parts, e.pos, 16, 140, 0.5f, { 200, 200, 210, 255 });   // vape cloud
+                showBanner(TextFormat("Toshko got away with %d gold", e.stolen), "", 2.0f);
+                play("hurt");
+                continue;
+            }
+        }
         else if (e.bossForm < 0) {  // boss bodies are moved by the BossFight
             if (fabsf(to.x) > 2) e.flip = to.x < 0;
             e.moving = d > 1 && e.atkAnim <= 0;        // plant feet while swinging
             e.lunge = fmaxf(0, e.lunge - edt);
             e.lungeCd = fmaxf(0, e.lungeCd - edt);
             if (e.moving) {
-                bool sees = lineClear(room, e.pos, player.pos, e.r);
+                bool sees = lineClear(room, e.pos, player.pos, e.r + 4);
                 Vector2 goal;
-                if (!sees) goal = nextWaypoint(room, flow, e.pos);         // route around walls
+                if (!sees) goal = nextWaypoint(room, flow, e.pos, e.r + 2);   // route around walls
                 else if (e.kind == EK_SKELETON && d > 70) {
                     // foot soldiers fan out to the sides so they surround you
                     Vector2 n = Vector2Normalize(to);
@@ -451,6 +495,7 @@ void Game::updateEnemies(float dt, float slow) {
                     Vector2 side = { -dir.y, dir.x };
                     dir = Vector2Normalize(Vector2Add(dir, Vector2Scale(side, sinf(e.wobble * 1.3f) * 0.8f)));
                 }
+                dir = Vector2Normalize(Vector2Add(dir, Vector2Scale(wallAvoid(room, e.pos, e.r, doorsOpen), 1.2f)));
                 // hounds that see you crouch and lunge
                 if (e.kind == EK_SKELETON2 && sees && d < 130 && d > 40 && e.lungeCd <= 0) { e.lunge = 0.35f; e.lungeCd = 2.5f; }
                 float spd = e.speed * (e.lunge > 0 ? 2.6f : 1.0f);
@@ -472,6 +517,18 @@ void Game::updateEnemies(float dt, float slow) {
             if (sd >= need) continue;
             Vector2 n = sd > 0.01f ? Vector2Scale(sep, 1.0f / sd) : Vector2{ 0, 1 };
             e.pos = moveInRoom(e.pos, Vector2Scale(n, (need - sd) * 0.5f), e.r, room, doorsOpen);
+        }
+
+        // Toshko doesn't hit you: he snatches up to 50 gold and runs
+        if (e.kind == EK_TOSHKO) {
+            if (e.stolen == 0 && d < e.r + PLAYER_R + 4 && !scared && player.gold > 0) {
+                e.stolen = std::min(50, player.gold);
+                player.gold -= e.stolen;
+                e.atkAnim = SPR.enemy[e.kind].attack.length(16);
+                showBanner(TextFormat("Toshko snatched %d gold!", e.stolen), "Kill him before he gets away", 2.0f);
+                play("coin");
+            }
+            continue;
         }
 
         // touch damage
@@ -516,6 +573,10 @@ void Game::killEnemy(Enemy& e) {
     corpses.push_back(corpse);
     int n = e.bossForm == 0 ? 12 + 2 * floor : e.bossForm > 0 ? 1 : 1 + GetRandomValue(0, 2);
     n += champ().extraCoins;
+    if (e.stolen > 0) {                    // caught Toshko: every snatched coin drops back
+        n += e.stolen;
+        showBanner("Your gold is back", "", 1.6f);
+    }
     for (int k = 0; k < n; ++k) coins.push_back({ e.pos, { frand(-90, 90), frand(-140, -40) }, 0 });
     burst(parts, e.pos, 14, 120, 0.7f, e.color);
     if (e.bossForm == 0) shake = 0.5f;
@@ -574,6 +635,20 @@ void Game::checkRoomExits() {
     float dcx = (ROOM_TW / 2) * TILE + TILE * 0.5f;
     float dcy = (ROOM_TH / 2) * TILE + TILE * 0.5f;
     Vector2& p = player.pos;
+    // the boss lair stays shut until the key is found: step back out of the doorway
+    for (int dir : { DIR_N, DIR_E, DIR_S, DIR_W }) {
+        if (!dungeon.bossDoorLocked(dir)) continue;
+        bool at = dir == DIR_N ? p.y < TILE + 8 && fabsf(p.x - dcx) < TILE
+                : dir == DIR_S ? p.y > (ROOM_TH - 1) * TILE - 8 && fabsf(p.x - dcx) < TILE
+                : dir == DIR_W ? p.x < TILE + 8 && fabsf(p.y - dcy) < TILE
+                :                p.x > (ROOM_TW - 1) * TILE - 8 && fabsf(p.y - dcy) < TILE;
+        if (!at) continue;
+        p.y += dir == DIR_N ? 14.0f : dir == DIR_S ? -14.0f : 0.0f;
+        p.x += dir == DIR_W ? 14.0f : dir == DIR_E ? -14.0f : 0.0f;
+        showBanner("The lair is locked", "Find the boss key on this floor", 1.8f);
+        play("hurt");
+        return;
+    }
     bool moved = true;
     if ((r.doors & DIR_N) && p.y < TILE + 8 && fabsf(p.x - dcx) < TILE) { dungeon.cy--; p = { dcx, (ROOM_TH - 1) * TILE - 28.0f }; }
     else if ((r.doors & DIR_S) && p.y > (ROOM_TH - 1) * TILE - 8 && fabsf(p.x - dcx) < TILE) { dungeon.cy++; p = { dcx, TILE + 28.0f }; }

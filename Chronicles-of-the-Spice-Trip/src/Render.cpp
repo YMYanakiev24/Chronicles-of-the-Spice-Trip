@@ -57,6 +57,7 @@ static float enemyScale(const Enemy& e) {
     if (e.boss) return 3.2f;
     if (e.kind == EK_SKULL) return 2.0f;
     if (e.kind == EK_THIEF || e.kind == EK_MELON) return 1.05f;   // these fill ~28px of the frame
+    if (e.kind == EK_TOSHKO) return 0.7f;                          // 48px frames he fills ~44px of
     return e.kind == EK_SKELETON2 ? 1.9f : 1.7f;
 }
 

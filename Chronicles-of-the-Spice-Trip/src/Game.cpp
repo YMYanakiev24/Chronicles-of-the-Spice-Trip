@@ -255,7 +255,11 @@ void Game::enterRoom() {
         for (int tries = 0; tries < 100; ++tries) {
             tx = GetRandomValue(3, ROOM_TW - 4);
             ty = GetRandomValue(3, ROOM_TH - 4);
-            if (r.isFloor(tx, ty)) break;
+            if (!r.isFloor(tx, ty)) continue;
+            // Toshko starts well away from the player, so there's time to react
+            Vector2 at = { tx * (float)TILE + 16, ty * (float)TILE + 16 };
+            if (kind == EK_TOSHKO && tries < 90 && Vector2Distance(at, player.pos) < 340) continue;
+            break;
         }
         e.pos = { tx * (float)TILE + 16, ty * (float)TILE + 16 };
         enemies.push_back(e);
@@ -282,6 +286,8 @@ void Game::enterRoom() {
             spawn("Wisp", 20 * tough, 85, 5, 10, 10, { 120,180,230,255 }, "Lightning", EK_SKULL);
         if (GetRandomValue(0, 2) == 0)
             spawn("Coin Thief", 45 * tough, 120, 9, 30, 12, { 40,60,140,255 }, "Lightning", EK_THIEF);
+        if (GetRandomValue(1, 100) <= 30)      // Toshko: snatches 50 gold and runs
+            spawn("Toshko", 40 * tough, 175, 0, 40, 12, { 30,30,60,255 }, "Lightning", EK_TOSHKO);
         if (GetRandomValue(0, 2) == 0)
             spawn("Melon Warrior", 110 * tough, 50, 16, 24, 14, { 230,150,60,255 }, "Fire", EK_MELON);
     }

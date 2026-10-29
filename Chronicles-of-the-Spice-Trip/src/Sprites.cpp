@@ -28,14 +28,14 @@ static Anim loadStrip(const char* file, int frameW) {
     return a;
 }
 
-static EnemyAnims loadEnemy(const char* prefix) {
+static EnemyAnims loadEnemy(const char* prefix, int frameW = 32) {
     EnemyAnims e;
     std::string p = prefix;
-    e.idle = loadStrip((p + "_idle.png").c_str(), 32);
-    e.move = loadStrip((p + "_move.png").c_str(), 32);
-    e.attack = loadStrip((p + "_attack.png").c_str(), 32);
-    e.hurt = loadStrip((p + "_hurt.png").c_str(), 32);
-    e.death = loadStrip((p + "_death.png").c_str(), 32);
+    e.idle = loadStrip((p + "_idle.png").c_str(), frameW);
+    e.move = loadStrip((p + "_move.png").c_str(), frameW);
+    e.attack = loadStrip((p + "_attack.png").c_str(), frameW);
+    e.hurt = loadStrip((p + "_hurt.png").c_str(), frameW);
+    e.death = loadStrip((p + "_death.png").c_str(), frameW);
     return e;
 }
 
@@ -55,6 +55,7 @@ void Sprites::load() {
     skull = loadStrip("skull.png", 16);
     oracle = loadStrip("oracle.png", 16);
     flame = loadStrip("flame.png", 32);
+    key = loadStrip("key.png", 16);
     vapes = loadStrip("vapes.png", 32);
     spellIcons = loadStrip("spell_icons.png", 32);
     enemy[EK_SKELETON] = loadEnemy("skel1");
@@ -62,13 +63,14 @@ void Sprites::load() {
     enemy[EK_VAMPIRE] = loadEnemy("vamp");
     enemy[EK_THIEF] = loadEnemy("thief");
     enemy[EK_MELON] = loadEnemy("melon");
+    enemy[EK_TOSHKO] = loadEnemy("toshko", 48);
 }
 
 void Sprites::unload() {
     auto un = [](Texture2D& t) { if (t.id) UnloadTexture(t); t = Texture2D{}; };
     un(tileset);
     for (Anim* a : { &peaks, &chest, &chestOpen, &torch, &sideTorch, &candle, &candle2,
-                     &flaskRed, &flaskBlue, &flag, &coin, &skull, &oracle, &flame, &vapes, &spellIcons })
+                     &flaskRed, &flaskBlue, &flag, &coin, &skull, &oracle, &flame, &key, &vapes, &spellIcons })
         un(a->tex);
     for (auto& e : enemy)
         for (Anim* a : { &e.idle, &e.move, &e.attack, &e.hurt, &e.death }) un(a->tex);

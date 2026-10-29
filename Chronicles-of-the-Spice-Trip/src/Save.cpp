@@ -9,7 +9,7 @@
 namespace save {
 
     namespace {
-        constexpr unsigned RUN_MAGIC = 0x53504333;       // "SPC3": champions and boss fights
+        constexpr unsigned RUN_MAGIC = 0x53504334;       // "SPC4": boss keys
         constexpr unsigned PROFILE_MAGIC = 0x53505031;   // "SPP1"
         constexpr unsigned SETTINGS_MAGIC = 0x53505331;  // "SPS1"
 
