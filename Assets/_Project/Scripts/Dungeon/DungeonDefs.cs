@@ -60,7 +60,7 @@ namespace SpiceTrip.Dungeon
         public int vape;         // >= 0: a timed vape buff
     }
 
-    public enum Special { ArcaneSurge, Aura, CoinDash, MugShield, MelonRoll, Drink, BearJump, CoinBarrage, Koi, Blink }
+    public enum Special { ArcaneSurge, Aura, CoinDash, MugShield, MelonRoll, Drink, BearJump, CoinBarrage, Koi, Blink, Scare }
 
     public class ChampionKit
     {
@@ -124,8 +124,8 @@ namespace SpiceTrip.Dungeon
                 special = "Arcane Surge", specialDesc = "Refill 40 mana.", kind = Special.ArcaneSurge, cooldown = 12, manaCostMul = 0.75f },
             new ChampionKit { id = "atanas", perk = "+20 max health.",
                 special = "Aura of Calmness", specialDesc = "Heal 25. Enemies and their shots move at half speed for 3 s.", kind = Special.Aura, cooldown = 10, hpBonus = 20 },
-            new ChampionKit { id = "gakev", perk = "Every kill drops an extra coin.",
-                special = "Coin Dash", specialDesc = "Dash a short way, untouchable.", kind = Special.CoinDash, cooldown = 4, extraCoins = 1 },
+            new ChampionKit { id = "gakev", perk = "Every kill drops three extra coins.",
+                special = "Coin Dash", specialDesc = "Dash a short way, untouchable.", kind = Special.CoinDash, cooldown = 4, extraCoins = 3 },
             new ChampionKit { id = "nikolay", perk = "+25 max health.",
                 special = "Mug-Shield", specialDesc = "For 2 s, enemy shots shatter against you.", kind = Special.MugShield, cooldown = 6, hpBonus = 25 },
             new ChampionKit { id = "pupesh", perk = "+4 blade damage.",
@@ -140,9 +140,14 @@ namespace SpiceTrip.Dungeon
                 special = "Release the Koi", specialDesc = "Three koi swim out and hunt the nearest enemies.", kind = Special.Koi, cooldown = 7, stillRegen = 2 },
             new ChampionKit { id = "fairy", perk = "Spells curve toward enemies.",
                 special = "Blink", specialDesc = "Teleport to the cursor for 10 fairy dust.", kind = Special.Blink, cooldown = 0.3f, spellHoming = 2.5f },
+            new ChampionKit { id = "momiche", perk = "Her axe hits harder: +3 blade damage.",
+                special = "Scare", specialDesc = "Every enemy runs from you for 3 s and can't attack.", kind = Special.Scare, cooldown = 8, bladeBonus = 3 },
         };
 
         public static ChampionKit Champion(string id) => Array.Find(Champions, c => c.id == id) ?? Champions[0];
+
+        /// <summary>How long Momiche's scare lasts, and how fast the scared run.</summary>
+        public const float ScareTime = 3, FleeSpeed = 1.3f;
 
         public static readonly DungeonBoss[] Bosses =
         {

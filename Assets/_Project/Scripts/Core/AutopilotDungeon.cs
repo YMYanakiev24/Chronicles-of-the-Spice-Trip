@@ -57,6 +57,10 @@ namespace SpiceTrip.Core
             // --- a room fight, with spells aimed at the nearest monster ---
             Check("there is a combat room", Enter(game, r => !r.isStart && !r.isShop && !r.isBoss));
             Check("its monsters wake and the doors bar", game.InFight && game.Enemies.Count > 0 && !game.Room.cleared);
+            game.Player.invuln = 1;
+            game.Player.mana = game.Player.maxMana;
+            yield return Hold(0.5f, Key.Enter);
+            Check("holding Enter casts the selected power", game.Player.mana < game.Player.maxMana - 10);
             bool shot = false;
             for (float t = 0; t < 30 && !game.Room.cleared; t += Time.unscaledDeltaTime)
             {
@@ -194,9 +198,26 @@ namespace SpiceTrip.Core
             yield return Wait(0.3f);
             yield return Click(Q("btn-dungeon"), "The Dungeon");
             yield return Wait(0.3f);
+            yield return Click(Q("dg-champ-momiche"), "Momiche");
+            yield return Wait(0.3f);
+            Check("Momiche is in the Dungeon lobby", _g.Ctx.Hub.selectedChar == "momiche");
+            yield return Shot("dungeon-lobby-momiche");
             yield return Click(Q("dg-boss-rush"), "Boss Rush");
             yield return Wait(0.4f);
             Check("Boss Rush starts with the Good Plazmodium at level 5", game.Mode == DungeonMode.BossRush && game.Fight.Def == Defs.Bosses[0] && game.Player.level == 5);
+
+            // Momiche's scare with a real Q press: the boss runs and holds its fire
+            yield return Survive(game, 1.5f, () => game.Fight.Time > 1);
+            var rushBoss = game.Enemies.First(e => e.bossForm == 0);
+            rushBoss.pos = Center;
+            game.Player.pos = Center + new Vector2(0, 90);
+            game.Player.specialCd = 0;
+            yield return Press(Key.Q);
+            game.EnemyShots.Clear();
+            yield return Survive(game, 1.2f, () => false);
+            Check("Q: Momiche scares the boss, which runs and holds its fire",
+                game.Player.scareT > 0 && game.EnemyShots.Count == 0 && Vector2.Distance(rushBoss.pos, game.Player.pos) > 150);
+            yield return Shot("dungeon-momiche-scare");
             bool stageShot = false;
             for (float t = 0; t < 60 && game.Overlay != Overlay.RushOver; t += Time.unscaledDeltaTime)
             {

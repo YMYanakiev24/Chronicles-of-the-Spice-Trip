@@ -39,7 +39,7 @@ namespace SpiceTrip.Data
         public string kit, name;
     }
 
-    /// <summary>special: none | aura | dash | shield | roll | drink | jump | coinring | koi | teleport</summary>
+    /// <summary>special: none | aura | dash | shield | roll | drink | jump | coinring | koi | teleport | scare</summary>
     [Serializable]
     public class ChampionKitDef : KitBase
     {

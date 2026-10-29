@@ -126,6 +126,7 @@ MonoBehaviour:
       y: 0
       width: 1
       height: 1
+    portraitCard: 0
   - id: atanas
     name: Atanas
     img: atanas.jpg
@@ -136,6 +137,7 @@ MonoBehaviour:
       y: 0
       width: 0.6
       height: 0.277
+    portraitCard: 0
   - id: gakev
     name: Gakev
     img: gakev.jpg
@@ -146,6 +148,7 @@ MonoBehaviour:
       y: 0.06
       width: 0.58
       height: 0.435
+    portraitCard: 0
   - id: nikolay
     name: Nikolay
     img: nikolay.jpg
@@ -156,6 +159,7 @@ MonoBehaviour:
       y: 0.1
       width: 0.76
       height: 0.76
+    portraitCard: 0
   - id: pupesh
     name: Pupesh
     img: pupesh.jpg
@@ -166,6 +170,7 @@ MonoBehaviour:
       y: 0.085
       width: 0.8
       height: 0.369
+    portraitCard: 0
   - id: ristyo
     name: Ristyo
     img: ristyo.jpg
@@ -176,6 +181,7 @@ MonoBehaviour:
       y: 0.22
       width: 0.58
       height: 0.435
+    portraitCard: 0
   - id: iliqnpuh
     name: Iliqn Puh
     img: iliqnpuh.jpg
@@ -186,6 +192,7 @@ MonoBehaviour:
       y: 0.25
       width: 0.52
       height: 0.24
+    portraitCard: 0
   - id: daniilvasil
     name: Daniil & Vasil
     img: daniilandvasil.jpg
@@ -196,6 +203,7 @@ MonoBehaviour:
       y: 0
       width: 0.546
       height: 1
+    portraitCard: 0
   - id: storyteller
     name: The Storyteller
     img: thestoryteller.jpg
@@ -206,6 +214,7 @@ MonoBehaviour:
       y: 0.15
       width: 0.66
       height: 0.495
+    portraitCard: 0
   - id: fairy
     name: The Fairy
     img: thefairy.jpg
@@ -216,16 +225,18 @@ MonoBehaviour:
       y: 0.32
       width: 0.56
       height: 0.258
-  - id: soon1
-    name: Coming soon
-    img: 
-    empty: 1
+    portraitCard: 0
+  - id: momiche
+    name: "Momiche\U0001F628"
+    img: momiche.jpg
+    empty: 0
     portraitRect:
       serializedVersion: 2
-      x: 0
-      y: 0
-      width: 1
-      height: 1
+      x: 0.817
+      y: 0.86
+      width: 0.179
+      height: 0.14
+    portraitCard: 1
   - id: soon2
     name: Coming soon
     img: 
@@ -236,6 +247,7 @@ MonoBehaviour:
       y: 0
       width: 1
       height: 1
+    portraitCard: 0
   shopStock:
   - id: ambrosiaCake
     price: 40
@@ -270,7 +282,7 @@ MonoBehaviour:
     playerShotRadius: 5
     playerShotLife: 1.4
     playerShotDamage: 8
-    heroSpriteScale: 3
+    heroSpriteScale: 2.25
     bossStartY: 90
     bossRadius: 32
     bossSpeed: 95
@@ -430,7 +442,7 @@ MonoBehaviour:
   - id: gakev
     params:
     - k: coinChance
-      v: 0.25
+      v: 0.6
     - k: coinHeal
       v: 5
     - k: coinLife
@@ -561,6 +573,15 @@ MonoBehaviour:
     ability: Blink
     special: teleport
     cooldown: 0.3
+  - id: momiche
+    params:
+    - k: duration
+      v: 3
+    - k: fleeSpeed
+      v: 1.3
+    ability: Scare
+    special: scare
+    cooldown: 8
   bounties:
   - id: goodPlaz
     first: 150

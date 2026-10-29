@@ -31,8 +31,15 @@ namespace SpiceTrip.EditorTools
         }
 
         [System.Serializable]
+        class NewCharacter
+        {
+            public string id, name, img, replaces;
+        }
+
+        [System.Serializable]
         class AbilityFile
         {
+            public List<NewCharacter> characters = new List<NewCharacter>();
             public List<BossKitDef> bosses = new List<BossKitDef>();
             public List<ChampionKitDef> champions = new List<ChampionKitDef>();
         }
@@ -51,6 +58,7 @@ namespace SpiceTrip.EditorTools
             ["daniilvasil"] = new Rect(0.24f, 0.000f, 0.546f, 1.000f), // 720×393: the duo
             ["storyteller"] = new Rect(0.14f, 0.150f, 0.66f, 0.495f),  // 720×960: hot tub
             ["fairy"] = new Rect(0.38f, 0.320f, 0.56f, 0.258f),        // 443×960: fairy by the trailer
+            ["momiche"] = new Rect(0.817f, 0.860f, 0.179f, 0.140f),    // 896×1177: the portrait in the sheet's corner
             // bosses
             ["goodPlaz"] = new Rect(0.00f, 0.325f, 0.50f, 0.231f),     // 443×960: form 1
             ["badPlaz"] = new Rect(0.04f, 0.300f, 0.49f, 0.226f),      // 443×960: form 1 (left of the "multiplies" caption)
@@ -100,6 +108,13 @@ namespace SpiceTrip.EditorTools
             var kits = JsonUtility.FromJson<AbilityFile>(File.ReadAllText(AbilitiesPath));
             db.bossKits = kits.bosses;
             db.championKits = kits.champions;
+            // New champions take the place of a Coming soon card, so the Changing Room keeps its layout.
+            foreach (var n in kits.characters)
+            {
+                int at = db.characters.FindIndex(c => c.id == n.replaces);
+                var def = new CharacterDef { id = n.id, name = n.name, img = FileName(n.img), portraitRect = Crop(n.id), portraitCard = true };
+                if (at >= 0) db.characters[at] = def; else db.characters.Add(def);
+            }
 
             var prog = JsonUtility.FromJson<ProgressionFile>(File.ReadAllText(ProgressionPath));
             db.bounties = prog.bounties;

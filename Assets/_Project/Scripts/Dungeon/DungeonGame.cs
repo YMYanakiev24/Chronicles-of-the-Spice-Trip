@@ -309,6 +309,7 @@ namespace SpiceTrip.Dungeon
             p.rollCd = Mathf.Max(0, p.rollCd - dt); p.invuln = Mathf.Max(0, p.invuln - dt);
             p.hitFlash = Mathf.Max(0, p.hitFlash - dt); p.specialCd = Mathf.Max(0, p.specialCd - dt);
             p.auraT = Mathf.Max(0, p.auraT - dt); p.shieldT = Mathf.Max(0, p.shieldT - dt); p.wobbleT = Mathf.Max(0, p.wobbleT - dt);
+            p.scareT = Mathf.Max(0, p.scareT - dt);
             p.meleeAnim = Mathf.Max(0, p.meleeAnim - dt * 4);
             p.mana = Mathf.Min(p.maxMana, p.mana + (p.Has(Skill.Arcane) ? 14.4f : 9f) * dt);
             if (kit.kind == Special.Blink) p.charge = Mathf.Min(Defs.DustMax, p.charge + Defs.DustRegen * dt);
@@ -371,6 +372,7 @@ namespace SpiceTrip.Dungeon
             if (!talking && inp.meleePressed) SwingBlade();
 
             UpdateShots(dt);
+            Fight.Scared = p.scareT > 0;
             Fight.Update(dt, p.pos, Enemies, EnemyShots, room, slow);
             UpdateEnemies(dt, slow);
             UpdateEnemyShots(dt, slow);
@@ -561,6 +563,12 @@ namespace SpiceTrip.Dungeon
                     Burst(p.pos, 12, 70, 0.5f, new Color32(240, 170, 255, 255));
                     Sfx("shield");
                     break;
+                case Special.Scare:
+                    p.scareT = Defs.ScareTime;
+                    Burst(p.pos, 18, 160, 0.5f, new Color32(170, 190, 255, 255));
+                    Shake = Mathf.Max(Shake, 0.15f);
+                    Sfx("scare");
+                    break;
             }
             p.specialCd = kit.cooldown;
         }
@@ -679,6 +687,7 @@ namespace SpiceTrip.Dungeon
             var p = Player;
             bool doorsOpen = room.cleared;
             bool untouchable = p.invuln > 0 || p.jumpT > 0;
+            bool scared = p.scareT > 0;           // Momiche's scare: everyone runs, nobody bites
             // One flow field per frame: every monster reads its next step from it, so
             // they path around pillars and (while it's cheaper) around spike traps.
             RoomPhysics.FlowField(room, p.pos, true, _flow);
@@ -695,7 +704,15 @@ namespace SpiceTrip.Dungeon
                 var to = p.pos - e.pos;
                 float d = to.magnitude;
 
-                if (e.bossForm < 0)          // boss bodies are moved by the BossFight
+                if (e.bossForm < 0 && scared)
+                {
+                    if (Mathf.Abs(to.x) > 2) e.flip = to.x > 0;            // facing away, running
+                    e.moving = true;
+                    e.lunge = 0; e.atkAnim = 0;
+                    var away = d > 0.01f ? -to / d : Vector2.right;
+                    e.pos = RoomPhysics.Move(e.pos, away * e.speed * Defs.FleeSpeed * edt, e.r, room, doorsOpen);
+                }
+                else if (e.bossForm < 0)          // boss bodies are moved by the BossFight
                 {
                     if (Mathf.Abs(to.x) > 2) e.flip = to.x < 0;
                     e.moving = d > 1 && e.atkAnim <= 0;        // plant feet while swinging
@@ -747,7 +764,7 @@ namespace SpiceTrip.Dungeon
                 }
 
                 // touch damage
-                if (d < e.r + PlayerR + 4 && e.atkCd <= 0 && !untouchable)
+                if (d < e.r + PlayerR + 4 && e.atkCd <= 0 && !untouchable && !scared)
                 {
                     HurtPlayer(e.dmg, 0.4f);
                     e.atkCd = 1;

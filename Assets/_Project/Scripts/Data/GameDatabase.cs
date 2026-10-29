@@ -46,6 +46,7 @@ namespace SpiceTrip.Data
         public string img;           // null/empty → procedural hero
         public bool empty;           // "Coming soon" placeholder
         public Rect portraitRect;
+        public bool portraitCard;    // the Changing Room card shows portraitRect (a sprite sheet), not the whole image
     }
 
     [Serializable]

@@ -297,7 +297,7 @@ namespace SpiceTrip.Dungeon
             _dialogueText = Lbl("", "dg-dialogue-text");
             _dialogue.Add(_dialogueText);
             _dialogue.Add(Lbl("E  continue", "dg-continue-hint"));
-            _hint = Lbl("WASD move   LMB blade   RMB cast   1-3 power   Q special   Space roll   E interact   Esc pause", "dg-hint");
+            _hint = Lbl("WASD move   LMB blade   RMB / Enter cast   1-3 power   Q special   Space roll   E interact   Esc pause", "dg-hint");
             hud.Add(_hint);
             return hud;
         }
@@ -510,7 +510,7 @@ namespace SpiceTrip.Dungeon
             (string key, string what)[] rows =
             {
                 ("W A S D", "move"), ("Shift", "run"), ("Space", "dodge-roll"), ("E", "talk, trade, open"),
-                ("LMB", "swing the blade"), ("RMB", "cast the selected power"), ("1 2 3", "choose a power"), ("Q", kit.special),
+                ("LMB", "swing the blade"), ("RMB / Enter", "cast the selected power"), ("1 2 3", "choose a power"), ("Q", kit.special),
             };
             foreach (var (key, what) in rows)
             {

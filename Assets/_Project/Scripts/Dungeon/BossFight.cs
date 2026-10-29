@@ -49,6 +49,8 @@ namespace SpiceTrip.Dungeon
         public float Time { get; private set; }
         public Bus Bus { get; private set; }
         public bool Active => Def != null;
+        /// <summary>Momiche's scare: the bodies run from the player and every attack waits (a bus already called still drives).</summary>
+        public bool Scared;
         public event Action<string> OnSfx;
 
         readonly DRandom _rng;
@@ -146,6 +148,14 @@ namespace SpiceTrip.Dungeon
                 float d = Mathf.Max(0.01f, to.magnitude);
                 if (Mathf.Abs(to.x) > 2) e.flip = to.x < 0;
 
+                if (Scared)
+                {
+                    e.diveT = 0;
+                    e.pos = RoomPhysics.Move(e.pos, -to * (e.speed * Defs.FleeSpeed * bdt / d), e.r, room, false);
+                    e.moving = true;
+                    continue;
+                }
+
                 // --- movement ---
                 if (e.diveT > 0)
                 {
@@ -184,7 +194,7 @@ namespace SpiceTrip.Dungeon
             }
 
             // --- Vlado: ticket spirals and the whistle ---
-            if (Def.kind == BossKind.Conductor && primary != null)
+            if (Def.kind == BossKind.Conductor && primary != null && !Scared)
             {
                 _spiralT -= bdt;
                 if (_spiralT <= 0)
@@ -209,7 +219,7 @@ namespace SpiceTrip.Dungeon
             }
 
             // --- the Cinder-Maw: ember rings, and fireballs once wounded ---
-            if (Def.kind == BossKind.Inferno && primary != null)
+            if (Def.kind == BossKind.Inferno && primary != null && !Scared)
             {
                 _emberT -= bdt;
                 if (_emberT <= 0)

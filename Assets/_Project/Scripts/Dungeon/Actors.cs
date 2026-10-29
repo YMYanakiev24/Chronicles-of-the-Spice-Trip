@@ -39,7 +39,7 @@ namespace SpiceTrip.Dungeon
         // Timers and the champion's special (not worth saving, but harmless to).
         public float castCd, meleeCd, meleeAnim, roll, rollCd, invuln, hitFlash;
         public Vector2 rollDir = new Vector2(0, 1), dashDir = new Vector2(0, 1);
-        public float specialCd, auraT, dashT, shieldT, rollAtkT, wobbleT, jumpT;
+        public float specialCd, auraT, dashT, shieldT, rollAtkT, wobbleT, jumpT, scareT;
         public float charge;            // coin power (Daniil & Vasil) or fairy dust (the Fairy)
         public int rollId;
         [NonSerialized] public bool moving;                     // walking this frame (the sprite faces moveDir)

@@ -27,7 +27,7 @@ namespace SpiceTrip.Dungeon
         Transform _world;
         Material _alpha, _additive;
         MaterialPropertyBlock _mpb;
-        Sprite _white, _circle, _glow, _ring, _ellipse, _feather, _ticket, _koi, _bus;
+        Sprite _white, _circle, _glow, _ring, _ellipse, _feather, _ticket, _koi, _bus, _fear;
         readonly List<SpriteRenderer> _pool = new List<SpriteRenderer>();
         int _drawn;
         float _gloom;
@@ -87,6 +87,7 @@ namespace SpiceTrip.Dungeon
                     if (d <= 63.5f && d >= 58) ring.Pixels[y * 128 + x] = new Color32(255, 255, 255, 255);
                 }
             _ring = Spr(ring);
+            _fear = Spr(ChampionFigures.FearFace(), FilterMode.Point);
             _feather = Spr(Grid(new[] { "..bbbbbbbbbb..", "wwwwwwwwwwwwwk", "..bbbbbbbbbb..", "...cccccccc..." },
                 ('b', "#5a8ad8"), ('w', "#f4f6ff"), ('c', "#9fc4ff"), ('k', "#2a3a6a")), FilterMode.Point);
             _ticket = Spr(Grid(new[] { "kkkkkkkkkkkk", "kppppppppppk", "kprrrrrrrrpk", "kppppppppppk", "kpddpdpddppk", "kkkkkkkkkkkk" },
@@ -407,6 +408,7 @@ namespace SpiceTrip.Dungeon
                 }
             }
             else D(_circle, order, e.pos.x, e.pos.y, e.r * 2, e.r * 2, e.hitFlash > 0 ? Color.white : e.color);
+            if (!e.dying) Fear(order + 3, e.pos.x, e.pos.y - e.r * 2 - 14, e.pos.y + e.r + 10, 16);
 
             if (!e.dying && !e.boss && e.hp < e.maxHp)   // bosses use the big bar instead
             {
@@ -429,6 +431,7 @@ namespace SpiceTrip.Dungeon
             D(token, order + 1, x, y, rad * 2, rad * 2, new Color(1, 1, 1, alpha), 0, false, e.flip);
             D(_ring, order + 2, x, y, rad * 2 + 2, rad * 2 + 2, new Color(col.r, col.g, col.b, alpha));
             if (e.hitFlash > 0) D(_circle, order + 3, x, y, rad * 2, rad * 2, new Color(1, 1, 1, 0.35f), 0, true);
+            if (!e.dying) Fear(order + 6, x, y - rad - 16, y + rad + 16, 26);
             if (e.bossForm > 0 && !e.dying && e.hp < e.maxHp)      // copies get their own little bar
             {
                 float bw = e.r * 2.4f, top = y - rad - 7;
@@ -437,9 +440,23 @@ namespace SpiceTrip.Dungeon
             }
         }
 
+        // Momiche's scare: a fearful face bobbing over everyone she frightened (under them against the top wall).
+        void Fear(int order, float x, float above, float below, float size)
+        {
+            if (_g.Player.scareT <= 0) return;
+            float y = above < Tile * 2 ? below : above;
+            D(_fear, order, x, y + Mathf.Sin(_g.Time * 8 + x) * 2, size, size);
+        }
+
         void DrawHero(int order)
         {
             var p = _g.Player;
+            if (p.scareT > Defs.ScareTime - 0.6f)        // the scream: two rings racing outward
+                for (int i = 0; i < 2; i++)
+                {
+                    float k = Mathf.Clamp01((Defs.ScareTime - p.scareT - i * 0.12f) / 0.6f);
+                    if (k > 0 && k < 1) D(_ring, order - 1, p.pos.x, p.pos.y, 30 + 300 * k, 30 + 300 * k, new Color(0.65f, 0.75f, 1f, 0.7f * (1 - k)), 0, true);
+                }
             float lift = p.jumpT > 0 ? Mathf.Sin((1 - p.jumpT / 0.6f) * Mathf.PI) * 22 : 0;
             if (p.auraT > 0)
             {
@@ -453,10 +470,10 @@ namespace SpiceTrip.Dungeon
 
             Shadow(order, p.pos, PlayerR * (1 - lift * 0.02f));
             float x = p.pos.x, y = p.pos.y - lift;
-            // the pixel hero, facing the way they walk (or aim, standing still), white for a moment when hit
+            // the champion, facing the way they walk (or aim, standing still), white for a moment when hit
             var look = p.moving ? p.moveDir : p.facing;
             var frame = HeroSprites.For(p.champion).Frame(look, p.moving, _g.Time);
-            D(frame, order + 1, x, y - 10, HeroSprites.W * 2, HeroSprites.H * 2, null, 0, false, false, p.hitFlash > 0 ? 3 : 1);
+            D(frame, order + 1, x, y - 10, HeroSprites.W * 1.4f, HeroSprites.H * 1.4f, null, 0, false, false, p.hitFlash > 0 ? 3 : 1);
             if (p.meleeAnim > 0)        // the godless blade's slash
             {
                 float ang = Mathf.Atan2(p.facing.y, p.facing.x);

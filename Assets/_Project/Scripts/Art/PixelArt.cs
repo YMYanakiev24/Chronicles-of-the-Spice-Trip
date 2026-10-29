@@ -4,7 +4,8 @@
  * Line-by-line port of the parts of the web game's PixelArt.js the game still
  * uses, drawn as pixel art on a PixelCanvas:
  *   - gothic props and the brazier flame (the hub's fallback scenes),
- *   - the hero, with a 3-frame walk in four directions (HeroSprites).
+ *   - the web hero, with a 3-frame walk in four directions (its icon; the
+ *     player walks as a ChampionFigures figure).
  *
  * Everything is cached so a sprite is only rasterised once. Output is checked
  * pixel-for-pixel against the JavaScript by the PixelArtParity tests.
@@ -284,21 +285,6 @@ namespace SpiceTrip.Art
         }
 
         static Dictionary<string, PixelCanvas[]> _heroSet;
-        static readonly Dictionary<string, Dictionary<string, PixelCanvas[]>> HeroColours = new Dictionary<string, Dictionary<string, PixelCanvas[]>>();
-
-        /// <summary>The hero (with the godless blade) in another cloak colour: one per champion.</summary>
-        public static Dictionary<string, PixelCanvas[]> HeroIn(string cloak)
-        {
-            if (HeroColours.TryGetValue(cloak, out var cached)) return cached;
-            var set = BuildHumanoidSet(new HumanoidPalette
-            {
-                cloak = cloak, cloakLt = PixelCanvas.ShadeLighten(cloak, 26), cloakDk = PixelCanvas.ShadeLighten(cloak, -26), trim = "#caa84d",
-                hood = PixelCanvas.ShadeLighten(cloak, -14), hoodLt = PixelCanvas.ShadeLighten(cloak, 12), skin = "#caa07a", boot = "#1a1620",
-                eye = "#9fe0ff", blade = "#bff6ff", bladeTip = "#ffffff",
-            }, true);
-            HeroColours[cloak] = set;
-            return set;
-        }
 
         public static Dictionary<string, PixelCanvas[]> Hero()
         {

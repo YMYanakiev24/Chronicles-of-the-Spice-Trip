@@ -149,6 +149,7 @@ namespace SpiceTrip.Dungeon
                 inp.rollPressed = kb.spaceKey.wasPressedThisFrame;
                 inp.interactPressed = kb.eKey.wasPressedThisFrame;
                 inp.specialPressed = kb.qKey.wasPressedThisFrame;
+                inp.castPressed = kb.enterKey.isPressed || kb.numpadEnterKey.isPressed;     // hold Enter to keep casting
                 if (kb.digit1Key.wasPressedThisFrame || kb.numpad1Key.wasPressedThisFrame) inp.slot = 0;
                 else if (kb.digit2Key.wasPressedThisFrame || kb.numpad2Key.wasPressedThisFrame) inp.slot = 1;
                 else if (kb.digit3Key.wasPressedThisFrame || kb.numpad3Key.wasPressedThisFrame) inp.slot = 2;
@@ -159,7 +160,7 @@ namespace SpiceTrip.Dungeon
                 inp.aim = View.ScreenToRoom(sp);
                 bool overUi = PointerOverClickable(sp);
                 inp.meleePressed = mouse.leftButton.wasPressedThisFrame && !overUi;
-                inp.castPressed = mouse.rightButton.wasPressedThisFrame && !overUi;
+                inp.castPressed |= mouse.rightButton.wasPressedThisFrame && !overUi;
             }
             else inp.aim = Game.Player.pos + Game.Player.facing * 40;
             return inp;

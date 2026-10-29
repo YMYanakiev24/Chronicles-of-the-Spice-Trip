@@ -109,8 +109,8 @@ None of this is in the web game. It was added on request, after Phase 3.
 - **The art is shared.** The dungeon sprite pack is copied into
   `StreamingAssets/assets/dungeon`. The painted arenas and boss sheets are the
   same files the Path uses, so replacing an arena changes both games.
-- **The hero walks.** The C++ hero is a block with a sword. Here it is the pixel
-  hero from `PixelArt.js`, facing the way it walks, in the champion's colours.
+- **The hero walks.** The C++ hero is a block with a sword. Here it is the
+  chosen champion, walking from all four sides (see below).
 - **Saves are JSON** (`dungeon.json` and `dungeon-profile.json` next to the
   other saves) instead of raw binary structs.
 - **The rules are a separate class** (`DungeonGame`), so the EditMode tests
@@ -119,9 +119,25 @@ None of this is in the web game. It was added on request, after Phase 3.
 ## The player's look on the Path
 
 The web game drew the champion's portrait card as the player. The arena now
-uses the walking pixel hero in the champion's colours, so the player faces the
-way they move. The portraits are still shown in the Changing Room and the
-Dungeon lobby.
+uses the champion's walking figure, so the player faces the way they move. The
+portraits are still shown in the Changing Room and the Dungeon lobby.
+
+The character sheets only show each champion from the front (and some from
+the side), so a back view can't be cut from them. Each champion is drawn
+instead as a 24 × 32 pixel figure from their sheet's look
+(`ChampionFigures.cs`), with front, back and side views and a four-frame
+walk. Momiche's sheet has every angle, so her frames are cut from it
+(`Tools~/cut-walk-sheet.ps1`). A walk sheet for any other champion
+(`walk-<id>.png`) replaces their drawn figure.
+
+## New content that isn't in the originals
+
+- **Momiche😨**, a new champion, takes the first "Coming soon" card. She comes
+  from `abilities.json` (`characters`, plus her kit) and `DungeonDefs.cs`.
+  The source-parity test checks every other card against `Scenes.js`.
+- **Enter** also shoots on the Path and casts in the Dungeon.
+- **Gakev** drops more coins: 60% of hits on the Path (was 25%), and three
+  extra coins per kill in the Dungeon (was one).
 
 ## Problems found in the web source
 

@@ -98,6 +98,21 @@ second game on the main menu.
 **Not verified:** nobody has played the Dungeon by hand in Unity, so its
 balance and feel are untested. No new Windows build was made.
 
+## Changes on 2026-10-29
+
+| Change | Verified by |
+| --- | --- |
+| Every champion walks as their own figure, seen from the front, the back and both sides, with a four-frame walk (drawn in `ChampionFigures.cs` from their character sheets) | `ChampionFigureTests`, `Captures/characters.png` from **Export Character Gallery**, autopilot screenshots |
+| Momiche😨: a new champion from your sprite sheet. Her frames are cut from it (`walk-momiche.png`) and her card shows the sheet's portrait. She takes the first "Coming soon" card | `ChampionFigureTests`, `SourceParityTests`, autopilot picks her in the Changing Room and the Dungeon lobby |
+| Momiche's Scare (Q / right click): for 3 s every enemy and boss runs from her, holds its fire and can't hurt her by touch | `AbilityTests`, `DungeonTests` (monsters and a boss), autopilot with a real Q press in both games |
+| Enter shoots on the Path and casts the selected power in the Dungeon (hold it to keep going) | Autopilot with real Enter presses |
+| Gakev drops more coins: 60% of hits on the Path (was 25%), three extra per kill in the Dungeon (was one) | `AbilityTests`, `DungeonTests` |
+
+**Test results:** EditMode 108/108, PlayMode 8/8, autopilot 106/106 checks.
+
+**Not verified:** nobody has played Momiche by hand yet, so the Scare's length
+and cooldown (3 s, every 8 s) may need tuning. No new Windows build was made.
+
 ## Open questions for you
 
 1. Should the menu art's painted "GOLD: 1450" be covered with the live gold?

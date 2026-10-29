@@ -1,0 +1,9 @@
+{
+  "_comment": "Where Momiche's frames sit on her sheet (x, y, w, h in sheet pixels). Each direction is the standing frame, then four walk frames. Left is the right row mirrored.",
+  "sheet": "Assets/StreamingAssets/assets/momiche.jpg",
+  "out": "Assets/StreamingAssets/assets/walk-momiche.png",
+  "cell": [144, 192],
+  "down":  [[1, 4, 107, 178], [1, 236, 107, 166], [1, 407, 107, 183], [1, 594, 107, 178], [1, 407, 107, 183]],
+  "up":    [[113, 4, 108, 178], [113, 236, 108, 166], [113, 407, 108, 183], [113, 594, 108, 178], [113, 407, 108, 183]],
+  "right": [[225, 4, 108, 178], [225, 236, 108, 166], [225, 4, 108, 178], [338, 236, 108, 166], [338, 4, 108, 178]]
+}

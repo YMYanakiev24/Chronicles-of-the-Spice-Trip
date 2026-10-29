@@ -118,6 +118,9 @@ namespace SpiceTrip.Core
             Check("Space fires player shots", battle.Sim.ShotsFired >= 3);
             Check("D strafes the player right", battle.Sim.Player.x > 450);
             yield return Shot("battle");
+            int firedBefore = battle.Sim.ShotsFired;
+            yield return Hold(0.8f, Key.Enter);
+            Check("Enter fires player shots too", battle.Sim.ShotsFired >= firedBefore + 2);
 
             battle.Sim.Player.hp = 1;
             battle.ScriptedInput = new BattleSim.Inputs { move = new Vector2(0, -1), aim = new Vector2(400, 90) };
@@ -277,6 +280,49 @@ namespace SpiceTrip.Core
                 yield return Wait(1.5f);
                 Check($"{other.name} fights in its own arena", battle.Active && battle.ShowingArenaArt);
                 yield return Shot("arena-" + other.id);
+                yield return Click(Q("bb-flee"), "Flee");
+                yield return Wait(0.3f);
+            }
+
+            // --- Momiche: walking from every side, and her scare on Q ---
+            yield return Click(Q("path-castle"), "enter the castle");
+            yield return Wait(0.3f);
+            yield return Click(hub.Corridor.ChangingDoor, "Changing Room");
+            yield return Wait(0.3f);
+            Check("Momiche has a card in the Changing Room", Q("char-momiche") != null);
+            Q("char-momiche").GetFirstAncestorOfType<ScrollView>()?.ScrollTo(Q("char-momiche"));    // her card is on the third row
+            yield return Wait(0.2f);
+            yield return Shot("changing-room-momiche");
+            yield return Click(Q("char-momiche"), "Momiche");
+            yield return Wait(0.5f);
+            Check("Momiche can be picked", ctx.Hub.selectedChar == "momiche");
+            yield return Click(Q("scene-corridor").Q(className: "scene-back"), "back to the path");
+            yield return Wait(0.3f);
+            var mordekai = ctx.Db.bosses[2];
+            yield return Click(hub.Path.BossButton(mordekai.id), mordekai.name);
+            yield return Wait(0.8f);
+            Check("Momiche fights with her Scare", battle.Active && battle.Sim.Kit?.special == "scare");
+            if (battle.Active)
+            {
+                var kbd = Keyboard.current;
+                InputSystem.QueueStateEvent(kbd, new KeyboardState(Key.A));
+                yield return Wait(0.45f);
+                yield return Shot("momiche-walk-left");
+                InputSystem.QueueStateEvent(kbd, new KeyboardState(Key.W));
+                yield return Wait(0.45f);
+                yield return Shot("momiche-walk-up");
+                InputSystem.QueueStateEvent(kbd, new KeyboardState());
+                yield return Wait(0.1f);
+                var mb = battle.Sim.Boss;
+                mb.x = ctx.Db.battle.arenaWidth / 2; mb.y = 160;
+                battle.Sim.Player.x = mb.x; battle.Sim.Player.y = mb.y + 160;
+                float apart = Vector2.Distance(new Vector2(mb.x, mb.y), new Vector2(battle.Sim.Player.x, battle.Sim.Player.y));
+                yield return Press(Key.Q);
+                battle.Sim.BossShots.Clear();
+                for (float t = 0; t < 1.2f; t += Time.unscaledDeltaTime) { battle.Sim.Player.hp = battle.Sim.Player.maxHp; yield return null; }
+                Check("Q: Momiche's scare sends the boss running", battle.Sim.ScareT > 0 && Vector2.Distance(new Vector2(mb.x, mb.y), new Vector2(battle.Sim.Player.x, battle.Sim.Player.y)) > apart + 20);
+                Check("a scared boss holds its fire", battle.Sim.BossShots.Count == 0);
+                yield return Shot("momiche-scare");
                 yield return Click(Q("bb-flee"), "Flee");
                 yield return Wait(0.3f);
             }

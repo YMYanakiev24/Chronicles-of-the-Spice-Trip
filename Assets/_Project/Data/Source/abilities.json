@@ -1,5 +1,8 @@
 {
-  "_comment": "Phase 3 abilities (approved design). Every number the boss and champion kits use lives here; edit and run Spice Trip > Rebuild Project. Times are seconds, speeds are arena px/s, angles are radians.",
+  "_comment": "Phase 3 abilities (approved design). Every number the boss and champion kits use lives here; edit and run Spice Trip > Rebuild Project. Times are seconds, speeds are arena px/s, angles are radians. 'characters' adds champions the web game doesn't have; each takes the place of a Coming soon card.",
+  "characters": [
+    { "id": "momiche", "name": "Momiche😨", "img": "assets/momiche.jpg", "replaces": "soon1" }
+  ],
   "bosses": [
     {
       "id": "goodPlaz", "kit": "split", "name": "Multiplies x3 on death",
@@ -46,7 +49,7 @@
     {
       "id": "gakev", "ability": "Coin Dash", "special": "dash", "cooldown": 4,
       "params": [
-        { "k": "coinChance", "v": 0.25 }, { "k": "coinHeal", "v": 5 }, { "k": "coinLife", "v": 6 },
+        { "k": "coinChance", "v": 0.6 }, { "k": "coinHeal", "v": 5 }, { "k": "coinLife", "v": 6 },
         { "k": "duration", "v": 0.25 }, { "k": "speedMul", "v": 3 }
       ]
     },
@@ -97,6 +100,10 @@
         { "k": "homingTurn", "v": 2.5 }, { "k": "shotDamage", "v": 6 },
         { "k": "dustMax", "v": 50 }, { "k": "dustCost", "v": 10 }, { "k": "dustRegen", "v": 2 }, { "k": "invuln", "v": 0.2 }
       ]
+    },
+    {
+      "id": "momiche", "ability": "Scare", "special": "scare", "cooldown": 8,
+      "params": [ { "k": "duration", "v": 3 }, { "k": "fleeSpeed", "v": 1.3 } ]
     }
   ]
 }

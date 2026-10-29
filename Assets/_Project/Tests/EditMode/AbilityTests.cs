@@ -165,7 +165,7 @@ namespace SpiceTrip.Tests
             var s = Sim("vlado", "gakev", rand: 0.1f);
             s.PlayerShots.Add(new BattleSim.Shot { x = s.Boss.x, y = s.Boss.y, r = 5, life = 1 });
             s.Step(0.001f, default);
-            Assert.AreEqual(1, s.Coins.Count, "25% of hits drop a coin");
+            Assert.AreEqual(1, s.Coins.Count, "60% of hits drop a coin");
             s.Player.hp = 50;
             s.Coins[0].x = 100; s.Coins[0].y = 400;   // away from the boss, so no touch damage
             s.Player.x = 100; s.Player.y = 400;
@@ -173,6 +173,31 @@ namespace SpiceTrip.Tests
             Assert.AreEqual(55, s.Player.hp, 0.01f);
             s.Step(0.001f, Special());
             Assert.IsTrue(s.PlayerInvulnerable);
+        }
+
+        [Test]
+        public void MomicheScaresTheBossAwayAndItHoldsItsFireForThreeSeconds()
+        {
+            var s = Sim("mordekai", "momiche");
+            var b = s.Boss;
+            s.Player.x = b.x; s.Player.y = b.y + 150;
+            float Dist() => Vector2.Distance(new Vector2(b.x, b.y), new Vector2(s.Player.x, s.Player.y));
+            float before = Dist();
+            s.Step(0.001f, Special());
+            Assert.AreEqual(3, s.ScareT, 0.01f);
+            s.BossShots.Clear();
+            Run(s, 1);
+            Assert.Greater(Dist(), before + 20, "it runs from her");
+            Assert.IsEmpty(s.BossShots, "and doesn't shoot");
+            s.Player.x = b.x; s.Player.y = b.y;
+            s.Step(0.02f, default);
+            Assert.AreEqual(s.Player.maxHp, s.Player.hp, "a scared boss doesn't bite");
+            Assert.IsFalse(s.TrySpecial(Special()), "8 s cooldown");
+            s.Player.y = b.y + 200;
+            Run(s, 2.1f);
+            Assert.LessOrEqual(s.ScareT, 0);
+            Run(s, 2);
+            Assert.IsNotEmpty(s.BossShots, "the feathers come back once the fright wears off");
         }
 
         [Test]

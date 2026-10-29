@@ -227,9 +227,9 @@ namespace SpiceTrip.Tests
             Assert.AreEqual(2f, Defs.BossStrength(11));
         }
 
-        static DungeonGame BossRoom(int floor, int seed = 3)
+        static DungeonGame BossRoom(int floor, int seed = 3, string champion = "hero")
         {
-            var g = NewRun("hero", seed);
+            var g = NewRun(champion, seed);
             while (g.FloorNumber < floor) g.Descend();
             Assert.IsTrue(GoTo(g, r => r.isBoss));
             g.Player.pos = new Vector2(Center.x, RoomH - Tile * 2f);
@@ -359,6 +359,7 @@ namespace SpiceTrip.Tests
         [TestCase("daniilvasil")]
         [TestCase("storyteller")]
         [TestCase("fairy")]
+        [TestCase("momiche")]
         public void EveryChampionsSpecialWorks(string id)
         {
             var g = NewRun(id);
@@ -400,7 +401,62 @@ namespace SpiceTrip.Tests
                 case Special.MugShield: Assert.AreEqual(p.maxHp, p.hp); Assert.IsEmpty(g.EnemyShots); break;
                 case Special.MelonRoll: Assert.LessOrEqual(dummy.hp, dummy.maxHp - 20); break;
                 case Special.BearJump: Assert.LessOrEqual(dummy.hp, dummy.maxHp - 18); break;
+                case Special.Scare: Assert.Greater(p.scareT, 0); break;
             }
+        }
+
+        [Test]
+        public void MomichesScareSendsMonstersRunningAndNobodyBites()
+        {
+            var g = NewRun("momiche");
+            Assert.IsTrue(GoTo(g, Combat, cleared: true));
+            var p = g.Player;
+            p.pos = Center;
+            Enemy Walker(Vector2 at) { var e = Dummy(at); e.speed = 60; e.dmg = 10; return e; }
+            var right = Walker(Center + new Vector2(50, 0));
+            var left = Walker(Center - new Vector2(50, 0));
+            var close = Walker(Center + new Vector2(0, 22));
+            g.Enemies.AddRange(new[] { right, left, close });
+            g.Tick(1 / 60f, new DungeonInput { slot = -1, aim = Center + new Vector2(100, 0), specialPressed = true });
+            Assert.AreEqual(Defs.ScareTime, p.scareT, 0.05f);
+            Run(g, 1);
+            Assert.Greater(Vector2.Distance(right.pos, p.pos), 75, "they run");
+            Assert.Greater(Vector2.Distance(left.pos, p.pos), 75);
+            Assert.AreEqual(p.maxHp, p.hp, "and don't attack");
+            Run(g, 2.1f);
+            Assert.AreEqual(0, p.scareT);
+            float d = Vector2.Distance(right.pos, p.pos);
+            Run(g, 0.5f);
+            Assert.Less(Vector2.Distance(right.pos, p.pos), d, "then come back");
+        }
+
+        [Test]
+        public void AScaredBossRunsAndHoldsItsFire()
+        {
+            var g = BossRoom(3, champion: "momiche");     // Mordekai
+            var boss = g.Enemies.Single(e => e.bossForm == 0);
+            boss.pos = Center;
+            g.Player.pos = Center + new Vector2(0, 90);
+            g.Tick(1 / 60f, new DungeonInput { slot = -1, aim = Center, specialPressed = true });
+            g.EnemyShots.Clear();
+            Run(g, 2.5f, () => { KeepAlive(g); return Idle(g); });
+            Assert.IsEmpty(g.EnemyShots, "no feathers while scared");
+            Assert.Greater(Vector2.Distance(boss.pos, g.Player.pos), 150, "it fled");
+            Run(g, 2.5f, () => { KeepAlive(g); return Idle(g); });
+            Assert.IsNotEmpty(g.EnemyShots, "it fires again afterwards");
+        }
+
+        [Test]
+        public void GakevsKillsDropThreeExtraCoins()
+        {
+            var g = NewRun("gakev");
+            Assert.IsTrue(GoTo(g, Combat, cleared: true));
+            var target = Dummy(Center + new Vector2(24, 0), hp: 1);
+            g.Enemies.Add(target);
+            g.Coins.Clear();
+            g.Tick(1 / 60f, new DungeonInput { slot = -1, aim = target.pos, meleePressed = true });
+            Assert.IsFalse(target.alive);
+            Assert.GreaterOrEqual(g.Coins.Count, 1 + 3, "a monster's one or two coins, plus three");
         }
 
         [Test]

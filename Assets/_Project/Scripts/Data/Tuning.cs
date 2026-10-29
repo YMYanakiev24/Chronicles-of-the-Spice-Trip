@@ -27,7 +27,7 @@ namespace SpiceTrip.Data
         public float playerFireCooldown = 0.22f;
         public float playerShotSpeed = 380, playerShotRadius = 5, playerShotLife = 1.4f;
         public int playerShotDamage = 8;
-        public float heroSpriteScale = 3f;       // the walking pixel hero (16 x 20 px)
+        public float heroSpriteScale = 2.25f;    // the walking champion (24 x 32 frames → 54 x 72)
 
         // Boss
         public float bossStartY = 90;

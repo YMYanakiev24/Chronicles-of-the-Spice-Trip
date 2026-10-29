@@ -272,8 +272,9 @@ namespace SpiceTrip.Hub
                 else if (!string.IsNullOrEmpty(ch.img))
                 {
                     var tex = ArtLibrary.Load(ch.img);
-                    if (tex != null) SetBackground(thumb, tex);
-                    else thumb.Add(Lbl("?", "char-soon"));
+                    if (tex == null) thumb.Add(Lbl("?", "char-soon"));
+                    else if (ch.portraitCard) SetBackground(thumb, ArtLibrary.Crop(ch.img, ch.portraitRect));
+                    else SetBackground(thumb, tex);
                 }
                 else thumb.Add(Icon("hero", side * 0.45f));
                 thumb.pickingMode = PickingMode.Ignore;

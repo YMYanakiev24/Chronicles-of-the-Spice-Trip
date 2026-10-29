@@ -45,7 +45,7 @@ namespace SpiceTrip.Battle
         SpriteRenderer _playerSr, _playerShadow;
         SpriteRenderer _arenaArt;                       // a boss's own backdrop (arena-<bossId>.jpg)
         readonly List<SpriteRenderer> _forest = new List<SpriteRenderer>();   // the procedural night forest
-        Sprite _bossSprite, _feather, _ticket, _seed, _koi, _bus, _ring;
+        Sprite _bossSprite, _feather, _ticket, _seed, _koi, _bus, _ring, _fear;
         readonly List<SpriteRenderer> _draws = new List<SpriteRenderer>();
         int _drawn;
         ChampionKitDef _kit;
@@ -124,6 +124,7 @@ namespace SpiceTrip.Battle
             _ticket = Spr(Tex(Grid(new[] { "kkkkkkkkkkkk", "kpppppppppk.", "kpddpdpddpk.", "kpppppppppk.", "kpdddpddppk.", "kpppppppppk.", "kkkkkkkkkkkk" },
                 ('k', "#9a7a40"), ('p', "#efe6cc"), ('d', "#3a2a1a")), FilterMode.Point));
             _seed = Spr(Tex(Grid(new[] { ".gg.", "gllg", "gggg", ".gg." }, ('g', "#2a5a1a"), ('l', "#7fbf4a")), FilterMode.Point));
+            _fear = Spr(Tex(ChampionFigures.FearFace(), FilterMode.Point));
             _koi = Spr(Tex(Grid(new[] { "o.....oooo....", "oo..oowwoooo..", "ooooowoooooke.", "oo..oooowoo...", "o.....oooo...." },
                 ('o', "#ff8a3a"), ('w', "#ffffff"), ('k', "#1a1414"), ('e', "#ffb070")), FilterMode.Point));
             _bus = Spr(Tex(Grid(new[]
@@ -420,7 +421,7 @@ namespace SpiceTrip.Battle
             _root.RegisterCallback<GeometryChangedEvent>(_ => LayoutArena());
         }
 
-        const string BaseHint = "WASD / arrows to move · aim & click (or Space) to shoot";
+        const string BaseHint = "WASD / arrows to move · aim & click (or Space / Enter) to shoot";
 
         // A health bar in arena coordinates: dark frame, inner track, coloured fill, centred label.
         VisualElement Bar(VisualElement host, float x, float y, float w, float h, string color, out Label label)
@@ -519,7 +520,7 @@ namespace SpiceTrip.Battle
             _bossHasArt = _bossSprite != null;
             BuildKitHud();
 
-            // The player walks as the pixel hero in the champion's colours, facing the way they move.
+            // The player walks as their champion, facing the way they move.
             _hero = HeroSprites.For(ch?.id);
             _playerSr.sprite = _hero.Frame(new Vector2(0, -1), false, 0);    // facing the boss
 
@@ -639,7 +640,7 @@ namespace SpiceTrip.Battle
                 if (kb.sKey.isPressed || kb.downArrowKey.isPressed) inp.move.y += 1;
                 if (kb.aKey.isPressed || kb.leftArrowKey.isPressed) inp.move.x -= 1;
                 if (kb.dKey.isPressed || kb.rightArrowKey.isPressed) inp.move.x += 1;
-                inp.shoot |= kb.spaceKey.isPressed;
+                inp.shoot |= kb.spaceKey.isPressed || kb.enterKey.isPressed || kb.numpadEnterKey.isPressed;
                 inp.special |= kb.qKey.wasPressedThisFrame;
                 if (kb.digit1Key.wasPressedThisFrame) inp.itemSlot = 1;
                 else if (kb.digit2Key.wasPressedThisFrame) inp.itemSlot = 2;
@@ -761,10 +762,20 @@ namespace SpiceTrip.Battle
 
             // Boss bodies (+ shadows drawn over their feet, as on the canvas)
             var bossColor = PixelCanvas.Col(_boss.color ?? "#9a5fd0");
+            bool scared = Sim.ScareT > 0;
             foreach (var u in Sim.Units)
             {
                 float size = _bossHasArt ? u.r * T.bossSpriteScale : u.r * 2;
-                D(_bossHasArt ? _bossSprite : _circle, _alpha, 40, u.x, u.y, size, size, 0, _bossHasArt ? Color.white : (Color)bossColor, u.hurt > 0 ? 2f : 1f);
+                float shiver = scared ? Mathf.Sin(t * 60 + u.x) * 1.5f : 0;
+                Color tint = _bossHasArt ? Color.white : (Color)bossColor;
+                if (scared) tint *= new Color(0.75f, 0.85f, 1f);
+                D(_bossHasArt ? _bossSprite : _circle, _alpha, 40, u.x + shiver, u.y, size, size, 0, tint, u.hurt > 0 ? 2f : 1f);
+                if (scared)     // Momiche's scare: a fearful face over every body (under it when the boss bar is in the way)
+                {
+                    float fy = u.y - size * 0.5f - 14;
+                    if (fy < 90) fy = u.y + size * 0.5f + 16;
+                    D(_fear, _alpha, 43, u.x, fy + Mathf.Sin(t * 8 + u.x) * 2, 28, 28);
+                }
                 if (!_bossHasArt)
                 {
                     float k = u.r / T.bossRadius;
@@ -785,11 +796,11 @@ namespace SpiceTrip.Battle
                 lift = 22 * k; grow = 1 + 0.3f * k;
             }
             _playerSr.sprite = _hero.Frame(Sim.Moving ? Sim.MoveDir : Sim.FacingAim, Sim.Moving, Sim.Time);
-            _playerSr.transform.localPosition = W(p.x, p.y - lift);
+            _playerSr.transform.localPosition = W(p.x, p.y - 12 - lift);        // feet just below the hit circle
             _playerSr.transform.localRotation = Quaternion.Euler(0, 0, Sim.RollT > 0 ? Sim.RollT * 900 : 0);
             Size(_playerSr, HeroSprites.W * T.heroSpriteScale * grow, HeroSprites.H * T.heroSpriteScale * grow);
-            _playerShadow.transform.localPosition = W(p.x, p.y + 16);
-            Size(_playerShadow, 28 / grow, 10 / grow);
+            _playerShadow.transform.localPosition = W(p.x, p.y + 20);
+            Size(_playerShadow, 30 / grow, 10 / grow);
 
             // Swiftwing Elixir glow and Warding Charm orbs
             if (Sim.SwiftT > 0) D(_glow, _additive, 49, p.x, p.y + 8, 70, 30, 0, new Color(0.5f, 1f, 0.6f, 0.45f));
@@ -799,7 +810,16 @@ namespace SpiceTrip.Battle
                 D(_glow, _additive, 56, p.x + Mathf.Cos(a) * 26, p.y + Mathf.Sin(a) * 26, 16, 16, 0, new Color(0.55f, 0.8f, 1f, 0.9f));
             }
 
-            // Atanas' calm aura and Nikolay's mug-shield
+            // Momiche's scream (a fast double ring), Atanas' calm aura and Nikolay's mug-shield
+            if (scared && _kit != null)
+            {
+                float since = _kit.P("duration", 3) - Sim.ScareT;
+                for (int i = 0; i < 2; i++)
+                {
+                    float k = Mathf.Clamp01((since - i * 0.12f) / 0.6f);
+                    if (k > 0 && k < 1) D(_ring, _additive, 55, p.x, p.y, 40 + 360 * k, 40 + 360 * k, 0, new Color(0.65f, 0.75f, 1f, 0.7f * (1 - k)));
+                }
+            }
             if (Sim.AuraT > 0)
             {
                 float k = 1 - Mathf.Repeat(t * 1.2f, 1);

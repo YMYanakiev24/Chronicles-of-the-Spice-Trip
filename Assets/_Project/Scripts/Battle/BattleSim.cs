@@ -106,6 +106,8 @@ namespace SpiceTrip.Battle
         // champion state
         public float SpecialCooldown { get; private set; }
         public float AuraT, ShieldT, DashT, RollT, JumpT, WobbleT, TeleportT;
+        /// <summary>Momiche's scare: while it runs, every boss body runs from her and holds its fire.</summary>
+        public float ScareT;
         public float CoinPower, Drunk, Nicotine, Dust;
         public float PlayerSpeed { get; private set; }
         public Vector2 FacingAim { get; private set; }
@@ -167,7 +169,7 @@ namespace SpiceTrip.Battle
             Active = true;
 
             SpecialCooldown = 0;
-            AuraT = ShieldT = DashT = RollT = JumpT = WobbleT = TeleportT = 0;
+            AuraT = ShieldT = DashT = RollT = JumpT = WobbleT = TeleportT = ScareT = 0;
             CoinPower = 0; Drunk = 0;
             Nicotine = K("nicotineStart");
             Dust = K("dustMax");
@@ -304,10 +306,10 @@ namespace SpiceTrip.Battle
                 else if (c.life <= 0) Coins.RemoveAt(i);
             }
 
-            // Touch damage from the boss bodies (a rolling melon hits back instead).
+            // Touch damage from the boss bodies (a rolling melon hits back instead; scared ones don't bite).
             foreach (var u in Units)
             {
-                if (Dist(p.x, p.y, u.x, u.y) >= p.r + u.r) continue;
+                if (Dist(p.x, p.y, u.x, u.y) >= p.r + u.r || ScareT > 0) continue;
                 if (RollT > 0)
                 {
                     if (_rollHits.Add(u)) { u.hp -= K("rollDamage", 20); u.hurt = T.bossHurtFlash; OnSfx?.Invoke("hit"); }
@@ -326,6 +328,17 @@ namespace SpiceTrip.Battle
         {
             var p = Player;
             float slow = InHoney(b) ? K("honeySlow", 1) : 1;
+
+            if (ScareT > 0)
+            {
+                // Run straight away from Momiche; volleys and dives wait until the fright wears off.
+                b.diveT = 0;
+                float fx = b.x - p.x, fy = b.y - p.y, fd = Mathf.Max(0.01f, Mathf.Sqrt(fx * fx + fy * fy));
+                float fs = b.speed * K("fleeSpeed", 1.3f) * slow;
+                b.x = Mathf.Clamp(b.x + fx / fd * fs * dt, T.bossClampEdge, T.arenaWidth - T.bossClampEdge);
+                b.y = Mathf.Clamp(b.y + fy / fd * fs * dt, T.bossClampEdge, T.arenaHeight - T.bossClampEdge);
+                return;
+            }
 
             if (b.diveT > 0)
             {
@@ -402,7 +415,7 @@ namespace SpiceTrip.Battle
         {
             var b = _primary;
             if (b == null || !Units.Contains(b)) return;
-            _spiralT -= dt;
+            if (ScareT <= 0) _spiralT -= dt;
             if (_spiralT <= 0)
             {
                 _spiralT = B("spiralInterval", 2);
@@ -417,7 +430,7 @@ namespace SpiceTrip.Battle
                 _spiralBase += B("spiralTurn", 0.26f);
                 OnSfx?.Invoke("ui");
             }
-            _whistleT -= dt;
+            if (ScareT <= 0) _whistleT -= dt;
             if (_whistleT <= 0 && ActiveBus == null)
             {
                 _whistleT = B("whistleEvery", 8);
@@ -563,6 +576,7 @@ namespace SpiceTrip.Battle
             if (JumpT > 0) JumpT -= dt;
             if (WobbleT > 0) WobbleT -= dt;
             if (TeleportT > 0) TeleportT -= dt;
+            if (ScareT > 0) ScareT -= dt;
             for (int i = Puddles.Count - 1; i >= 0; i--) { Puddles[i].life -= dt; if (Puddles[i].life <= 0) Puddles.RemoveAt(i); }
         }
 
@@ -662,6 +676,10 @@ namespace SpiceTrip.Battle
                     p.y = Mathf.Clamp(inp.aim.y, T.playerEdge, T.arenaHeight - T.playerEdge);
                     TeleportT = K("invuln", 0.2f);
                     OnSfx?.Invoke("shield");
+                    break;
+                case "scare":
+                    ScareT = K("duration", 3);
+                    OnSfx?.Invoke("scare");
                     break;
                 default:
                     return false;

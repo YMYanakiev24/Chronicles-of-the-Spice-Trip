@@ -72,12 +72,14 @@ namespace SpiceTrip.Tests
             Assert.AreEqual(12, _db.characters.Count);
             for (int i = 0; i < _src.characters.Count; i++)
             {
+                if (_src.characters[i].empty && !_db.characters[i].empty) continue;     // a new champion took this Coming soon card
                 Assert.AreEqual(_src.characters[i].id, _db.characters[i].id);
                 Assert.AreEqual(_src.characters[i].name, _db.characters[i].name);
                 Assert.AreEqual(_src.characters[i].empty, _db.characters[i].empty);
                 Assert.AreEqual(string.IsNullOrEmpty(_src.characters[i].img), string.IsNullOrEmpty(_db.characters[i].img));
             }
-            Assert.AreEqual(2, _db.characters.FindAll(c => c.empty).Count, "two Coming soon cards");
+            Assert.AreEqual("momiche", _db.characters[10].id, "Momiche takes the first Coming soon card");
+            Assert.AreEqual(1, _db.characters.FindAll(c => c.empty).Count, "one Coming soon card left");
         }
 
         [Test]
