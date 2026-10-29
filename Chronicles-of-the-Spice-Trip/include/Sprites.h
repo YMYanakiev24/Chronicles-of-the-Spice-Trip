@@ -42,3 +42,23 @@ extern Sprites SPR;
 
 // Draw a 16px tileset cell (col,row) scaled to fill a TILE at (x,y).
 void drawTile(int col, int row, float x, float y, Color tint = WHITE);
+
+// Which way a figure faces, in screen terms (y pointing down).
+enum Facing { FACE_DOWN = 0, FACE_UP = 1, FACE_LEFT = 2, FACE_RIGHT = 3 };
+Facing facingOf(Vector2 dir);
+
+// A champion's walking figure from every side: assets/walk/walk-<id>.png, exported
+// from the Unity project (Spice Trip > Export Walk Sheets). Rows are down, up and
+// right; each row is the standing frame, then the walk cycle. Left is the right
+// row mirrored. Frames are 3:4.
+struct WalkSheet {
+    Texture2D tex{};
+    int frames = 0, fw = 0, fh = 0;
+    bool ok() const { return tex.id != 0; }
+    void load(const char* file);
+    void unload();
+    // The frame index for standing (0), or stepping through the walk cycle at 8 frames a second.
+    int  frameAt(bool walking, float time) const;
+    // Draws one frame stretched over `dst`; `flash` adds a white flash (struck).
+    void draw(Facing facing, int frame, Rectangle dst, Color tint = WHITE, bool flash = false) const;
+};

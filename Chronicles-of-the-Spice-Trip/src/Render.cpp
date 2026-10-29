@@ -1,5 +1,6 @@
 // ============================================================================
-//  Render.cpp — the procedural hero, sprite-sheet enemies and projectiles.
+//  Render.cpp — the champions' walking figures (and the procedural hero they fall
+//  back to), sprite-sheet enemies and projectiles.
 // ============================================================================
 #include "Render.h"
 #include "Common.h"
@@ -23,6 +24,32 @@ void drawHero(Vector2 p, Vector2 facing, float meleeAnim, bool flash, Color cloa
     Vector2 tip = { p.x + cosf(ang - swing) * 26, p.y + sinf(ang - swing) * 26 };
     Vector2 hilt = { p.x + cosf(ang - swing) * 8,  p.y + sinf(ang - swing) * 8 };
     DrawLineEx(hilt, tip, 3.0f, meleeAnim > 0 ? Color{ 234, 255, 255, 255 } : Color{ 180,190,205,255 });
+}
+
+void drawChampion(const WalkSheet& w, Vector2 p, Vector2 look, bool walking, float time,
+                  Vector2 facing, float meleeAnim, bool flash, Color cloak, float lift) {
+    if (!w.ok()) { drawHero(p, facing, meleeAnim, flash, cloak, lift); return; }
+    drawShadow(p, PLAYER_R * (1 - lift * 0.02f));
+    float x = p.x, y = p.y - lift;                 // Bear Jump lifts the champion off the ground
+    const float fw = 24 * 1.4f, fh = 32 * 1.4f;    // the drawn figures' 24 x 32, scaled up
+    w.draw(facingOf(look), w.frameAt(walking, time), { x - fw / 2, y - 10 - fh / 2, fw, fh }, WHITE, flash);
+    if (meleeAnim > 0) {                           // the godless blade's slash
+        float ang = atan2f(facing.y, facing.x);
+        float a = ang - sinf((1.0f - meleeAnim) * PI) * 0.9f;
+        DrawRectanglePro({ x + cosf(a) * 17, y - 4 + sinf(a) * 17, 22, 3 }, { 11, 1.5f }, a * RAD2DEG, { 234, 255, 255, 255 });
+    }
+}
+
+void drawFigureIn(const WalkSheet& w, Facing facing, int frame, Rectangle box, Color tint) {
+    float h = fminf(box.height, box.width * 4 / 3), fw = h * 3 / 4;
+    w.draw(facing, frame, { box.x + (box.width - fw) / 2, box.y + box.height - h, fw, h }, tint);
+}
+
+void drawTurnaround(const WalkSheet& w, Rectangle box, float time) {
+    static const Facing order[4] = { FACE_DOWN, FACE_LEFT, FACE_UP, FACE_RIGHT };
+    float cw = box.width / 4;
+    for (int i = 0; i < 4; ++i)
+        drawFigureIn(w, order[i], w.frameAt(true, time), { box.x + i * cw + 1, box.y, cw - 2, box.height });
 }
 
 // Sprite scale per enemy kind (frames are 32px; the creature fills ~16px).

@@ -90,6 +90,8 @@ struct Game {
     void drawRunComplete();
     void drawRushOver();
     void drawMenuBackground();
+    void drawFear(float x, float above, float below, float size) const;   // over a scared enemy
+    void drawName(int champion, float x, float y, int size, Color color, bool centred = false) const;
     Rectangle castleRect() const;
 
     void play(const char* sfx);
@@ -115,6 +117,9 @@ struct Game {
     std::vector<Coin> coins;
     std::vector<FloatText> floaters;
     BossFight fight;
+    float scareT = 0;                   // Momiche's scare: seconds everyone keeps running
+    bool  heroMoving = false;           // walking this frame (the figure faces heroMoveDir)
+    Vector2 heroMoveDir{ 0, 1 };
     int   floor = 1, kills = 0;
     float runTime = 0;
     bool  inFight = false;
@@ -139,6 +144,8 @@ struct Game {
     au::Music music;
     Texture2D menuBg{}, castleTex{}, marinTex{}, shopTex{};
     Texture2D champTex[CHAMPION_COUNT]{};
+    WalkSheet walk[CHAMPION_COUNT];     // each champion from every side (assets/walk/)
+    Texture2D fearTex{};                // the fearful face (assets/walk/fear.png)
     BossArt bossArt;
 };
 

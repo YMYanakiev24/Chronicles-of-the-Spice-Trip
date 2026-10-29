@@ -55,6 +55,7 @@ public:
     float time = 0;           // seconds since the fight began
     Bus   bus;
     std::function<void(const char*)> sfx;   // sound cues
+    bool  scared = false;     // Momiche's scare: the bodies run and every attack waits (a bus already called still drives)
 
     bool  active() const { return def != nullptr; }
     void  begin(const BossDef& d, float strength, Vector2 at, std::vector<Enemy>& enemies);

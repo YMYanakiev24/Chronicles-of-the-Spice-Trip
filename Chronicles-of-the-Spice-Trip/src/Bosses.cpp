@@ -3,6 +3,7 @@
 //  The patterns follow the original Path boss fights, scaled to a room.
 // ============================================================================
 #include "Bosses.h"
+#include "Champions.h"
 #include "Render.h"
 #include "Sprites.h"
 #include <cmath>
@@ -124,6 +125,13 @@ void BossFight::update(float dt, Vector2 player, std::vector<Enemy>& enemies, st
         float d = fmaxf(0.01f, Vector2Length(to));
         if (fabsf(to.x) > 2) e.flip = to.x < 0;
 
+        if (scared) {               // run from the player and hold every attack
+            e.diveT = 0;
+            e.pos = moveInRoom(e.pos, Vector2Scale(to, -e.speed * FLEE_SPEED * bdt / d), e.r, room, false);
+            e.moving = true;
+            continue;
+        }
+
         // --- movement ---
         if (e.diveT > 0) {
             e.diveT -= bdt;
@@ -158,7 +166,7 @@ void BossFight::update(float dt, Vector2 player, std::vector<Enemy>& enemies, st
     }
 
     // --- Vlado: ticket spirals and the whistle ---
-    if (def->kind == BossKind::Conductor && primary) {
+    if (def->kind == BossKind::Conductor && primary && !scared) {
         spiralT -= bdt;
         if (spiralT <= 0) {
             spiralT = def->fireInterval;
@@ -179,7 +187,7 @@ void BossFight::update(float dt, Vector2 player, std::vector<Enemy>& enemies, st
     }
 
     // --- the Cinder-Maw: ember rings, and fireballs once it is wounded ---
-    if (def->kind == BossKind::Inferno && primary) {
+    if (def->kind == BossKind::Inferno && primary && !scared) {
         emberT -= bdt;
         if (emberT <= 0) {
             emberT = RING_EVERY;

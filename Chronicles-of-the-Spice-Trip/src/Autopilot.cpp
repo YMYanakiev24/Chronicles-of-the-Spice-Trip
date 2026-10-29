@@ -129,7 +129,21 @@ void Autopilot::build() {
     add("champion picked", 4, [this](Game& g, float t) {
         if (t < 0.3f) return false;
         check("clicking a card picks that champion", g.profile.champion == 1);
+        int cards = 0;
+        for (int i = 0; i < CHAMPION_COUNT; ++i)
+            for (auto& h : ui::hits()) if (h.label == CHAMPIONS[i].name) { cards++; break; }
+        check(TextFormat("all %d champions have a card, Momiche included", CHAMPION_COUNT), cards == CHAMPION_COUNT);
+        bool sides = true;
+        for (auto& w : g.walk) sides &= w.ok() && w.frames == 5 && w.fw * 4 == w.fh * 3;
+        check("every champion walks from all four sides (a walk sheet each)", sides);
         shot(g, "champions");
+        for (auto& h : ui::hits())          // point at Momiche's card to show her details
+            if (h.label == "Momiche") in::moveMouse({ h.rect.x + h.rect.width / 2, h.rect.y + h.rect.height / 2 });
+        return true;
+    });
+    add("momiche's card", 3, [this](Game& g, float t) {
+        if (t < 0.3f) return false;
+        shot(g, "champions-momiche");
         return true;
     });
     add("leave champions", 3, [](Game&, float t) {
@@ -215,6 +229,18 @@ void Autopilot::build() {
         }
         if (t < 0.1f) return false;
         check("the blade hits what's in front", !g.enemies.empty() && g.enemies.front().hp < markF);
+        return true;
+    });
+    add("enter casts", 3, [this](Game& g, float t) {
+        if (t == 0) {
+            g.player.castCd = 0; g.player.mana = g.player.maxMana;
+            if (!g.enemies.empty()) aimAt(g, g.enemies.front().pos);
+            in::hold(KEY_ENTER, true);
+            return false;
+        }
+        if (g.player.castCd <= 0 && t < 1) return false;
+        in::hold(KEY_ENTER, false);
+        check("Enter casts the selected power", g.player.castCd > 0);
         return true;
     });
     add("clear the room", 30, [this](Game& g, float t) {
@@ -513,7 +539,7 @@ void Autopilot::build() {
                 g.startRun();
                 goToRoom(g, isCombatRoom);
                 g.enemies.clear();
-                g.enemies.push_back(dummy({ ROOM_CENTER.x + (c.kind == Special::BearJump ? 30.0f : 60.0f), ROOM_CENTER.y }));
+                g.enemies.push_back(dummy({ ROOM_CENTER.x + (c.kind == Special::BearJump ? 30.0f : c.kind == Special::Scare ? 20.0f : 60.0f), ROOM_CENTER.y }));
                 g.player.pos = ROOM_CENTER;
                 g.player.facing = { 1, 0 };
                 aimAt(g, { ROOM_CENTER.x + 120, ROOM_CENTER.y });
@@ -521,6 +547,7 @@ void Autopilot::build() {
                 case Special::ArcaneSurge: g.player.mana = 10; break;
                 case Special::Drink:       g.player.hp = 50; break;
                 case Special::CoinBarrage: g.player.charge = COIN_POWER_MAX; break;
+                case Special::Scare:       g.enemies.front().speed = 70; g.enemies.front().dmg = 10; break;   // close enough to bite
                 case Special::MugShield: {
                     Projectile p;
                     p.pos = { ROOM_CENTER.x - 60, ROOM_CENTER.y }; p.vel = { 200, 0 };
@@ -551,12 +578,51 @@ void Autopilot::build() {
             case Special::CoinBarrage: ok = coinShots == 16; break;
             case Special::Koi:         ok = koi == 3; break;
             case Special::Blink:       ok = g.player.pos.x > markX + 100 && g.player.charge < DUST_MAX; break;
+            case Special::Scare:       ok = g.scareT > 0 && d && d->pos.x > ROOM_CENTER.x + 40 && g.player.hp == g.player.maxHp; break;
             }
             check(TextFormat("%s's special (%s) works", c.name, c.special), ok);
             if (c.kind == Special::Koi) shot(g, "koi");
             return true;
         });
     }
+
+    // ===== Gakev's coins and Momiche's scare on a boss =====
+    add("gakev's coins", 3, [this](Game& g, float t) {
+        if (t == 0) {
+            g.profile.champion = 2;             // Gakev
+            g.startRun();
+            goToRoom(g, isCombatRoom);
+            g.enemies.clear(); g.coins.clear();
+            Enemy e = dummy({ ROOM_CENTER.x + 60, ROOM_CENTER.y });
+            e.hp = 0;                           // falls this frame
+            g.enemies.push_back(e);
+            return false;
+        }
+        if (t < 0.05f) return false;
+        int n = (int)g.coins.size();            // a monster drops 1-3, Gakev adds three
+        check(TextFormat("Gakev: a kill drops three extra coins (%d)", n), n >= 4 && n <= 6);
+        return true;
+    });
+    add("scared boss", 4, [this](Game& g, float t) {
+        if (t == 0) {
+            for (int i = 0; i < CHAMPION_COUNT; ++i) if (CHAMPIONS[i].kind == Special::Scare) g.profile.champion = i;
+            g.startRun();
+            goToRoom(g, [](const Room& r) { return r.isBoss; });
+            g.player.pos = { ROOM_CENTER.x, ROOM_PX_H - TILE * 3.0f };
+            Enemy* b = boss(g);
+            markF = b ? Vector2Distance(b->pos, g.player.pos) : 0;
+            markB = false;
+            in::tap(g.settings.keys.special);
+            return false;
+        }
+        if (!markB) { g.enemyShots.clear(); markB = true; }   // nothing is in the air before the scream
+        if (t < 1.2f) return false;
+        Enemy* b = boss(g);
+        check("Q: Momiche's scare sends the boss running", g.scareT > 0 && b && Vector2Distance(b->pos, g.player.pos) > markF + 20);
+        check("a scared boss holds its fire", g.enemyShots.empty());
+        shot(g, "momiche-scare");
+        return true;
+    });
     add("hud", 3, [this](Game& g, float t) {
         if (t < 0.6f) return false;
         shot(g, "hud");
