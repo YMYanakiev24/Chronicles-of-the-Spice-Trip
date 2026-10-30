@@ -48,6 +48,7 @@ void setFullscreen(bool on) {
 
 void Game::init(bool windowed) {
     settings = save::readSettings();
+    touch::setLayout(save::readTouchLayout());
     profile = save::readProfile();
     if (profile.champion < 0 || profile.champion >= CHAMPION_COUNT) profile.champion = 0;
     player.champion = profile.champion;
@@ -129,6 +130,7 @@ void Game::frame() {
     case Screen::Menu:      menuScreen(); break;
     case Screen::Champions: championsScreen(); break;
     case Screen::Settings:  settingsScreen(); break;
+    case Screen::Controls:  controlsScreen(); break;
     case Screen::Intro:     introScreen(); break;
     case Screen::Play:      playScreen(); break;
     }

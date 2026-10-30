@@ -1,8 +1,10 @@
 // ============================================================================
-//  Autopilot.h — plays the game with scripted input, checks every system,
+//  Autopilot.h вЂ” plays the game with scripted input, checks every system,
 //  saves screenshots and writes autopilot.log. Run with --autopilot <dir>.
 // ============================================================================
 #pragma once
+
+#include "raylib.h"
 
 #include <cstdio>
 #include <functional>
@@ -28,6 +30,7 @@ private:
     float  markF = 0;                   // scratch values a step remembers between frames
     float  markX = 0, markY = 0;
     bool   markB = false;
+    Vector2 markP{};
     std::string dir;
     FILE*  log = nullptr;
 

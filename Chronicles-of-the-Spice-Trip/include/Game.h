@@ -22,9 +22,9 @@
 #include <string>
 #include <vector>
 
-enum class Screen { Menu, Champions, Settings, Intro, Play };
+enum class Screen { Menu, Champions, Settings, Controls, Intro, Play };
 enum class Mode { Run, BossRush };
-enum class Overlay { None, Pause, Shop, RunComplete, RushOver };
+enum class Overlay { None, Pause, Controls, Shop, RunComplete, RushOver };
 
 struct Popup { const Anim* anim; Vector2 pos; float t; };        // a flask rising from a chest
 struct Coin { Vector2 pos, vel; float t; };                       // loot that flies to you
@@ -61,6 +61,7 @@ struct Game {
     void menuScreen();
     void championsScreen();
     void settingsScreen();
+    void controlsScreen();
     void introScreen();
     void playScreen();
 
@@ -91,6 +92,7 @@ struct Game {
     void drawBossBar();
     void drawShop();
     void drawPause();
+    void drawControlsEditor();
     void drawRunComplete();
     void drawRushOver();
     void drawMenuBackground();

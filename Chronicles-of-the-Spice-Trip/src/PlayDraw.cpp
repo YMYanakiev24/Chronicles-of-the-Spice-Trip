@@ -13,7 +13,8 @@
 void Game::playScreen() {
     float dt = fminf(GetFrameTime(), 0.05f);
     if (in::pressed(KEY_ESCAPE)) {
-        if (overlay == Overlay::Shop || overlay == Overlay::Pause) overlay = Overlay::None;
+        if (overlay == Overlay::Controls) { save::writeTouchLayout(touch::layout()); overlay = Overlay::Pause; }
+        else if (overlay == Overlay::Shop || overlay == Overlay::Pause) overlay = Overlay::None;
         else if (overlay == Overlay::None) overlay = Overlay::Pause;
         play("ui");
     }
@@ -46,6 +47,7 @@ void Game::playScreen() {
     switch (overlay) {
     case Overlay::Shop:        drawShop(); break;
     case Overlay::Pause:       drawPause(); break;
+    case Overlay::Controls:    drawControlsEditor(); break;
     case Overlay::RunComplete: drawRunComplete(); break;
     case Overlay::RushOver:    drawRushOver(); break;
     default: break;
@@ -498,6 +500,16 @@ void Game::drawShop() {
         panel.x + 24, panel.y + ph - 32, 10, ui::MUTED);
 }
 
+// Over the live game, so the buttons can be placed around the real HUD.
+void Game::drawControlsEditor() {
+    ui::veil(0.35f);
+    if (touch::editFrame()) {
+        save::writeTouchLayout(touch::layout());
+        play("ui");
+        overlay = Overlay::Pause;
+    }
+}
+
 void Game::drawPause() {
     int sw = GetScreenWidth(), sh = GetScreenHeight();
     if (saveMsgT > 0) saveMsgT -= GetFrameTime();
@@ -512,7 +524,12 @@ void Game::drawPause() {
         play(ok ? "quest" : "hurt");
     }
     if (ui::button({ bx, by + 2 * (bh + gap), bw, bh }, "Main Menu", ui::Style::Danger)) { play("ui"); toMenu(); return; }
-    if (saveMsgT > 0) ui::textCentered(saveMsg.c_str(), bx + bw / 2, by + 3 * (bh + gap) + 6, 20, Fade(ui::GOOD, fminf(1.0f, saveMsgT)));
+    float msgY = by + 3 * (bh + gap);
+    if (touch::enabled()) {
+        if (ui::button({ bx, msgY, bw, bh }, "Touch Controls")) { play("ui"); overlay = Overlay::Controls; }
+        msgY += bh + gap;
+    }
+    if (saveMsgT > 0) ui::textCentered(saveMsg.c_str(), bx + bw / 2, msgY + 6, 20, Fade(ui::GOOD, fminf(1.0f, saveMsgT)));
 
     // controls and the champion's kit
     Rectangle card = { sw / 2.0f + 10, by - 10, 380, 300 };

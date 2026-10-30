@@ -24,6 +24,15 @@ struct Settings {
     Keybinds keys;
 };
 
+// The phone controls. Positions are fractions of the screen, so a layout
+// survives a different screen shape; sizes are radii on the 720-line screen.
+enum TouchControl { TC_BLADE, TC_CAST, TC_ROLL, TC_INTERACT, TC_PAUSE, TC_STICK, TC_COUNT };
+
+struct TouchLayout {
+    bool  custom = false;       // false: the default layout for this screen
+    float x[TC_COUNT] = {}, y[TC_COUNT] = {}, r[TC_COUNT] = {};
+};
+
 // Human-readable name for a key code (covers the keys players can bind).
 inline const char* keyName(int k) {
     switch (k) {

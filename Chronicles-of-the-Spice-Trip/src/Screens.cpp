@@ -231,8 +231,25 @@ void Game::settingsScreen() {
         }
     }
     }
+    else {
+        y += 112;
+        ui::text("Touch controls", x, y, 20, ui::ACCENT);
+        if (ui::button({ x, y + 32, 320, 44 }, "Move and Resize Buttons")) { play("ui"); screen = Screen::Controls; }
+    }
 
     if (ui::button({ panel.x + pw - 190, panel.y + ph - 70, 160, 46 }, "Back", ui::Style::Primary)) { play("ui"); leave(); }
+}
+
+// ------------------------------------------------------------ touch controls
+void Game::controlsScreen() {
+    drawMenuBackground();
+    ui::veil(0.7f);
+    bool done = touch::editFrame();
+    if (done || in::pressed(KEY_ESCAPE)) {
+        save::writeTouchLayout(touch::layout());
+        play("ui");
+        screen = Screen::Settings;
+    }
 }
 
 // --------------------------------------------------------------------- intro

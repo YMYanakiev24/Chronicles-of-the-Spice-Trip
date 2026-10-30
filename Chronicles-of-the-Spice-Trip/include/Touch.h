@@ -16,6 +16,11 @@ namespace touch {
     void update(bool playing, const Keybinds& keys);    // once per frame, before the game reads input
     void draw(const Keybinds& keys);
 
+    void setLayout(const TouchLayout& t);
+    const TouchLayout& layout();
+    Vector2 controlPos(int control);    // where a TouchControl sits right now
+    bool editFrame();                   // the move-and-resize screen; true when Done is pressed
+
     void zone(Rectangle r, int key);    // tapping r presses key (HUD slots register themselves each frame)
     Vector2 stickDir();                 // normalised direction of the stick, {0,0} when idle
 
