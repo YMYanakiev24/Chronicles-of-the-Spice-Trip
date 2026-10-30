@@ -25,6 +25,7 @@ void Game::playScreen() {
     float target = r.isBoss && !r.cleared ? (painted ? 0.16f : 0.38f) : 0.0f;
     gloom += (target - gloom) * fminf(1.0f, dt * 2.5f);
 
+    updateCamera(dt);
     Camera2D cam = camera();
     if (shake > 0 && overlay == Overlay::None) {
         shake = fmaxf(0, shake - dt);
@@ -83,7 +84,20 @@ void Game::drawRoom() {
             else if (tx == 0 && ty == midY) dir = DIR_W;
             else if (tx == ROOM_TW - 1 && ty == midY) dir = DIR_E;
             bool isDoor = dir && (r.doors & dir);
-            bool innerWall = !border && r.tiles[ty][tx] == RT_WALL;
+            bool innerWall = !border && (r.tiles[ty][tx] == RT_WALL || r.tiles[ty][tx] == RT_FLAMER);
+            if (!border && r.tiles[ty][tx] == RT_VOID) {    // outside the room's shape
+                bool edge = false;                         // void touching floor reads as a wall face
+                for (int k = 0; k < 4; ++k) {
+                    int nx = tx + (k == 0) - (k == 1), ny = ty + (k == 2) - (k == 3);
+                    if (nx > 0 && ny > 0 && nx < ROOM_TW - 1 && ny < ROOM_TH - 1 && !tileSolid(r.tiles[ny][nx])) edge = true;
+                }
+                DrawRectangle((int)px, (int)py, TILE, TILE, { 10, 9, 14, 255 });
+                if (edge) {
+                    if (SPR.tileset.id) drawTile(1 + ((tx * 7 + ty * 3) % 4), 0, px, py);
+                    else { DrawRectangle((int)px, (int)py, TILE, TILE, { 24, 22, 32, 255 }); DrawRectangle((int)px, (int)py, TILE, 6, { 58, 54, 74, 255 }); }
+                }
+                continue;
+            }
             unsigned h = (unsigned)(tx * 73856093) ^ (unsigned)(ty * 19349663) ^
                 (unsigned)(dungeon.cx * 83492791 + dungeon.cy * 2654435761u);
 
@@ -113,6 +127,41 @@ void Game::drawRoom() {
             else if (ty == ROOM_TH - 1) drawTile(tx == 0 ? 0 : tx == ROOM_TW - 1 ? 5 : 1 + tx % 4, 4, px, py);
             else drawTile(tx == 0 ? 0 : 5, 1 + ty % 3, px, py);
         }
+
+    // fire-throwers: a metal nozzle on the brick, sputtering, then a roaring jet
+    for (int i = 0; i < r.flamerCount; ++i) {
+        const Flamer& f = r.flamers[i];
+        int state = flamerState(f, trapClock);
+        Vector2 c = { f.tx * (float)TILE + TILE / 2.0f, f.ty * (float)TILE + TILE / 2.0f };
+        Vector2 d = { (float)((f.dir == DIR_E) - (f.dir == DIR_W)), (float)((f.dir == DIR_S) - (f.dir == DIR_N)) };
+        DrawRectangle((int)c.x - 11, (int)c.y - 11, 22, 22, { 70, 66, 74, 255 });
+        DrawRectangleLines((int)c.x - 11, (int)c.y - 11, 22, 22, { 30, 26, 32, 255 });
+        Vector2 mouth = Vector2Add(c, Vector2Scale(d, 10));
+        DrawCircleV(mouth, 6, { 40, 34, 36, 255 });
+        DrawCircleV(mouth, 3.5f, state == 0 ? Color{ 90, 40, 30, 255 } : Color{ 255, 150, 50, 255 });
+        if (state == 1) {           // warning sparks
+            for (int k = 0; k < 3; ++k) {
+                float t = fmodf(clock * 3 + k * 0.33f, 1.0f);
+                Vector2 sp = Vector2Add(mouth, Vector2Scale(d, t * 18));
+                DrawCircleV({ sp.x + sinf(clock * 20 + k) * 3, sp.y + cosf(clock * 17 + k) * 3 }, 2.5f * (1 - t), Fade({ 255, 190, 80, 255 }, 1 - t));
+            }
+        }
+        else if (state == 2) {      // the jet itself, flickering blobs along its tiles
+            int fx[FLAMER_RANGE], fy[FLAMER_RANGE];
+            int n = flameTiles(r, f, fx, fy);
+            float len = n * (float)TILE;
+            for (float s2 = 0; s2 < len; s2 += 7) {
+                float u = s2 / fmaxf(len, 1);
+                float wob = sinf(clock * 25 + s2 * 0.4f) * 3;
+                Vector2 p = Vector2Add(mouth, Vector2Scale(d, s2));
+                p = Vector2Add(p, { -d.y * wob, d.x * wob });
+                float rad = 7 + 7 * u + sinf(clock * 31 + s2) * 1.5f;
+                DrawCircleV(p, rad, Fade({ 230, 70, 20, 255 }, 0.55f * (1 - u * 0.5f)));
+                DrawCircleV(p, rad * 0.6f, Fade({ 255, 170, 50, 255 }, 0.8f * (1 - u * 0.6f)));
+                DrawCircleV(p, rad * 0.25f, Fade({ 255, 240, 180, 255 }, 0.9f * (1 - u)));
+            }
+        }
+    }
 
     if (arena.id) {             // the boss's painted arena, framed by the walls
         Rectangle inner = { (float)TILE, (float)TILE, ROOM_PX_W - 2 * TILE, ROOM_PX_H - 2 * TILE };

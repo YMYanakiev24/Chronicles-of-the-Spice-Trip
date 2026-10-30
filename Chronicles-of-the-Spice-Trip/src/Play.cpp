@@ -17,10 +17,20 @@ static constexpr int ORACLE_COUNT = (int)(sizeof ORACLE_LINES / sizeof ORACLE_LI
 Camera2D Game::camera() const {
     int sw = GetScreenWidth(), sh = GetScreenHeight();
     Camera2D cam{};
-    cam.target = ROOM_CENTER;
     cam.offset = { sw / 2.0f, sh / 2.0f };
-    cam.zoom = fminf(sw / (ROOM_PX_W * 1.12f), sh / (ROOM_PX_H * 1.18f));   // the whole room, centred
+    // Closer than the whole room, so the view travels with the player.
+    cam.zoom = fminf(sw / (ROOM_PX_W * 0.72f), sh / (ROOM_PX_H * 0.78f));
+    // Keep the view inside the room (with a little margin); centre an axis that already fits.
+    float halfW = sw / 2.0f / cam.zoom, halfH = sh / 2.0f / cam.zoom, pad = TILE * 0.5f;
+    cam.target.x = halfW * 2 >= ROOM_PX_W + 2 * pad ? ROOM_CENTER.x : Clamp(camPos.x, halfW - pad, ROOM_PX_W - halfW + pad);
+    cam.target.y = halfH * 2 >= ROOM_PX_H + 2 * pad ? ROOM_CENTER.y : Clamp(camPos.y, halfH - pad, ROOM_PX_H - halfH + pad);
     return cam;
+}
+
+void Game::updateCamera(float dt) {
+    // Snap on room changes and respawns; otherwise glide after the player.
+    if (Vector2Distance(camPos, player.pos) > ROOM_PX_H * 0.6f) camPos = player.pos;
+    else camPos = Vector2Lerp(camPos, player.pos, fminf(1.0f, dt * 6.0f));
 }
 
 Vector2 Game::mouseWorld() const { return GetScreenToWorld2D(in::mouse(), camera()); }
@@ -91,6 +101,10 @@ void Game::updatePlay(float dt) {
     bool spikesUp = fmodf(trapClock, 2.4f) < 1.2f;
     if (spikesUp && !airborne && player.roll <= 0 && player.invuln <= 0 && onSpikes(room, player.pos))
         hurtPlayer(8, 0.6f);
+    if (!airborne && player.roll <= 0 && player.invuln <= 0 && inFlames(room, player.pos, trapClock)) {
+        hurtPlayer(12, 0.7f);
+        burst(parts, player.pos, 8, 70, 0.4f, { 255, 140, 40, 255 });
+    }
 
     // --- the boss key (lies in the middle once its room is safe) ---
     if (room.hasKey && room.cleared && !dungeon.keyFound && Vector2Distance(player.pos, ROOM_CENTER) < 26) {

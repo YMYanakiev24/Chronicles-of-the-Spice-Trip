@@ -128,6 +128,8 @@ struct Game {
     float runTime = 0;
     bool  inFight = false;
     float chestOpenT = 99, shake = 0, gloom = 0, trapClock = 0;
+    Vector2 camPos = { 0, 0 };     // where the follow camera looks (eases after the player)
+    void updateCamera(float dt);
     float banner = 0;
     std::string bannerText, bannerSub;
     std::string dialogue;
