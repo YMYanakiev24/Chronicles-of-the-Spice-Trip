@@ -4,7 +4,9 @@
 #include "Save.h"
 #include <cstring>
 #include <filesystem>
+#include <fstream>
 #include <type_traits>
+#include <vector>
 
 namespace save {
 
@@ -18,20 +20,21 @@ namespace save {
         template <typename T>
         bool writePod(const char* file, const T& value) {
             static_assert(std::is_trivially_copyable_v<T>);
-            return SaveFileData(path(file).c_str(), (void*)&value, (int)sizeof value);
+            std::ofstream out(path(file), std::ios::binary);
+            out.write((const char*)&value, sizeof value);
+            return out.good();
         }
 
         template <typename T>
         bool readPod(const char* file, T& value, unsigned magic) {
             static_assert(std::is_trivially_copyable_v<T>);
-            std::string p = path(file);
-            if (!FileExists(p.c_str())) return false;
-            int size = 0;
-            unsigned char* data = LoadFileData(p.c_str(), &size);
-            if (!data) return false;
-            bool ok = size == (int)sizeof(T) && *(const unsigned*)data == magic;
-            if (ok) memcpy(&value, data, sizeof(T));
-            UnloadFileData(data);
+            std::ifstream in(path(file), std::ios::binary | std::ios::ate);
+            if (!in || (size_t)in.tellg() != sizeof(T)) return false;
+            std::vector<char> data(sizeof(T));
+            in.seekg(0);
+            in.read(data.data(), sizeof(T));
+            bool ok = in.good() && *(const unsigned*)data.data() == magic;
+            if (ok) memcpy((void*)&value, data.data(), sizeof(T));
             return ok;
         }
 

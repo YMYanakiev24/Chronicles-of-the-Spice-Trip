@@ -3,6 +3,7 @@
 // ============================================================================
 #include "Game.h"
 #include "Input.h"
+#include "Touch.h"
 #include "Render.h"
 #include "Ui.h"
 #include <bit>
@@ -106,7 +107,7 @@ void Game::menuScreen() {
     if (ui::button(next(), "Settings")) { play("ui"); screen = Screen::Settings; rebinding = -1; t = 0; return; }
     if (ui::button(next(), "Exit", ui::Style::Danger)) { play("ui"); quit = true; return; }
 
-    ui::textRight("F11 fullscreen", sw - 20.0f, sh - 24.0f, 10, Fade(ui::TEXT, 0.5f));
+    if (!touch::enabled()) ui::textRight("F11 fullscreen", sw - 20.0f, sh - 24.0f, 10, Fade(ui::TEXT, 0.5f));
 }
 
 // ------------------------------------------------------------ champion select
@@ -199,7 +200,8 @@ void Game::settingsScreen() {
     slider(y + 34, "Music", settings.musicVol);
     slider(y + 66, "Effects", settings.sfxVol);
 
-    // --- screen ---
+    // --- screen and keys: the desktop's business ---
+    if (!touch::enabled()) {
     y += 112;
     ui::text("Screen", x, y, 20, ui::ACCENT);
     bool full = isFullscreen();
@@ -227,6 +229,7 @@ void Game::settingsScreen() {
         if (ui::button(box, active ? "press a key" : keyName(*binds[i]), active ? ui::Style::Primary : ui::Style::Normal, active ? 10 : 20)) {
             rebinding = i; play("ui");
         }
+    }
     }
 
     if (ui::button({ panel.x + pw - 190, panel.y + ph - 70, 160, 46 }, "Back", ui::Style::Primary)) { play("ui"); leave(); }

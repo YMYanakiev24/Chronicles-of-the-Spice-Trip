@@ -22,3 +22,11 @@ profile.dat
 
 # Autopilot screenshots and logs
 autopilot/
+
+# Android build output
+android/.gradle/
+android/.kotlin/
+android/build/
+android/app/build/
+android/app/.cxx/
+android/local.properties

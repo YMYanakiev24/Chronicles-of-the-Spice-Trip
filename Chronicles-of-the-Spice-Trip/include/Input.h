@@ -16,6 +16,13 @@ namespace in {
     bool    mousePressed(int button);
     Vector2 mouse();                    // screen position
 
+    // --- on-screen controls (Touch.cpp), rebuilt every frame ---
+    void clearVirtual();
+    void virtualHold(int key, bool on);
+    void virtualTap(int key);
+    void virtualMouse(int button, bool on);
+    void setCaptured(bool on);          // fingers belong to the controls, not the raw mouse
+
     // --- scripted input (autopilot) ---
     void setScripted(bool on);
     bool scripted();

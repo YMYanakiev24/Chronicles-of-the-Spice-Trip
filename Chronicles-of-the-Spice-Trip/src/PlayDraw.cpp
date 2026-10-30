@@ -3,6 +3,7 @@
 // ============================================================================
 #include "Game.h"
 #include "Input.h"
+#include "Touch.h"
 #include "Render.h"
 #include "Ui.h"
 #include <algorithm>
@@ -343,6 +344,7 @@ void Game::drawHud() {
         int cost = player.buzzing(VP_RAZZ) ? 0 : (int)ceilf(SPELLS[i].manaCost * c.manaCostMul);
         bool castable = player.mana >= cost;
         DrawRectangleRec(s, { 16, 14, 24, 230 });
+        touch::zone(s, KEY_ONE + i);
         if (SPR.spellIcons.ok()) drawAnim(SPR.spellIcons, i, { s.x + slot / 2, s.y + slot / 2 - 4 }, 1.1f, false, castable ? WHITE : Color{ 90, 90, 100, 255 });
         else DrawRectangle((int)s.x + 8, (int)s.y + 8, (int)slot - 16, 24, SPELLS[i].color);
         DrawRectangleLinesEx(s, sel ? 3.0f : 1.0f, sel ? ui::ACCENT : ui::EDGE);
@@ -353,6 +355,7 @@ void Game::drawHud() {
     {
         Rectangle s = { hx + 3 * (slot + gap) + 14, hy, slot, slot };
         DrawRectangleRec(s, { 30, 20, 40, 235 });
+        touch::zone(s, settings.keys.special);
         if (champTex[player.champion].id) {
             Texture2D tx = champTex[player.champion];
             ui::drawContain(tx, { c.crop.x * tx.width, c.crop.y * tx.height, c.crop.width * tx.width, c.crop.height * tx.height },
@@ -397,7 +400,7 @@ void Game::drawHud() {
     }
 
     // --- a reminder of the controls, in the first room only ---
-    if (r.isStart && mode == Mode::Run && floor == 1)
+    if (r.isStart && mode == Mode::Run && floor == 1 && !touch::enabled())
         ui::textCentered(TextFormat("WASD move   LMB blade   RMB/Enter cast   1-3 power   %s special   %s roll   %s interact   Esc pause",
             keyName(settings.keys.special), keyName(settings.keys.roll), E), sw / 2.0f, sh - 18.0f, 10, Fade(ui::MUTED, 0.9f));
 }

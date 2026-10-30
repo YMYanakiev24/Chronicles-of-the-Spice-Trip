@@ -3,6 +3,7 @@
 //  back to), sprite-sheet enemies and projectiles.
 // ============================================================================
 #include "Render.h"
+#include "Platform.h"
 #include "Common.h"
 #include "Sprites.h"
 #include <cmath>
@@ -155,6 +156,9 @@ void drawProjectile(const Projectile& p, float t) {
 }
 
 std::string findAsset(const char* file) {
+#ifdef PLATFORM_ANDROID
+    return platform::assetExists(file) ? file : "";     // packed at the root of the APK's assets
+#endif
     // Images live in the project's assets/ folder. Try several relative depths
     // so it works whether the cwd is the project dir (VS) or the build folder (exe).
     const char* roots[] = { "assets/", "../assets/", "../../assets/",
