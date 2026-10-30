@@ -134,6 +134,12 @@ void Game::updatePlay(float dt) {
     fight.update(dt, player.pos, enemies, enemyShots, room, slow);
     updateEnemies(dt, slow);
     updateEnemyShots(dt, slow);
+    // Triceps: her gravity wells drag you in, and blasts, live wires and the staff hurt
+    Vector2 pull = fight.gravityPull(player.pos);
+    if ((pull.x || pull.y) && !airborne)
+        player.pos = moveInRoom(player.pos, Vector2Scale(pull, dt * slow), PLAYER_R, room, room.cleared);
+    if (player.invuln <= 0 && !airborne)
+        if (int dmg = fight.hazardHit(player.pos, PLAYER_R)) { hurtPlayer((float)dmg, 0.5f); shake = fmaxf(shake, 0.25f); }
     if (fight.busHits(player.pos, PLAYER_R) && player.invuln <= 0 && !airborne) {
         fight.bus.hit = true;
         hurtPlayer((float)fight.busDamage(), 0.8f);
@@ -545,6 +551,7 @@ void Game::updateEnemyShots(float dt, float slow) {
     Room& room = dungeon.cur();
     for (auto& p : enemyShots) {
         if (!p.alive) continue;
+        if (p.curve != 0) p.vel = Vector2Rotate(p.vel, p.curve * dt * slow);    // Triceps' boots in their field
         p.pos = Vector2Add(p.pos, Vector2Scale(p.vel, dt * slow));
         p.life -= dt * slow;
         if (p.life <= 0 || roomWallSolid(room, (int)floorf(p.pos.x / TILE), (int)floorf(p.pos.y / TILE), false)) {

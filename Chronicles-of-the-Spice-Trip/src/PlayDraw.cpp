@@ -208,13 +208,14 @@ void Game::drawActors() {
         if (e.bossForm >= 0) drawBossBody(e, currentBossIndex(), bossArt);
         else drawEnemy(e);
     };
+    drawLabFloor(fight, clock);             // Triceps' wells, wires and the staff's reach lie on the floor
     for (auto& c : corpses) drawBody(c);
     for (auto& e : enemies) drawBody(e);
     for (auto& e : enemies) {               // a fearful face bobs over everyone Momiche scared
         if (e.dying) continue;
         if (e.bossForm >= 0) {
-            float top = e.pos.y - e.r * 0.4f, radius = e.r * 1.3f;    // where drawBossBody puts the token
-            drawFear(e.pos.x, top - radius - 16, top + radius + 16, 26);
+            float top = bossTop(e, currentBossIndex(), bossArt);         // over the head of the token or figure
+            drawFear(e.pos.x, top - 16, e.pos.y + e.r * 0.9f + 16, 26);
         }
         else drawFear(e.pos.x, e.pos.y - e.r * 2 - 14, e.pos.y + e.r + 10, 16);
     }
@@ -246,6 +247,7 @@ void Game::drawActors() {
     for (auto& p : shots) drawProjectile(p, clock);
     for (auto& p : enemyShots) drawProjectile(p, clock);
     drawBus(fight.bus, clock);
+    drawLabAir(fight, clock);
 
     for (auto& pt : parts) {
         Color c = pt.color; c.a = (unsigned char)(255 * (pt.life / pt.maxLife));
@@ -542,7 +544,7 @@ void Game::drawRunComplete() {
     ui::textWrapped("Pyraketh, the Cinder-Maw, lies still. Every boss of the Path has fallen to you.",
         p.x + 28, p.y + 80, pw - 56, 20, ui::TEXT);
     float y = p.y + 150;
-    for (int i = 0; i < BOSS_COUNT; ++i) {      // the five fallen bosses
+    for (int i = 0; i < BOSS_COUNT; ++i) {      // the six fallen bosses
         float slot = (pw - 56) / BOSS_COUNT;
         drawBossToken(i, bossArt, { p.x + 28 + i * slot + slot / 2, y + 50 }, 44);
     }
@@ -560,7 +562,7 @@ void Game::drawRushOver() {
     Rectangle p = { (sw - pw) / 2, (sh - ph) / 2, pw, ph };
     ui::titledPanel(p, rushWon ? "Boss Rush conquered" : "Defeated");
     if (rushWon) {
-        ui::text(TextFormat("All five bosses in %s", ui::clock(rushTime)), p.x + 28, p.y + 90, 30, ui::TEXT);
+        ui::text(TextFormat("All six bosses in %s", ui::clock(rushTime)), p.x + 28, p.y + 90, 30, ui::TEXT);
         ui::text(rushRecord ? "A new record!" : TextFormat("Best: %s", ui::clock(profile.bestRush)), p.x + 28, p.y + 140, 20,
             rushRecord ? ui::ACCENT : ui::MUTED);
     }

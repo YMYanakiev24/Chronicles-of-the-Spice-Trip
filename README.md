@@ -3,7 +3,8 @@
 A dark pixel-art dungeon crawler written in C++ with [raylib](https://www.raylib.com/).
 Pick a champion, fight down through randomly built floors of the Mistwood
 Depths, and beat the boss at the bottom of each one: the four bosses from the
-Path in their painted arenas, then Pyraketh, the Cinder-Maw.
+Path in their painted arenas, Triceps in her cave, then Pyraketh, the
+Cinder-Maw.
 
 ## Building and running
 
@@ -56,7 +57,7 @@ Movement, run, roll, interact and the special can be rebound in **Settings**.
   Bear Jump, Coin Barrage, Release the Koi, Blink and Scare. Each one walks as
   their own figure, seen from the front, the back and both sides, and the
   champion select shows every champion from all four sides.
-- **Boss Rush.** All five bosses back to back at level 5, timed. The best time
+- **Boss Rush.** All six bosses back to back at level 5, timed. The best time
   is kept.
 - **Saves.** Save from the pause menu and **Continue** from the main menu.
   Records (deepest floor, bosses beaten, best Boss Rush) and settings are kept
@@ -73,11 +74,32 @@ to (x1.6 damage).
 | 2 | The Bad Plasmodium | The same, with 5-shot spreads and copies that fire 3 |
 | 3 | Mordekai | Fans of 7 feathers, and a dive at you every third volley |
 | 4 | Vlado | Spirals of 12 tickets, and a whistle that sends bus No.9 down your lane |
-| 5 | Pyraketh, the Cinder-Maw | Chases you, breathes rings of embers, and throws fireballs once wounded |
+| 5 | Triceps | Walks her cave like a champion; gravity grenades, magnetic boots, the fulcrum staff and the circuit chain (see below) |
+| 6 | Pyraketh, the Cinder-Maw | Chases you, breathes rings of embers, and throws fireballs once wounded |
 
-Beating floor 5 completes the Spice Trip. You can keep descending; every cycle
+Beating floor 6 completes the Spice Trip. You can keep descending; every cycle
 the bosses get 50% stronger. The numbers for each boss are at the top of
 `src/Bosses.cpp`.
+
+### Triceps
+
+Triceps fights in Triceps' Cave (`assets/arenas/triceps.png`). She walks
+like the champions: a figure seen from every side, facing the way she goes
+(`assets/walk/walk-triceps.png`). When she attacks she strikes the pose from her
+character sheet (`assets/walk/triceps-poses.png`), and the formula behind the
+attack rises over her. Her four attacks take turns, with a short walk between
+them:
+
+| Attack | What it does | The physics |
+| --- | --- | --- |
+| Gravity Grenade Toss | A grenade flies a parabola onto where you stand. It opens a well that pulls you in for 2 s, then goes off | y = x tan(a) - gx^2 / 2(v cos a)^2, F = ma |
+| Magnetic Boot Kick | Three boots: one straight at you, two curving in from the sides | F = q(E + v x B): each boot turns at a steady rate |
+| Fulcrum Staff Swing | She comes at you, winds up (the reach shows red), swings round, and the far end bats three iron balls at you. The tip hits hardest | T = r x F, F1 d1 = F2 d2 |
+| Electrical Circuit Chain | Capacitor nodes charge for a second, then every wire between them is live. The first wire runs through where you stood | I = V / R |
+
+Below half health she walks less, throws two grenades and kicks five boots, and
+her circuit has five nodes. She is weak to Water. Momiche's scare sends her
+running, but a grenade or circuit she has already started keeps going.
 
 ### Momiche, Gakev and the walking figures
 
@@ -105,7 +127,7 @@ Chronicles-of-the-Spice-Trip/
     src/Play.cpp        movement, combat, champions, enemies, loot
     src/PlayDraw.cpp    the room, actors, HUD and overlays
     src/Screens.cpp     menu, champion select, settings, intro
-  src/Bosses.cpp      the five bosses: table, attack patterns, drawing
+  src/Bosses.cpp      the six bosses: table, attack patterns, drawing
   src/Champions.cpp   the champion roster (art, walking figures, perks and specials)
   src/Rooms.cpp       floor generation, room layouts, collision, pathfinding
   src/Render.cpp      the champions' figures, monsters and projectiles
@@ -115,18 +137,19 @@ Chronicles-of-the-Spice-Trip/
   src/Input.cpp       keyboard and mouse (real or scripted)
   src/Save.cpp        savegame.dat, profile.dat, settings.dat
   src/Autopilot.cpp   the automated play-through (see below)
-  assets/             art; assets/arenas/ holds the four painted boss arenas,
-                      assets/walk/ the champions' walk sheets
+  assets/             art; assets/arenas/ holds the bosses' painted arenas,
+                      assets/walk/ the champions' and Triceps' walk sheets
   vendor/raylib/      raylib headers and library
 ```
 
 ## Automated play-through
 
 `--autopilot <folder>` plays the whole game with scripted input. It clicks
-through the menus, fights a room, opens a chest, shops, beats all five bosses,
+through the menus, fights a room, opens a chest, shops, beats all six bosses
+(and checks each of Triceps' attacks),
 completes a run, saves and continues, wins a Boss Rush, and tries every
 champion's special, Momiche's scare on a boss, Gakev's coins and casting with
-Enter. It writes a PASS/FAIL line for each check (69) to
+Enter. It writes a PASS/FAIL line for each check (81) to
 `<folder>/autopilot.log`, saves screenshots next to it, and exits with the
 number of failures:
 

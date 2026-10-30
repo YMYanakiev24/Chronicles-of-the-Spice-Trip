@@ -30,6 +30,8 @@ enum class ShotKind : unsigned char {
     Feather,    // Mordekai's fan
     Ticket,     // Vlado's spiralling tickets
     Ember,      // the Cinder-Maw's fire
+    Boot,       // Triceps' magnetic boots, curving in their field
+    Ball,       // the iron balls her staff bats at you
 };
 
 struct Projectile {
@@ -41,6 +43,7 @@ struct Projectile {
     bool     alive = true;
     ShotKind kind = ShotKind::Spell;
     float    homing = 0;          // turn rate toward the nearest target (rad/s)
+    float    curve = 0;           // magnetic boots: the velocity turns this fast (rad/s), F = q(v x B)
 };
 
 struct Enemy {
@@ -73,6 +76,8 @@ struct Enemy {
     float   diveT = 0;                 // Mordekai's dive
     Vector2 diveDir{};
     bool    chaser = false;            // tiny copies just chase
+    Vector2 look{ 0, 1 };              // Triceps: the way she faces as she walks
+    int     pose = -1;                 // Triceps: the attack pose she strikes (-1: walking)
 };
 
 struct Particle { Vector2 pos, vel; float life, maxLife, size; Color color; };
