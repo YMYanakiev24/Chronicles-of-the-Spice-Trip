@@ -321,7 +321,7 @@ void Autopilot::build() {
         return true;
     });
 
-    // ===== the five floor bosses =====
+    // ===== the six floor bosses =====
     auto enterBoss = [this, add](int index) {
         add(TextFormat("boss %d", index + 1), 4, [this, index](Game& g, float t) {
             if (t < 0.3f) return false;
@@ -454,18 +454,83 @@ void Autopilot::build() {
     });
     slayAndDescend(3, nullptr);
 
-    // floor 5: the Cinder-Maw
+    // floor 5: Triceps in her cave. Her four attacks take turns, so they're checked in order.
     enterBoss(4);
+    add("triceps walks", 5, [this](Game& g, float t) {
+        Enemy* b = boss(g);
+        if (!b) return false;
+        if (t == 0) { markX = b->pos.x; markY = b->pos.y; }
+        if (!b->moving || Vector2Distance(b->pos, { markX, markY }) < 20) return false;
+        const WalkSheet& w = g.bossArt.walk[4];
+        check("her cave arena is loaded", g.bossArt.arena[4].id != 0);
+        check("Triceps walks as her own figure (five frames a side) with her attack poses",
+            w.ok() && w.frames == 5 && g.bossArt.poses[4].id != 0);
+        shot(g, "boss-triceps");
+        return true;
+    });
+    add("gravity grenade", 8, [this](Game& g, float) {
+        Grenade& gr = g.fight.grenades[0];
+        if (!gr.active || gr.well <= 0) return false;
+        Vector2 pull = g.fight.gravityPull({ gr.to.x + 60, gr.to.y });   // a step to the right of the middle
+        check("a gravity grenade lands on you and its well pulls you in", pull.x < -30 && fabsf(pull.y) < 1);
+        shot(g, "triceps-well");
+        return true;
+    });
+    add("blast", 4, [this](Game& g, float) {
+        Grenade& gr = g.fight.grenades[0];
+        g.player.pos = gr.to; g.player.invuln = 0;      // stay in the middle for the blast
+        if (!gr.hit) return false;
+        check("the well goes off under you", true);
+        return true;
+    });
+    add("magnetic boots", 8, [this](Game& g, float) {
+        int boots = 0, curving = 0;
+        for (auto& p : g.enemyShots) if (p.kind == ShotKind::Boot) { boots++; curving += p.curve != 0; }
+        if (boots < 3) return false;
+        check("she kicks three magnetic boots, two curving in from the sides", boots == 3 && curving == 2);
+        shot(g, "triceps-boots");
+        return true;
+    });
+    add("fulcrum staff", 9, [this](Game& g, float) {
+        if (!g.fight.staff.swinging) return false;
+        check("she comes at you and swings the fulcrum staff", true);
+        shot(g, "triceps-staff");
+        return true;
+    });
+    add("iron balls", 3, [this](Game& g, float) {
+        if (countShots(g, ShotKind::Ball) < 3) return false;
+        check("the staff's far end bats three iron balls", true);
+        return true;
+    });
+    add("circuit chain", 9, [this](Game& g, float) {
+        const Circuit& c = g.fight.circuit;
+        if (!c.active || c.charge > 0) return false;
+        check("her circuit chain charges, then goes live across four nodes", c.count == 4);
+        shot(g, "triceps-circuit");
+        return true;
+    });
+    add("shock", 3, [this](Game& g, float) {
+        const Circuit& c = g.fight.circuit;
+        if (!c.active) return false;
+        g.player.pos = Vector2Lerp(c.node[0], c.node[1], 0.5f); g.player.invuln = 0;   // onto the first wire
+        if (c.shockCd <= 0) return false;
+        check("a live wire shocks you", true);
+        return true;
+    });
+    slayAndDescend(4, nullptr);
+
+    // floor 6: the Cinder-Maw
+    enterBoss(5);
     add("embers", 6, [this](Game& g, float) {
         if (countShots(g, ShotKind::Ember) < 10) return false;
         check("the Cinder-Maw breathes a ring of embers", true);
         shot(g, "boss-cinder-maw");
         return true;
     });
-    slayAndDescend(4, nullptr);
+    slayAndDescend(5, nullptr);
     add("run complete", 4, [this](Game& g, float t) {
         if (t < 0.6f) return false;
-        check("beating floor 5 completes the Spice Trip", g.overlay == Overlay::RunComplete && g.profile.runsCompleted == 1);
+        check("beating floor 6 completes the Spice Trip", g.overlay == Overlay::RunComplete && g.profile.runsCompleted == 1);
         check("every boss is marked as beaten", g.profile.bossesBeaten == (1u << BOSS_COUNT) - 1);
         shot(g, "run-complete");
         return true;
@@ -473,7 +538,7 @@ void Autopilot::build() {
     add("descend deeper", 3, [](Game&, float t) { return t > 0.1f && clickLabel("Descend deeper"); });
     add("deeper", 4, [this](Game& g, float t) {
         if (t < 0.4f) return false;
-        check("floor 6 starts the cycle again, stronger", g.floor == 6 && g.overlay == Overlay::None
+        check("floor 7 starts the cycle again, stronger", g.floor == 7 && g.overlay == Overlay::None
             && g.currentBossIndex() == 0 && g.currentStrength() > 1.4f);
         keepAlive = false;
         return true;
@@ -499,7 +564,7 @@ void Autopilot::build() {
     });
     add("continued", 3, [this](Game& g, float t) {
         if (t < 0.4f) return false;
-        check("Continue resumes on floor 6", g.screen == Screen::Play && g.floor == 6);
+        check("Continue resumes on floor 7", g.screen == Screen::Play && g.floor == 7);
         g.toMenu();
         return true;
     });
@@ -523,7 +588,7 @@ void Autopilot::build() {
     });
     add("rush won", 3, [this](Game& g, float t) {
         if (t < 0.4f) return false;
-        check("all five bosses back to back wins the Boss Rush", g.rushWon && g.profile.bestRush > 0);
+        check("all six bosses back to back wins the Boss Rush", g.rushWon && g.profile.bestRush > 0);
         shot(g, "rush-won");
         keepAlive = false;
         return true;

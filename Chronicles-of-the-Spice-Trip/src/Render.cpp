@@ -151,6 +151,24 @@ void drawProjectile(const Projectile& p, float t) {
         DrawCircleV(p.pos, p.r, { 255, 150, 60, 255 });
         DrawCircleV(p.pos, p.r * 0.5f, { 255, 236, 180, 255 });
         break;
+    case ShotKind::Boot: {      // a steel boot, its field lines streaming behind
+        Vector2 d = fromAngle(ang), side = { -d.y, d.x };
+        for (int i = -1; i <= 1; ++i)
+            DrawLineEx(Vector2Add(Vector2Subtract(p.pos, Vector2Scale(d, 8)), Vector2Scale(side, i * 4.0f)),
+                Vector2Add(Vector2Subtract(p.pos, Vector2Scale(d, 20)), Vector2Scale(side, i * 8.0f)), 1.5f, Fade({ 120, 200, 255, 255 }, 0.6f));
+        DrawRectanglePro({ p.pos.x, p.pos.y, 14, 9 }, { 7, 4.5f }, ang * RAD2DEG, { 176, 186, 202, 255 });
+        DrawCircleV(Vector2Add(p.pos, Vector2Add(Vector2Scale(d, 6), Vector2Scale(side, 2))), 4.5f, { 150, 160, 178, 255 });
+        DrawLineEx(Vector2Add(Vector2Subtract(p.pos, Vector2Scale(d, 7)), Vector2Scale(side, 5)),
+            Vector2Add(Vector2Add(p.pos, Vector2Scale(d, 9)), Vector2Scale(side, 5)), 2.5f, { 54, 58, 70, 255 });   // the sole
+        break;
+    }
+    case ShotKind::Ball: {      // an iron ball off the end of her staff
+        Vector2 d = fromAngle(ang);
+        DrawLineEx(Vector2Subtract(p.pos, Vector2Scale(d, 18)), p.pos, 3, Fade(WHITE, 0.3f));
+        DrawCircleV(p.pos, p.r, { 70, 74, 88, 255 });
+        DrawCircleV({ p.pos.x - p.r * 0.35f, p.pos.y - p.r * 0.35f }, p.r * 0.35f, { 196, 202, 216, 255 });
+        break;
+    }
     }
 }
 
