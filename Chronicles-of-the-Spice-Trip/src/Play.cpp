@@ -25,8 +25,23 @@ Camera2D Game::camera() const {
 
 Vector2 Game::mouseWorld() const { return GetScreenToWorld2D(in::mouse(), camera()); }
 
-float Game::hurtMul() const {
-    return (player.has(SK_IRON_SKIN) ? 0.75f : 1.0f) * (player.buzzing(VP_MINT) ? 0.5f : 1.0f);
+float Game::hurtMul() const { return player.has(VP_MINT) ? 0.85f : 1.0f; }
+
+int Game::spellCost(int spell) const {
+    return (int)ceilf(SPELLS[spell].manaCost * champ().manaCostMul * (player.has(VP_RAZZ) ? 0.8f : 1.0f));
+}
+
+int Game::bladeDamage() const {
+    return 10 + player.level * 2 + WEAPONS[player.weapon].damage + player.upgrades[player.weapon][UP_SHARPEN] * 3
+        + (player.has(VP_MELON) ? 4 : 0) + champ().bladeBonus;
+}
+
+float Game::swingTime() const {
+    return WEAPONS[player.weapon].swing * (1 - 0.08f * player.upgrades[player.weapon][UP_BALANCE]);
+}
+
+float Game::bladeReach() const {
+    return WEAPONS[player.weapon].reach + 4.0f * player.upgrades[player.weapon][UP_EXTEND];
 }
 
 static void burst(std::vector<Particle>& parts, Vector2 at, int n, float speed, float life, Color c) {
@@ -36,6 +51,9 @@ static void burst(std::vector<Particle>& parts, Vector2 at, int n, float speed, 
 
 // ------------------------------------------------------------------ the frame
 void Game::updatePlay(float dt) {
+    if (hitStop > 0) { hitStop -= dt; dt = 0; }       // a solid hit: everything holds its breath
+    finaleT = fmaxf(0, finaleT - dt);
+    if (slowMo > 0) { slowMo -= dt; dt *= 0.3f; }     // a boss's last moments
     Room& room = dungeon.cur();
     const ChampionDef& c = champ();
     Keybinds& K = settings.keys;
@@ -51,15 +69,12 @@ void Game::updatePlay(float dt) {
         *timer = fmaxf(0, *timer - dt);
     player.meleeAnim = fmaxf(0, player.meleeAnim - dt * 4);
     scareT = fmaxf(0, scareT - dt);
-    player.mana = fminf(player.maxMana, player.mana + (player.has(SK_ARCANE) ? 14.4f : 9.0f) * dt);
+    player.mana = fminf(player.maxMana, player.mana + 9.0f * dt);
     if (c.kind == Special::Blink) player.charge = fminf(DUST_MAX, player.charge + DUST_REGEN * dt);
-    for (int v = 0; v < VP_COUNT; ++v) {
-        if (!player.buzzing((Vape)v)) continue;
-        player.vapeT[v] = fmaxf(0, player.vapeT[v] - dt);
-        if (frand(0, 1) < dt * 5)   // a lazy cloud drifting up off the player
+    for (int v = 0; v < VP_COUNT; ++v)
+        if (player.has((Vape)v) && frand(0, 1) < dt * 0.5f)   // the odd lazy puff drifting up off the player
             parts.push_back({ { player.pos.x + frand(-6, 6), player.pos.y - 18 }, { frand(-12, 12), frand(-40, -20) },
                 1.0f, 1.0f, frand(2, 4), VAPE_COLOR[v] });
-    }
     trapClock += dt;
 
     // --- hotbar ---
@@ -79,11 +94,13 @@ void Game::updatePlay(float dt) {
     Vector2 aim = Vector2Subtract(mouseWorld(), player.pos);
     if (Vector2Length(aim) > 1) player.facing = Vector2Normalize(aim);
     if (!talking && in::pressed(K.roll) && player.rollCd <= 0 && (mv.x || mv.y)) {
-        player.roll = 0.28f; player.rollCd = player.has(SK_DASH) ? 0.35f : 0.7f;
+        player.roll = 0.28f; player.rollCd = 0.7f;
         player.invuln = fmaxf(player.invuln, 0.3f); player.rollDir = mv;
     }
     if (!talking && in::pressed(K.special)) useSpecial(mv);
     movePlayer(dt, mv);
+    Vector2 offRock = fight.rockPush(player.pos, PLAYER_R);
+    if (offRock.x || offRock.y) player.pos = moveInRoom(player.pos, offRock, PLAYER_R, room, room.cleared);
     if (c.stillRegen > 0 && !(mv.x || mv.y) && player.hp < player.maxHp)
         player.hp = fminf(player.maxHp, player.hp + c.stillRegen * dt);
 
@@ -103,16 +120,14 @@ void Game::updatePlay(float dt) {
     Vector2 chestPos = { room.chestTx * (float)TILE + 16, room.chestTy * (float)TILE + 16 };
     bool nearChest = room.hasChest && !room.chestOpened && room.cleared && Vector2Distance(player.pos, chestPos) < 40;
     if (nearChest && !talking && in::pressed(K.interact)) {
-        room.chestOpened = true; play("pickup"); chestOpenT = 0;
-        bool mana = GetRandomValue(0, 1) == 0;
-        popups.push_back({ mana ? &SPR.flaskBlue : &SPR.flaskRed, { chestPos.x, chestPos.y - 14 }, 0 });
-        if (mana) { player.maxMana += 10; player.mana = fminf(player.maxMana, player.mana + 10); showBanner("Chest: +10 max mana", "", 1.6f); }
-        else { player.hp = fminf(player.maxHp, player.hp + 10); showBanner("Chest: +10 health", "", 1.6f); }
-        for (int k = 0; k < 4; ++k) coins.push_back({ chestPos, { frand(-90, 90), frand(-140, -40) }, 0 });
-        burst(parts, chestPos, 12, 80, 0.6f, { 245, 215, 120, 255 });
+        room.chestOpened = true; play("rattle"); chestOpenT = 0;     // it shakes, then slamChest throws it open
+        chestMana = GetRandomValue(0, 1) == 0;
+        chestPack = GetRandomValue(1, 100) <= CHEST_PACK_PERCENT;
+        if (chestMana) { player.maxMana += 10; player.mana = fminf(player.maxMana, player.mana + 10); }
+        else player.hp = fminf(player.maxHp, player.hp + 10);
     }
 
-    // --- the oracle (start room) and Marin (shop room) ---
+    // --- the oracle (start room) and the merchant (shop room) ---
     bool nearOracle = room.isStart && mode == Mode::Run && Vector2Distance(player.pos, ORACLE_POS) < 48;
     if (nearOracle && in::pressed(K.interact)) {
         play("ui");
@@ -122,16 +137,34 @@ void Game::updatePlay(float dt) {
     }
     if (!nearOracle) dialogue.clear();
     bool nearMerchant = room.isShop && Vector2Distance(player.pos, MERCHANT_POS) < 56;
-    if (nearMerchant && !talking && in::pressed(K.interact)) { overlay = Overlay::Shop; play("ui"); }
+    if (nearMerchant && !talking && in::pressed(K.interact)) { overlay = room.isGalin ? Overlay::Galin : Overlay::Shop; play("ui"); }
 
     // --- attacks ---
     bool castKey = in::mousePressed(MOUSE_BUTTON_RIGHT) || in::down(KEY_ENTER) || in::down(KEY_KP_ENTER);   // hold Enter to keep casting
     if (!talking && castKey) castSpell();
     if (!talking && in::mousePressed(MOUSE_BUTTON_LEFT)) swingBlade();
+    if (castT > 0) {                               // motes drawn in to the hand, then away it goes
+        Vector2 hand = castHand();
+        const SpellDef& s = SPELLS[castingSpell];
+        if (frand(0, 1) < dt * 70) {
+            Vector2 from = Vector2Add(hand, Vector2Scale(fromAngle(frand(0, 2 * PI)), frand(16, 30)));
+            parts.push_back({ from, Vector2Scale(Vector2Subtract(hand, from), 5), 0.2f, 0.2f, frand(1.2f, 2.4f), s.glow, 0, true });
+        }
+        castT -= dt;
+        if (castT <= 0) releaseSpell(castingSpell);
+    }
 
     updateShots(dt);
     fight.scared = scareT > 0;
     fight.update(dt, player.pos, enemies, enemyShots, room, slow);
+    if (fight.quake > 0) { shake = fmaxf(shake, fight.quake); fight.quake = 0; }
+    if (fight.headline) { showBanner(fight.headline, fight.subline, 1.8f); fight.headline = nullptr; }
+    if (fight.arenaBroke) {                        // stone flying up out of the floor
+        fight.arenaBroke = false;
+        for (int k = 0; k < 50; ++k)
+            parts.push_back({ { frand(TILE * 2.0f, ROOM_PX_W - TILE * 2.0f), frand(TILE * 2.0f, ROOM_PX_H - TILE * 2.0f) }, { frand(-60, 60), frand(-240, -80) },
+                0.9f, 0.9f, frand(1.5f, 4), k % 2 ? Color{ 96, 88, 106, 255 } : fight.def->color, 420, true });
+    }
     updateEnemies(dt, slow);
     updateEnemyShots(dt, slow);
     // Triceps: her gravity wells drag you in, and blasts, live wires and the staff hurt
@@ -155,17 +188,18 @@ void Game::updatePlay(float dt) {
     updateLoot(dt);
 
     // --- room cleared? open the doors ---
-    if (inFight && enemies.empty()) {
+    if (inFight && enemies.empty() && finaleT <= 0) {
         room.cleared = true; inFight = false;
         if (room.isBoss) bossDefeated();
         else { showBanner("Room cleared", "", 1.4f); play("quest"); }
     }
+    if (rewardT > 0 && (rewardT -= dt) <= 0) overlay = rewardOverlay;
     if (overlay != Overlay::None) return;
 
     // --- leave through an open door, or take the stairs down ---
     checkRoomExits();
     bool lootTaken = coins.empty() && corpses.empty();
-    if (mode == Mode::Run && room.isBoss && room.cleared && lootTaken && Vector2Distance(player.pos, ROOM_CENTER) < 18) {
+    if (mode == Mode::Run && room.isBoss && room.cleared && lootTaken && rewardT <= 0 && Vector2Distance(player.pos, ROOM_CENTER) < 18) {
         descend();
         return;
     }
@@ -223,8 +257,7 @@ void Game::movePlayer(float dt, Vector2 mv) {
     }
     else {
         float speed = (in::down(settings.keys.run) ? RUN : WALK) * c.speedMul
-            * (player.has(SK_SWIFT) ? 1.15f : 1.0f) * (player.buzzing(VP_MANGO) ? 1.35f : 1.0f)
-            * (player.jumpT > 0 ? 1.5f : 1.0f);
+            * (player.has(VP_MANGO) ? 1.1f : 1.0f) * (player.jumpT > 0 ? 1.5f : 1.0f);
         delta = Vector2Scale(mv, speed * dt);
     }
     player.pos = moveInRoom(player.pos, delta, PLAYER_R, room, doorsOpen);
@@ -327,44 +360,85 @@ void Game::useSpecial(Vector2 mv) {
 // ------------------------------------------------------------------- attacks
 void Game::castSpell() {
     const ChampionDef& c = champ();
-    if (player.castCd > 0) return;
+    if (player.castCd > 0 || castT > 0) return;
     const SpellDef& s = SPELLS[player.selected];
-    int cost = player.buzzing(VP_RAZZ) ? 0 : (int)ceilf(s.manaCost * c.manaCostMul);
+    int cost = spellCost(player.selected);
     if (player.mana < cost) return;
     player.mana -= cost;
-    player.castCd = 0.28f * c.castCdMul;
-    play(s.sfx);
+    player.castCd = fmaxf(0.28f * c.castCdMul, s.charge + 0.04f);
+    if (s.charge > 0) {
+        castingSpell = player.selected; castT = s.charge;
+        play(castingSpell == SP_FIRE ? "charge" : "chill");
+    }
+    else releaseSpell(player.selected);
+}
+
+Vector2 Game::aimDir() const {
     Vector2 dir = Vector2Normalize(Vector2Subtract(mouseWorld(), player.pos));
-    if (Vector2Length(dir) < 0.01f) dir = player.facing;
+    return Vector2Length(dir) < 0.01f ? player.facing : dir;
+}
+
+Vector2 Game::castHand() const {
+    Vector2 d = aimDir();
+    return { player.pos.x + d.x * 18, player.pos.y - 6 + d.y * 18 };
+}
+
+void Game::releaseSpell(int spell) {
+    const ChampionDef& c = champ();
+    const SpellDef& s = SPELLS[spell];
+    play(s.sfx);
+    Vector2 dir = aimDir();
     if (player.wobbleT > 0) dir = fromAngle(atan2f(dir.y, dir.x) + frand(-0.35f, 0.35f));   // Ristyo's drink
     Projectile p;
     p.pos = Vector2Add(player.pos, Vector2Scale(dir, 14));
     p.vel = Vector2Scale(dir, s.speed);
     p.damage = s.damage; p.color = s.color; p.glow = s.glow; p.school = s.school;
-    p.life = 1.4f; p.r = player.selected == 2 ? 4.0f : 6.0f;
+    p.life = 1.4f; p.r = spell == SP_BOLT ? 4.0f : 6.0f;
     p.homing = c.spellHoming;
+    p.spell = spell; p.trail = ++iceTrails;
+    if (spell == SP_BOLT) {
+        p.lastJag = p.pos; p.nextSpike = BOLT_JAG;
+        flashes.push_back({ p.pos, 0, 0.1f, 18, frand(0, PI), { 210, 230, 255, 255 }, false });
+    }
     shots.push_back(p);
 }
 
 void Game::swingBlade() {
     if (player.meleeCd > 0) return;
-    player.meleeCd = 0.4f; player.meleeAnim = 1.0f;
-    int damage = 10 + player.level * 2 + (player.has(SK_BLADE) ? 8 : 0) + (player.buzzing(VP_MELON) ? 12 : 0) + champ().bladeBonus;
+    player.meleeCd = swingTime(); player.meleeAnim = 1.0f;
+    play("slash");
+    const WeaponDef& w = WEAPONS[player.weapon];
+    int damage = bladeDamage();
+    float reach = bladeReach();
     bool hitAny = false;
     for (auto& e : enemies) {
         if (!e.alive) continue;
         Vector2 to = Vector2Subtract(e.pos, player.pos);
         float d = Vector2Length(to);
-        if (d >= 40 + e.r || Vector2DotProduct(Vector2Normalize(to), player.facing) <= 0.3f) continue;
+        if (d >= reach + e.r || Vector2DotProduct(Vector2Normalize(to), player.facing) <= 0.3f) continue;
         hitEnemy(e, damage, { 234, 255, 255, 255 });
-        if (player.has(SK_LEECH)) player.hp = fminf(player.maxHp, player.hp + 2);
         hitAny = true;
+        Vector2 dir = Vector2Normalize(to);
+        float ang = atan2f(dir.y, dir.x);
+        if (e.bossForm < 0) e.knock = Vector2Scale(dir, w.knockback * KNOCK_DECAY);   // bosses stand their ground
+        Vector2 at = Vector2Subtract(e.pos, Vector2Scale(dir, e.r * 0.6f));
+        flashes.push_back({ at, 0, 0.14f, 28, ang + 0.6f, WHITE, false });
+        for (int k = 0; k < 9; ++k)                // sparks thrown on through the target
+            parts.push_back({ at, Vector2Scale(fromAngle(ang + frand(-0.7f, 0.7f)), frand(110, 280)), 0.28f, 0.28f,
+                frand(1.2f, 2.6f), k % 3 ? Color{ 255, 244, 200, 255 } : Color{ 255, 190, 90, 255 }, 0, true });
     }
-    if (hitAny) play("hit");
+    if (hitAny) { play(w.sfx); shake = fmaxf(shake, 0.14f); hitStop = HIT_FREEZE; }
 }
 
 void Game::hitEnemy(Enemy& e, int damage, Color fx) {
-    e.hp -= damage; e.hitFlash = 0.12f;
+    bool boss = e.bossForm == 0 && fight.active();
+    if (boss && fight.shielded()) { burst(parts, e.pos, 3, 50, 0.25f, { 210, 210, 220, 255 }); return; }   // roaring: nothing gets through
+    if (!boss || !fight.strikeCore(damage)) {
+        float before = e.hp;
+        e.hp -= damage;
+        if (boss && before > fight.gate(e)) e.hp = fmaxf(e.hp, fight.gate(e));    // every stage gets its turn
+    }
+    e.hitFlash = 0.12f;
     floaters.push_back({ { e.pos.x + frand(-6, 6), e.pos.y - e.r - 8 }, 0, damage, fx });
     burst(parts, e.pos, 5, 60, 0.4f, fx);
     if (champ().kind == Special::CoinBarrage)
@@ -373,6 +447,7 @@ void Game::hitEnemy(Enemy& e, int damage, Color fx) {
 
 void Game::hurtPlayer(float damage, float invuln) {
     float dealt = damage * hurtMul();
+    if (fight.active() && player.hp <= player.maxHp * MERCY_BELOW) dealt *= 0.5f;
     player.hp -= dealt;
     player.hitFlash = 0.15f; player.invuln = invuln;
     floaters.push_back({ { player.pos.x, player.pos.y - 26 }, 0, (int)ceilf(dealt), { 255, 110, 110, 255 } });
@@ -398,19 +473,94 @@ void Game::updateShots(float dt) {
         }
         p.pos = Vector2Add(p.pos, Vector2Scale(p.vel, dt));
         p.life -= dt;
+        p.travelled += Vector2Length(p.vel) * dt;
+        if (p.spell == SP_FIRE && frand(0, 1) < dt * 150) {     // embers and smoke streaming off behind
+            int shade = GetRandomValue(0, 3);
+            Color c = shade == 0 ? Color{ 255, 226, 130, 255 } : shade == 3 ? Color{ 92, 84, 84, 255 } : Color{ 255, 120, 40, 255 };
+            parts.push_back({ { p.pos.x + frand(-3, 3), p.pos.y + frand(-3, 3) },
+                { p.vel.x * -0.14f + frand(-14, 14), p.vel.y * -0.14f + frand(-22, 8) }, 0.4f, 0.4f, frand(2, 4.6f), c, 0, true });
+        }
+        for (; p.spell == SP_ICE && p.travelled >= p.nextSpike; p.nextSpike += SPIKE_GAP)
+            plantSpikes(p, Vector2Subtract(p.pos, Vector2Scale(Vector2Normalize(p.vel), p.travelled - p.nextSpike)));
+        for (; p.spell == SP_BOLT && p.travelled >= p.nextSpike; p.nextSpike += BOLT_JAG) {
+            Vector2 d = Vector2Normalize(p.vel), side = { -d.y, d.x };
+            Vector2 on = Vector2Add(Vector2Subtract(p.pos, Vector2Scale(d, p.travelled - p.nextSpike)), Vector2Scale(side, frand(-9, 9)));
+            arcs.push_back({ p.lastJag, on, 0, 0.26f, 2.4f, frand(0, 100) });
+            if (GetRandomValue(0, 3) == 0)         // now and then the bolt forks
+                zapFork(on, atan2f(d.y, d.x) + (GetRandomValue(0, 1) ? 1 : -1) * frand(0.6f, 1.2f), frand(18, 34));
+            p.lastJag = on;
+        }
         if (p.life <= 0 || roomWallSolid(room, (int)floorf(p.pos.x / TILE), (int)floorf(p.pos.y / TILE), room.cleared)) {
-            p.alive = false; continue;
+            p.alive = false; spellEnded(p, nullptr); continue;
         }
         for (auto& e : enemies) {
             if (!e.alive || Vector2Distance(p.pos, e.pos) >= e.r + p.r) continue;
             bool weak = e.weakness && p.school && TextIsEqual(e.weakness, p.school);
             hitEnemy(e, weak ? (int)(p.damage * 1.6f) : p.damage, weak ? Color{ 255, 230, 120, 255 } : p.glow);
-            p.alive = false; play("hit");
+            if (p.spell == SP_FIRE) e.burnT = BURN_TIME;
+            if (p.spell == SP_BOLT) e.hitFlash = 0.22f;   // lit up white a little longer
+            p.alive = false;
             burst(parts, p.pos, 8, 90, 0.5f, p.glow);
+            spellEnded(p, &e);
             break;
         }
     }
     shots.erase(std::remove_if(shots.begin(), shots.end(), [](const Projectile& p) { return !p.alive; }), shots.end());
+}
+
+// Tidelash's next stretch of trail: a spike that stands taller the further out it is, with
+// a small one on each side leaning away from the line.
+void Game::plantSpikes(const Projectile& p, Vector2 at) {
+    float k = fminf(1, p.nextSpike / 340), h = 11 + 37 * k;
+    Vector2 d = Vector2Normalize(p.vel), side = { -d.y, d.x };
+    int seq = (int)(p.nextSpike / SPIKE_GAP);
+    const Room& room = dungeon.cur();
+    spikes.push_back({ at, { frand(-2, 2), -h }, h * 0.22f, 0, -1, p.trail, seq });
+    for (float s : { -1.0f, 1.0f }) {
+        float small = h * frand(0.46f, 0.6f);
+        Vector2 out = Vector2Scale(side, s), foot = Vector2Add(at, Vector2Scale(out, 6 + 8 * k));
+        if (roomWallSolid(room, (int)floorf(foot.x / TILE), (int)floorf(foot.y / TILE), true)) continue;
+        spikes.push_back({ foot, { out.x * small * 0.85f, out.y * small * 0.85f - small * 0.35f }, small * 0.26f, 0, -1, p.trail, seq });
+    }
+    std::stable_sort(spikes.begin(), spikes.end(), [](const IceSpike& a, const IceSpike& b) { return a.pos.y < b.pos.y; });
+}
+
+void Game::zapFork(Vector2 from, float ang, float len) {
+    for (int k = 0; k < 3; ++k) {
+        Vector2 to = Vector2Add(from, Vector2Scale(fromAngle(ang + frand(-0.6f, 0.6f)), len / 3));
+        arcs.push_back({ from, to, 0, 0.16f, 1.4f, frand(0, 100) });
+        from = to;
+    }
+}
+
+// A god-power has hit something, or the wall, or run out.
+void Game::spellEnded(const Projectile& p, const Enemy* hit) {
+    if (p.spell == SP_FIRE) {
+        flashes.push_back({ p.pos, 0, 0.32f, 46, 0, { 255, 130, 50, 255 }, true });
+        for (int k = 0; k < 20; ++k) {
+            bool smoke = k % 4 == 0;
+            parts.push_back({ p.pos, Vector2Scale(fromAngle(frand(0, 2 * PI)), frand(40, smoke ? 90.0f : 230.0f)), smoke ? 0.7f : 0.42f, smoke ? 0.7f : 0.42f,
+                frand(2, smoke ? 6.0f : 4.0f), smoke ? Color{ 86, 78, 78, 255 } : k % 3 ? Color{ 255, 150, 50, 255 } : Color{ 255, 232, 150, 255 }, 0, true });
+        }
+        play("fireboom");
+    }
+    else if (p.spell == SP_ICE) {
+        if (hit) { cracks.push_back({ hit->pos, 0, hit->r * 2.4f + 14, frand(0, 100), { 180, 235, 255, 255 } }); play("icecrack"); }
+        for (auto& s : spikes)
+            if (s.trail == p.trail) s.breakAt = s.t + 0.35f + s.seq * 0.018f;   // from the caster out to the tip
+    }
+    else if (p.spell == SP_BOLT) {
+        arcs.push_back({ p.lastJag, p.pos, 0, 0.26f, 2.4f, frand(0, 100) });
+        flashes.push_back({ p.pos, 0, hit ? 0.2f : 0.12f, hit ? 46.0f : 24.0f, frand(0, PI), { 210, 230, 255, 255 }, false });
+        if (hit) {                                 // lightning crawling off the target, and the room lit up
+            for (int k = 0; k < 6; ++k) zapFork(hit->pos, k * PI / 3 + frand(-0.3f, 0.3f), hit->r + frand(18, 32));
+            for (int k = 0; k < 8; ++k)
+                parts.push_back({ p.pos, Vector2Scale(fromAngle(frand(0, 2 * PI)), frand(90, 240)), 0.25f, 0.25f, frand(1.2f, 2.4f), { 215, 235, 255, 255 }, 0, true });
+            skyFlash = 0.5f;
+            play("thunder");
+        }
+    }
+    else if (hit) play("hit");
 }
 
 // ------------------------------------------------------------------- enemies
@@ -448,6 +598,16 @@ void Game::updateEnemies(float dt, float slow) {
         if (!e.alive) continue;
         float edt = dt * slow;
         e.hitFlash = fmaxf(0, e.hitFlash - dt);
+        if (e.burnT > 0) {
+            e.burnT = fmaxf(0, e.burnT - dt);
+            if (frand(0, 1) < dt * 18)
+                parts.push_back({ { e.pos.x + frand(-e.r, e.r), e.pos.y - frand(0, e.r * 1.4f) }, { frand(-10, 10), frand(-70, -30) },
+                    0.5f, 0.5f, frand(1.2f, 2.6f), GetRandomValue(0, 1) ? Color{ 255, 150, 50, 255 } : Color{ 255, 226, 130, 255 }, 0, true });
+        }
+        if (Vector2LengthSqr(e.knock) > 1) {
+            e.pos = moveInRoom(e.pos, Vector2Scale(e.knock, dt), e.r, room, doorsOpen);
+            e.knock = Vector2Scale(e.knock, expf(-KNOCK_DECAY * dt));
+        }
         e.atkCd = fmaxf(0, e.atkCd - edt);
         e.wobble += edt * 4;
         e.animT += edt;
@@ -481,13 +641,13 @@ void Game::updateEnemies(float dt, float slow) {
         }
         else if (e.bossForm < 0) {  // boss bodies are moved by the BossFight
             if (fabsf(to.x) > 2) e.flip = to.x < 0;
-            e.moving = d > 1 && e.atkAnim <= 0;        // plant feet while swinging
+            e.moving = d > 1 && e.atkAnim <= 0 && Vector2LengthSqr(e.knock) < 400;     // plant feet while swinging or reeling
             e.lunge = fmaxf(0, e.lunge - edt);
             e.lungeCd = fmaxf(0, e.lungeCd - edt);
             if (e.moving) {
                 bool sees = lineClear(room, e.pos, player.pos, e.r + 4);
                 Vector2 goal;
-                if (!sees) goal = nextWaypoint(room, flow, e.pos, e.r + 2);   // route around walls
+                if (!sees) goal = nextWaypoint(room, flow, e.pos, e.r);   // route around walls
                 else if (e.kind == EK_SKELETON && d > 70) {
                     // foot soldiers fan out to the sides so they surround you
                     Vector2 n = Vector2Normalize(to);
@@ -501,7 +661,8 @@ void Game::updateEnemies(float dt, float slow) {
                     Vector2 side = { -dir.y, dir.x };
                     dir = Vector2Normalize(Vector2Add(dir, Vector2Scale(side, sinf(e.wobble * 1.3f) * 0.8f)));
                 }
-                dir = Vector2Normalize(Vector2Add(dir, Vector2Scale(wallAvoid(room, e.pos, e.r, doorsOpen), 1.2f)));
+                // only out in the open: a push off the path pins a wide body on a corner in a tight lane
+                if (sees) dir = Vector2Normalize(Vector2Add(dir, Vector2Scale(wallAvoid(room, e.pos, e.r, doorsOpen), 1.2f)));
                 // hounds that see you crouch and lunge
                 if (e.kind == EK_SKELETON2 && sees && d < 130 && d > 40 && e.lungeCd <= 0) { e.lunge = 0.35f; e.lungeCd = 2.5f; }
                 float spd = e.speed * (e.lunge > 0 ? 2.6f : 1.0f);
@@ -509,14 +670,17 @@ void Game::updateEnemies(float dt, float slow) {
             }
         }
 
-        // solid bodies: push out of the player and out of each other
+        // solid bodies: push out of the player and out of each other (nothing shifts the Bad Plasmodium)
+        bool rooted = e.bossForm == 0 && fight.active() && fight.def->kind == BossKind::Rooted;
         Vector2 off = Vector2Subtract(e.pos, player.pos);
         float dist = Vector2Length(off), minD = e.r + PLAYER_R;
         if (dist < minD && player.jumpT <= 0) {
             Vector2 n = dist > 0.01f ? Vector2Scale(off, 1.0f / dist) : Vector2{ 1, 0 };
-            e.pos = moveInRoom(e.pos, Vector2Scale(n, minD - dist), e.r, room, doorsOpen);
+            if (rooted) player.pos = moveInRoom(player.pos, Vector2Scale(n, dist - minD), PLAYER_R, room, doorsOpen);
+            else e.pos = moveInRoom(e.pos, Vector2Scale(n, minD - dist), e.r, room, doorsOpen);
         }
         for (auto& o : enemies) {
+            if (rooted) break;
             if (&o == &e || !o.alive) continue;
             Vector2 sep = Vector2Subtract(e.pos, o.pos);
             float sd = Vector2Length(sep), need = e.r + o.r;
@@ -576,7 +740,7 @@ void Game::killEnemy(Enemy& e) {
     player.xp += e.xp;
     play("pickup");
     Enemy corpse = e;
-    corpse.dying = true; corpse.deathT = 0; corpse.hitFlash = 0; corpse.atkAnim = 0;
+    corpse.dying = true; corpse.deathT = 0; corpse.hitFlash = 0; corpse.atkAnim = 0; corpse.burnT = 0;
     corpses.push_back(corpse);
     int n = e.bossForm == 0 ? 12 + 2 * floor : e.bossForm > 0 ? 1 : 1 + GetRandomValue(0, 2);
     n += champ().extraCoins;
@@ -585,9 +749,19 @@ void Game::killEnemy(Enemy& e) {
         showBanner("Your gold is back", "", 1.6f);
     }
     for (int k = 0; k < n; ++k) coins.push_back({ e.pos, { frand(-90, 90), frand(-140, -40) }, 0 });
+    if (e.kind == EK_GAKEV)
+        coins.push_back({ e.pos, { frand(-40, 40), -160 }, 0, true });
     burst(parts, e.pos, 14, 120, 0.7f, e.color);
     if (e.bossForm == 0) shake = 0.5f;
     fight.onDeath(e, spawned);
+    if (fight.active() && e.bossForm >= 0) {
+        if (e.bossForm == 0 && fight.def->kind != BossKind::Split)     // its minions go down with it
+            for (auto& o : enemies)
+                if (o.alive && o.bossForm > 0) { o.alive = false; burst(parts, o.pos, 8, 90, 0.5f, o.color); }
+        bool left = !spawned.empty();
+        for (auto& o : enemies) left |= o.alive && o.bossForm >= 0 && o.hp > 0;
+        if (!left && finaleT <= 0) finalBlow(e);
+    }
 
     while (player.xp >= player.xpNext) {
         player.xp -= player.xpNext; player.level++;
@@ -599,10 +773,88 @@ void Game::killEnemy(Enemy& e) {
     }
 }
 
+void Game::finalBlow(const Enemy& e) {
+    corpses.pop_back();                        // it doesn't fade away: it comes apart
+    BodyCut cut = bossCut(e, currentBossIndex(), bossArt);
+    const int cols = 6, rows = 7;
+    float cw = fabsf(cut.src.width) / cols, ch = cut.src.height / rows;
+    Vector2 size = { cut.dst.width / cols, cut.dst.height / rows };
+    float ground = cut.dst.y + cut.dst.height;
+    for (int y = 0; y < rows; ++y)
+        for (int x = 0; x < cols; ++x) {
+            int col = cut.src.width < 0 ? cols - 1 - x : x;
+            Rectangle src = { cut.src.x + col * cw, cut.src.y + y * ch, cut.src.width < 0 ? -cw : cw, ch };
+            Vector2 at = { cut.dst.x + (x + 0.5f) * size.x, cut.dst.y + (y + 0.5f) * size.y };
+            rubble.push_back({ cut.tex, src, at, size, { frand(-70, 70), frand(-130, -20) }, y * 0.16f + frand(0, 0.35f), 0, 0, frand(-6, 6), ground + frand(-4, 8) });
+        }
+    fight.calm();
+    enemyShots.clear();
+    finaleT = FINALE_TIME; hitStop = FINAL_FREEZE; slowMo = FINAL_SLOW;
+    player.invuln = fmaxf(player.invuln, FINALE_TIME + 1);
+    shake = 0.8f; skyFlash = 0.6f;
+    flashes.push_back({ e.pos, 0, 0.2f, 90, frand(0, PI), WHITE, false });
+    flashes.push_back({ e.pos, 0, 0.3f, 120, 0, e.color, true });
+    play("finalhit");
+    play("crumble");
+}
+
 // ---------------------------------------------------------------------- loot
+// The lid flies up: the loot, the light and a shower of stars all come out at once.
+void Game::slamChest() {
+    Room& room = dungeon.cur();
+    Vector2 chestPos = { room.chestTx * (float)TILE + 16, room.chestTy * (float)TILE + 16 };
+    play("lid");
+    shake = fmaxf(shake, 0.12f);
+    chestLight = 1; chestLooting = true;
+    popups.push_back({ chestMana ? &SPR.flaskBlue : &SPR.flaskRed, { chestPos.x, chestPos.y - 14 }, 0 });
+    showBanner(chestMana ? "Chest: +10 max mana" : "Chest: +10 health", "", 1.6f);
+    for (int k = 0; k < 4; ++k) coins.push_back({ chestPos, { frand(-90, 90), frand(-140, -40) }, 0 });
+    if (chestPack) coins.push_back({ chestPos, { frand(-40, 40), -160 }, 0, true });
+    for (int k = 0; k < 16; ++k) {
+        Vector2 v = Vector2Scale(fromAngle(-PI / 2 + frand(-0.9f, 0.9f)), frand(110, 260));
+        float life = frand(0.7f, 1.1f);
+        parts.push_back({ { chestPos.x, chestPos.y - 8 }, v, life, life, frand(3, 5.5f),
+            k % 3 ? Color{ 255, 222, 110, 255 } : Color{ 255, 255, 235, 255 }, 340, false, true });
+    }
+}
+
+// Flashes, cracks and ice run on their own clocks, and frozen frames stop them too.
+void Game::updateEffects(float dt) {
+    for (auto& f : flashes) f.t += dt;
+    flashes.erase(std::remove_if(flashes.begin(), flashes.end(), [](const Flash& f) { return f.t >= f.life; }), flashes.end());
+    for (auto& a : arcs) a.t += dt;
+    arcs.erase(std::remove_if(arcs.begin(), arcs.end(), [](const Arc& a) { return a.t >= a.life; }), arcs.end());
+    skyFlash = fmaxf(0, skyFlash - dt * 3);
+    for (auto& c : cracks) c.t += dt;
+    cracks.erase(std::remove_if(cracks.begin(), cracks.end(), [](const FloorCrack& c) { return c.t >= CRACK_TIME; }), cracks.end());
+
+    bool shattered = false;
+    for (auto& s : spikes) {
+        s.t += dt;
+        if (s.breakAt < 0 || s.t < s.breakAt) continue;
+        for (int k = 0; k < 4; ++k)                // it falls to shards
+            parts.push_back({ Vector2Add(s.pos, Vector2Scale(s.rise, frand(0, 1))), { frand(-70, 70), frand(-120, -20) }, 0.5f, 0.5f,
+                frand(1.2f, 2.8f), k % 2 ? Color{ 214, 244, 255, 255 } : Color{ 128, 205, 240, 255 }, 380, true });
+        shattered |= s.seq == 0;
+    }
+    if (shattered) play("shatter");
+    spikes.erase(std::remove_if(spikes.begin(), spikes.end(), [](const IceSpike& s) { return s.breakAt >= 0 && s.t >= s.breakAt; }), spikes.end());
+}
+
 void Game::updateLoot(float dt) {
-    for (auto& p : parts) { p.pos = Vector2Add(p.pos, Vector2Scale(p.vel, dt)); p.life -= dt; }
+    for (auto& p : parts) { p.vel.y += p.gravity * dt; p.pos = Vector2Add(p.pos, Vector2Scale(p.vel, dt)); p.life -= dt; }
     parts.erase(std::remove_if(parts.begin(), parts.end(), [](const Particle& p) { return p.life <= 0; }), parts.end());
+    updateEffects(dt);
+    for (auto& r : rubble) {
+        r.t += dt;
+        if (r.t < r.delay) continue;
+        if (r.t - dt < r.delay)                // a puff of dust as each piece lets go
+            parts.push_back({ r.pos, { frand(-20, 20), frand(-40, -10) }, 0.5f, 0.5f, frand(2, 4), { 120, 112, 124, 255 }, 0, true });
+        r.vel.y += 420 * dt;
+        r.pos = Vector2Add(r.pos, Vector2Scale(r.vel, dt));
+        r.rot += r.spin * dt;
+        if (r.pos.y > r.ground) { r.pos.y = r.ground; r.vel = { r.vel.x * 0.4f, r.vel.y * -0.3f }; r.spin *= 0.4f; }
+    }
 
     for (auto& c : corpses) c.deathT += dt;
     corpses.erase(std::remove_if(corpses.begin(), corpses.end(), [](const Enemy& c) {
@@ -610,7 +862,10 @@ void Game::updateLoot(float dt) {
             : c.kind == EK_SKULL ? 0.5f : SPR.enemy[c.kind].death.length(14) + 0.6f;   // linger a moment
         return c.deathT > len; }), corpses.end());
 
+    if (chestOpenT < CHEST_SLAM && chestOpenT + dt >= CHEST_SLAM) slamChest();
     chestOpenT += dt;
+    if (chestLooting && coins.empty() && popups.empty()) chestLooting = false;   // all taken: the light goes out
+    if (!chestLooting) chestLight = fmaxf(0, chestLight - dt * 2.5f);
     for (auto& p : popups) { p.t += dt; p.pos.y -= 26 * dt; }
     popups.erase(std::remove_if(popups.begin(), popups.end(), [](const Popup& p) { return p.t > 1.4f; }), popups.end());
 
@@ -631,6 +886,11 @@ void Game::updateLoot(float dt) {
     }
     coins.erase(std::remove_if(coins.begin(), coins.end(), [&](const Coin& c) {
         if (c.t <= 0.45f || Vector2Distance(c.pos, player.pos) >= 8) return false;
+        if (c.pack) {
+            player.packs++; play("quest");
+            showBanner("Cigarette pack", "Galin can upgrade your weapon with this", 2.2f);
+            return true;
+        }
         player.gold++; play("coin");
         return true; }), coins.end());
 }
@@ -662,21 +922,49 @@ void Game::checkRoomExits() {
     else if ((r.doors & DIR_W) && p.x < TILE + 8 && fabsf(p.y - dcy) < TILE) { dungeon.cx--; p = { (ROOM_TW - 1) * TILE - 28.0f, dcy }; }
     else if ((r.doors & DIR_E) && p.x > (ROOM_TW - 1) * TILE - 8 && fabsf(p.y - dcy) < TILE) { dungeon.cx++; p = { TILE + 28.0f, dcy }; }
     else moved = false;
-    if (moved) enterRoom();
+    if (!moved) return;
+    for (auto& c : coins) player.packs += c.pack;   // a pack still in the air comes along
+    enterRoom();
 }
 
-// ---------------------------------------------------------------------- shop
+// --------------------------------------------------------------------- shops
 void Game::buy(int i) {
     const ShopItem& it = SHOP_ITEMS[i];
-    if (it.skill && player.has((Skill)it.skill)) return;
+    if (it.vape >= 0 && player.has((Vape)it.vape)) return;
     if (player.gold < it.price) { shopMsgT = 1.5f; shopMsg = "Not enough gold"; play("hurt"); return; }
     player.gold -= it.price;
-    if (it.skill) { player.skills |= it.skill; play("levelup"); }
-    else if (it.vape >= 0) { player.vapeT[it.vape] = VAPE_TIME[it.vape]; play("pickup"); }
+    if (it.vape >= 0) { player.vapes |= 1u << it.vape; play("levelup"); }
     else {
         if (i == 0) player.hp = fminf(player.maxHp, player.hp + 35);
         else player.mana = fminf(player.maxMana, player.mana + 50);
         play("pickup");
     }
     shopMsgT = 1.5f; shopMsg = std::string("Bought ") + it.name;
+}
+
+void Game::buyWeapon(int i) {
+    const WeaponDef& w = WEAPONS[i];
+    if (i == player.weapon) return;
+    if (!player.owns(i)) {
+        if (player.gold < w.price) { shopMsgT = 1.5f; shopMsg = "Not enough gold"; play("hurt"); return; }
+        player.gold -= w.price;
+        player.weaponsOwned |= 1u << i;
+        shopMsg = std::string("Bought ") + w.name;
+        play("levelup");
+    }
+    else { shopMsg = std::string("Equipped ") + w.name; play("ui"); }
+    player.weapon = i;
+    shopMsgT = 1.5f;
+}
+
+void Game::buyUpgrade(int u) {
+    int& level = player.upgrades[player.weapon][u];
+    if (level >= UPGRADE_MAX) return;
+    int price = UPGRADES[u].gold * (level + 1);
+    shopMsgT = 1.5f;
+    if (player.packs < 1) { shopMsg = "No cigarette pack: Gakev drops them"; play("hurt"); return; }
+    if (player.gold < price) { shopMsg = "Not enough gold"; play("hurt"); return; }
+    player.packs--; player.gold -= price; level++;
+    shopMsg = TextFormat("%s: %s %d/%d", WEAPONS[player.weapon].name, UPGRADES[u].name, level, UPGRADE_MAX);
+    play("levelup");
 }

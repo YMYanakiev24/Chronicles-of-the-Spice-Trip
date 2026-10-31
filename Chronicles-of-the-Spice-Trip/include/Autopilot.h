@@ -27,7 +27,8 @@ private:
     int    passes = 0, fails = 0, shotCount = 0;
     float  markF = 0;                   // scratch values a step remembers between frames
     float  markX = 0, markY = 0;
-    bool   markB = false;
+    bool   markB = false, markC = false;
+    int    markWeapon = 0;
     std::string dir;
     FILE*  log = nullptr;
 

@@ -111,6 +111,29 @@ namespace au {
         b.clear(); renderNoise(b, 0.30f, 0.22f, 2200, 0.8f, 2); renderTone(b, 520, 180, TRI, 0.26f, 0.12f); make("swing", b);
         b.clear(); renderTone(b, 200, 60, SINE, 0.90f, 0.30f); renderTone(b, 210, 64, TRI, 0.90f, 0.12f); make("well", b);
         b.clear(); renderNoise(b, 0.60f, 0.45f, 500, 0.5f, 0); renderTone(b, 110, 38, SAW, 0.50f, 0.30f); make("boom", b);
+        // The blade: a whoosh on every swing, then steel ringing or a blunt thud as it lands
+        b.clear(); renderNoise(b, 0.14f, 0.16f, 2600, 1.2f, 2); renderTone(b, 900, 300, TRI, 0.12f, 0.07f); make("slash", b);
+        b.clear(); renderTone(b, 2300, 1900, SQUARE, 0.09f, 0.09f); renderTone(b, 3400, 0, SINE, 0.22f, 0.10f); renderNoise(b, 0.08f, 0.30f, 3000, 1.0f, 1); renderTone(b, 200, 90, SQUARE, 0.08f, 0.18f); make("clang", b);
+        b.clear(); renderTone(b, 240, 90, SINE, 0.14f, 0.40f); renderNoise(b, 0.07f, 0.28f, 900, 1.0f, 2); make("bonk", b);
+        // Emberhex: the fire gathering, and its burst
+        b.clear(); renderTone(b, 180, 720, SAW, 0.24f, 0.11f); renderNoise(b, 0.24f, 0.12f, 900, 0.7f, 2); make("charge", b);
+        b.clear(); renderNoise(b, 0.38f, 0.38f, 700, 0.6f, 0); renderTone(b, 150, 50, SAW, 0.26f, 0.26f); renderNoise(b, 0.20f, 0.14f, 2600, 0.8f, 1); make("fireboom", b);
+        // Tidelash: the chill gathering, the spikes racing out, the floor cracking, the trail shattering
+        b.clear(); renderTone(b, 1400, 2800, SINE, 0.26f, 0.10f); renderTone(b, 2100, 4200, TRI, 0.26f, 0.06f); make("chill", b);
+        b.clear(); renderNoise(b, 0.26f, 0.18f, 3800, 1.5f, 2); renderTone(b, 1900, 900, TRI, 0.20f, 0.09f); make("icecast", b);
+        b.clear(); renderNoise(b, 0.06f, 0.40f, 2400, 0.9f, 1); renderTone(b, 420, 130, SQUARE, 0.10f, 0.16f); renderNoise(b, 0.08f, 0.25f, 1500, 1.0f, 2, 0.05f); make("icecrack", b);
+        b.clear(); for (int i = 0; i < 6; ++i) { renderNoise(b, 0.10f, 0.20f, 3500.0f + i * 600, 2.0f, 2, i * 0.06f); renderTone(b, 2600.0f + i * 420, 0, SINE, 0.12f, 0.07f, i * 0.06f); } make("shatter", b);
+        // Stormbolt striking: a sharp crack, then thunder rolling away
+        b.clear(); renderNoise(b, 0.10f, 0.42f, 3400, 0.7f, 1); renderTone(b, 1600, 160, SQUARE, 0.09f, 0.16f); renderNoise(b, 0.45f, 0.30f, 220, 0.6f, 0, 0.03f); renderTone(b, 70, 40, SAW, 0.40f, 0.18f, 0.03f); make("thunder", b);
+        // A boss: its roar at half health, its beam, the last hit, the crumbling, and your fanfare
+        b.clear(); renderTone(b, 160, 70, SAW, 1.00f, 0.34f); renderTone(b, 240, 96, SQUARE, 1.00f, 0.12f); renderNoise(b, 1.00f, 0.26f, 500, 0.6f, 0); make("roar", b);
+        b.clear(); renderTone(b, 900, 700, SAW, 0.55f, 0.16f); renderNoise(b, 0.55f, 0.24f, 2200, 0.8f, 2); renderTone(b, 110, 90, SQUARE, 0.55f, 0.16f); make("beam", b);
+        b.clear(); renderNoise(b, 0.10f, 0.48f, 2400, 0.7f, 1); renderTone(b, 130, 34, SAW, 0.80f, 0.40f); renderNoise(b, 0.80f, 0.34f, 300, 0.5f, 0, 0.05f); make("finalhit", b);
+        b.clear(); for (int i = 0; i < 9; ++i) { renderNoise(b, 0.14f, 0.28f, 260.0f + i * 40, 0.9f, 2, i * 0.16f); renderTone(b, 110.0f - i * 5, 60, SQUARE, 0.10f, 0.10f, i * 0.16f); } make("crumble", b);
+        b.clear(); { float f[6] = { 392,523,659,784,1047,1319 }; for (int i = 0; i < 6; ++i) renderTone(b, f[i], 0, TRI, i == 5 ? 0.9f : 0.28f, 0.28f, i * 0.12f); } make("victory", b);
+        // A chest: rattling on its feet, then the lid thrown open with a sparkle
+        b.clear(); for (int i = 0; i < 6; ++i) { renderNoise(b, 0.05f, 0.18f + 0.02f * i, 500, 1.0f, 2, i * 0.07f); renderTone(b, 130, 90, SQUARE, 0.04f, 0.10f, i * 0.07f); } make("rattle", b);
+        b.clear(); renderNoise(b, 0.16f, 0.40f, 400, 0.7f, 0); renderTone(b, 120, 50, SQUARE, 0.14f, 0.30f); { float f[4] = { 1047,1319,1568,2093 }; for (int i = 0; i < 4; ++i) renderTone(b, f[i], 0, SINE, 0.22f, 0.13f, 0.06f + i * 0.06f); } make("lid", b);
         return m;
     }
 

@@ -4,7 +4,7 @@
 #include "Entities.h"
 
 const SpellDef SPELLS[SPELL_COUNT] = {
-    { "Emberhex",  "Fire",      12, 22, 460.0f, {255,122, 58,255}, {255,208,137,255}, "fire" },
-    { "Tidelash",  "Water",     10, 16, 420.0f, { 79,210,200,255}, {191,246,238,255}, "nature" },
-    { "Stormbolt", "Lightning", 24, 40, 900.0f, {159,208,255,255}, {234,255,255,255}, "lightning" },
+    { "Emberhex",  "Fire",      12, 22, 460.0f, {255,122, 58,255}, {255,208,137,255}, "fire", 0.22f },
+    { "Tidelash",  "Water",     10, 16, 420.0f, { 79,210,200,255}, {191,246,238,255}, "icecast", 0.25f },
+    { "Stormbolt", "Lightning", 24, 40, 900.0f, {159,208,255,255}, {234,255,255,255}, "lightning", 0 },
 };
