@@ -24,7 +24,8 @@ struct Room {
     bool cleared = false;     // enemies defeated -> doors open
     bool isStart = false;
     bool isBoss = false;
-    bool isShop = false;      // Marin's market: no enemies, no clutter
+    bool isShop = false;      // the floor's shop: no enemies, no clutter
+    bool isGalin = false;     // a shop room: Galin's stall instead of Marin's market
     bool hasKey = false;      // the boss key lies here once the room is cleared
     int  doors = 0;           // bitmask of neighbours that exist
     unsigned char tiles[ROOM_TH][ROOM_TW] = {};   // interior layout (RoomTile)
@@ -40,8 +41,9 @@ struct Dungeon {
     int  cx = DUNGEON_G / 2;     // current room
     int  cy = DUNGEON_G / 2;
     bool keyFound = false;       // the boss lair stays locked until this floor's key is found
+    bool galinNext = false;      // the next floor's shop: Marin and Galin take turns
 
-    void  generate();          // a fresh floor: start room, combat rooms, Marin, the boss
+    void  generate();          // a fresh floor: start room, combat rooms, one shop, the boss
     void  generateArena();     // a single sealed boss room (Boss Rush)
     Room& cur() { return grid[cy][cx]; }
     const Room& cur() const { return grid[cy][cx]; }
@@ -69,8 +71,9 @@ void buildFlowField(const Room& r, Vector2 target, bool avoidSpikes, FlowField& 
 bool lineClear(const Room& r, Vector2 a, Vector2 b, float radius);
 
 // Where a chaser at `from` should head next to reach the flow field's target.
-// A body of `radius` that can't reach that step in a straight line (it would clip
-// a wall corner) is sent back to the centre of its own tile first.
+// A body of `radius` that can't reach that step in a straight line (it would clip a
+// wall corner) eases onto the lane's centre line as it goes. It never backs up: those
+// behind it in a tight lane would hold it pressed against the corner.
 Vector2 nextWaypoint(const Room& r, const FlowField& f, Vector2 from, float radius = 0);
 
 // Move a circle within a room, sliding along walls (axis-separated).

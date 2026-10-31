@@ -14,7 +14,7 @@ void Game::playScreen() {
     float dt = fminf(GetFrameTime(), 0.05f);
     if (in::pressed(KEY_ESCAPE)) {
         if (overlay == Overlay::Controls) { save::writeTouchLayout(touch::layout()); overlay = Overlay::Pause; }
-        else if (overlay == Overlay::Shop || overlay == Overlay::Pause) overlay = Overlay::None;
+        else if (overlay == Overlay::Shop || overlay == Overlay::Galin || overlay == Overlay::Pause) overlay = Overlay::None;
         else if (overlay == Overlay::None) overlay = Overlay::Pause;
         play("ui");
     }
@@ -42,10 +42,12 @@ void Game::playScreen() {
     if (gloom > 0.001f) DrawRectangle(0, 0, sw, sh, Fade({ 4, 2, 10, 255 }, gloom));
     DrawRectangle(0, 0, sw, sh, Fade(FOG_TINT, 0.04f));
     if (player.auraT > 0) DrawRectangle(0, 0, sw, sh, Fade({ 120, 180, 255, 255 }, 0.06f));
+    if (skyFlash > 0) DrawRectangle(0, 0, sw, sh, Fade({ 205, 225, 255, 255 }, skyFlash * 0.2f));
     drawHud();
 
     switch (overlay) {
     case Overlay::Shop:        drawShop(); break;
+    case Overlay::Galin:       drawGalin(); break;
     case Overlay::Pause:       drawPause(); break;
     case Overlay::Controls:    drawControlsEditor(); break;
     case Overlay::RunComplete: drawRunComplete(); break;
@@ -171,7 +173,17 @@ void Game::drawActors() {
         Vector2 c = { r.chestTx * (float)TILE + 16, r.chestTy * (float)TILE + 16 };
         drawShadow({ c.x, c.y + 8 }, 12);
         if (SPR.chest.ok()) {
-            if (r.chestOpened) drawAnim(SPR.chestOpen, animFrame(SPR.chestOpen, chestOpenT, 10, false), c, 2.0f);
+            Vector2 foot = { c.x, c.y + SPR.chest.fh };
+            float size = SPR.chest.fw * 2.0f;
+            if (r.chestOpened && chestOpenT < CHEST_SLAM) {          // shaking harder and harder, squashing down
+                float k = chestOpenT / CHEST_SLAM, beat = sinf(chestOpenT * 40);
+                float tall = 1 - 0.22f * k + beat * 0.07f * k;
+                drawAnimOnFoot(SPR.chestOpen, 0, foot, size * (2 - tall), size * tall, beat * (2 + 10 * k));
+            }
+            else if (r.chestOpened) {                                // the lid slams up, and the chest bounces
+                float since = chestOpenT - CHEST_SLAM, tall = 1 + 0.4f * expf(-since * 9) * cosf(since * 26);
+                drawAnimOnFoot(SPR.chestOpen, animFrame(SPR.chestOpen, since, 40, false), foot, size * (2 - tall), size * tall);
+            }
             else drawAnim(SPR.chest, fmodf(clock, 2.5f) < 0.5f ? animFrame(SPR.chest, clock, 8, true) : 0, c, 2.0f);  // rattles now and then
         }
         else {
@@ -180,17 +192,25 @@ void Game::drawActors() {
         }
     }
 
-    if (r.isShop) {             // rug, candles and Marin himself, gently bobbing
+    if (chestLight > 0) drawChestLight({ r.chestTx * (float)TILE + 16, r.chestTy * (float)TILE + 12 }, chestLight, clock);
+
+    if (r.isShop && r.isGalin) {   // the stall on its patch of grass, Galin's feet where Marin's would be
+        const float size = 170;
+        ui::drawContain(galinShopTex, { 0, 0, (float)galinShopTex.width, (float)galinShopTex.height },
+            { MERCHANT_POS.x - size / 2, MERCHANT_POS.y + 26 - size * 0.88f, size, size });
+    }
+    else if (r.isShop) {        // rug, candles and the merchant, gently bobbing
         Vector2 m = MERCHANT_POS;
+        Texture2D who = marinTex;
         Rectangle rug = { m.x - 70, m.y - 6, 140, 60 };
         DrawRectangleRec(rug, { 70, 34, 70, 255 });
         DrawRectangleLinesEx(rug, 3, { 200, 160, 80, 255 });
         drawAnim(SPR.candle, animFrame(SPR.candle, clock, 7, true), { m.x - 54, m.y + 6 }, 2.0f);
         drawAnim(SPR.candle, animFrame(SPR.candle, clock + 0.4f, 7, true), { m.x + 54, m.y + 6 }, 2.0f);
         drawShadow({ m.x, m.y + 14 }, 16);
-        if (marinTex.id) {
-            float hgt = 70, sc = hgt / marinTex.height, bob = sinf(clock * 2.2f) * 2;
-            DrawTextureEx(marinTex, { m.x - marinTex.width * sc / 2, m.y - hgt + 26 + bob }, 0, sc, WHITE);
+        if (who.id) {
+            float hgt = 70, sc = hgt / who.height, bob = sinf(clock * 2.2f) * 2;
+            DrawTextureEx(who, { m.x - who.width * sc / 2, m.y - hgt + 26 + bob }, 0, sc, WHITE);
         }
         else DrawCircleV(m, 14, { 90, 60, 160, 255 });
         for (int i = 0; i < 3; ++i)
@@ -211,17 +231,28 @@ void Game::drawActors() {
         if (e.bossForm >= 0) drawBossBody(e, currentBossIndex(), bossArt);
         else drawEnemy(e);
     };
+    drawLabFloor(fight, clock);             // Triceps' wells, wires and the staff's reach lie on the floor
+    drawArenaFloor(fight, clock);
+    for (auto& c : cracks) drawCrack(c);
+    for (auto& s : spikes) drawIceSpike(s);
+    drawRocks(fight, player.pos.y, true);
     for (auto& c : corpses) drawBody(c);
+    for (auto& r : rubble)
+        DrawTexturePro(r.tex, r.src, { r.pos.x, r.pos.y, r.size.x, r.size.y }, { r.size.x / 2, r.size.y / 2 }, r.rot * RAD2DEG, Fade(WHITE, fminf(1, finaleT * 2)));
     for (auto& e : enemies) drawBody(e);
+    for (auto& e : enemies) if (e.burnT > 0) drawBurn(e, clock);
     for (auto& e : enemies) {               // a fearful face bobs over everyone Momiche scared
         if (e.dying) continue;
         if (e.bossForm >= 0) {
-            float top = e.pos.y - e.r * 0.4f, radius = e.r * 1.3f;    // where drawBossBody puts the token
-            drawFear(e.pos.x, top - radius - 16, top + radius + 16, 26);
+            float top = bossTop(e, currentBossIndex(), bossArt);         // over the head of the token or figure
+            drawFear(e.pos.x, top - 16, e.pos.y + e.r * 0.9f + 16, 26);
         }
         else drawFear(e.pos.x, e.pos.y - e.r * 2 - 14, e.pos.y + e.r + 10, 16);
     }
-    for (auto& c : coins) drawAnim(SPR.coin, animFrame(SPR.coin, c.t, 12, true), c.pos, 1.4f);
+    for (auto& c : coins) {
+        if (c.pack) ui::drawContain(packTex, { 0, 0, (float)packTex.width, (float)packTex.height }, { c.pos.x - 11, c.pos.y - 11, 22, 22 });
+        else drawAnim(SPR.coin, animFrame(SPR.coin, c.t, 12, true), c.pos, 1.4f);
+    }
 
     // the hero, with their champion's effects
     if (scareT > SCARE_TIME - 0.6f)         // the scream: two rings racing outward
@@ -240,20 +271,29 @@ void Game::drawActors() {
         DrawCircleV(player.pos, PLAYER_R + 4, Fade(player.rollAtkT > 0 ? Color{ 110, 200, 80, 255 } : Color{ 245, 210, 110, 255 }, 0.35f));
     // walking as their own figure, facing the way they walk (or aim, standing still)
     drawChampion(walk[player.champion], player.pos, heroMoving ? heroMoveDir : player.facing, heroMoving, clock,
-        player.facing, player.meleeAnim, player.hitFlash > 0, champ().cloak, lift);
+        player.facing, player.meleeAnim, player.hitFlash > 0, champ().cloak,
+        { weaponTex[player.weapon], WEAPONS[player.weapon].slant, bladeReach() * 0.95f }, lift);
     if (player.shieldT > 0) {
         DrawCircleV({ player.pos.x, player.pos.y - 6 }, 22, Fade({ 230, 190, 120, 255 }, 0.18f));
         DrawCircleLinesV({ player.pos.x, player.pos.y - 6 }, 22, Fade({ 250, 220, 150, 255 }, 0.9f));
     }
+    if (castT > 0) drawSpellCharge(castingSpell, castHand(), 1 - castT / SPELLS[castingSpell].charge, clock);
+    drawRocks(fight, player.pos.y, false);
 
     for (auto& p : shots) drawProjectile(p, clock);
     for (auto& p : enemyShots) drawProjectile(p, clock);
     drawBus(fight.bus, clock);
+    drawLabAir(fight, clock);
+    drawArenaAir(fight, clock);
 
     for (auto& pt : parts) {
-        Color c = pt.color; c.a = (unsigned char)(255 * (pt.life / pt.maxLife));
-        DrawCircleV(pt.pos, pt.size, c);
+        float left = pt.life / pt.maxLife;
+        Color c = pt.color; c.a = (unsigned char)(255 * left);
+        if (pt.star) drawStar(pt.pos, pt.size, pt.life * 5, c);
+        else DrawCircleV(pt.pos, pt.shrink ? pt.size * left : pt.size, c);
     }
+    for (auto& a : arcs) drawArc(a, clock);
+    for (auto& f : flashes) drawFlash(f);
     for (auto& pu : popups)
         drawAnim(*pu.anim, animFrame(*pu.anim, pu.t, 8, true), pu.pos, 2.0f, false, Fade(WHITE, fminf(1.0f, 1.4f - pu.t)));
 }
@@ -285,8 +325,8 @@ void Game::drawHud() {
     Vector2 chestPos = { r.chestTx * (float)TILE + 16, r.chestTy * (float)TILE + 16 };
     if (r.hasChest && !r.chestOpened && r.cleared && Vector2Distance(player.pos, chestPos) < 40)
         prompt(cam, { chestPos.x, chestPos.y - 34 }, E, "open");
-    if (r.isShop && overlay != Overlay::Shop && Vector2Distance(player.pos, MERCHANT_POS) < 56)
-        prompt(cam, { MERCHANT_POS.x, MERCHANT_POS.y - 66 }, E, "trade with Marin");
+    if (r.isShop && overlay == Overlay::None && Vector2Distance(player.pos, MERCHANT_POS) < 56)
+        prompt(cam, { MERCHANT_POS.x, MERCHANT_POS.y - (r.isGalin ? 136 : 66) }, E, r.isGalin ? "trade with Galin" : "trade with Marin");
     if (r.isStart && mode == Mode::Run && dialogue.empty() && Vector2Distance(player.pos, ORACLE_POS) < 48)
         prompt(cam, { ORACLE_POS.x, ORACLE_POS.y - 40 }, E, "talk");
     if (mode == Mode::Run && r.isBoss && r.cleared && Vector2Distance(player.pos, ROOM_CENTER) < 70)
@@ -320,13 +360,25 @@ void Game::drawHud() {
                                           : TextFormat("Boss Rush %d/%d   %s", rushStage + 1, BOSS_COUNT, ui::clock(rushTime));
     ui::text(where, box.x + 100, box.y + box.height + 16, 10, ui::MUTED);
 
-    // active vapes and champion effects
-    float iy = box.y + box.height + 54, ix = box.x + 14;
+    // the weapon in hand and the packs in your pocket
+    float wy = box.y + box.height + 44;
+    drawWeapon(player.weapon, { box.x + 14, wy, 44, 22 });
+    int upgrades = 0;
+    for (int level : player.upgrades[player.weapon]) upgrades += level;
+    const char* held = upgrades ? TextFormat("%s +%d", WEAPONS[player.weapon].name, upgrades) : WEAPONS[player.weapon].name;
+    ui::text(held, box.x + 64, wy + 6, 10, ui::TEXT);
+    if (player.packs > 0) {
+        float px = box.x + 76 + ui::measure(held, 10);
+        ui::drawContain(packTex, { 0, 0, (float)packTex.width, (float)packTex.height }, { px, wy, 22, 22 });
+        ui::text(TextFormat("x%d", player.packs), px + 24, wy + 6, 10, ui::ACCENT);
+    }
+
+    // vapes for good, and the champion's effects for now
+    float iy = box.y + box.height + 74, ix = box.x + 14;
     for (int v = 0; v < VP_COUNT; ++v) {
-        if (!player.buzzing((Vape)v)) continue;
+        if (!player.has((Vape)v)) continue;
         if (SPR.vapes.ok()) drawAnim(SPR.vapes, v, { ix + 10, iy + 8 }, 0.9f);
-        ui::text(TextFormat("%ds", (int)ceilf(player.vapeT[v])), ix + 26, iy + 2, 10, VAPE_COLOR[v]);
-        ix += 64;
+        ix += 34;
     }
     auto effect = [&](float left, const char* name, Color col) {
         if (left <= 0) return;
@@ -343,7 +395,7 @@ void Game::drawHud() {
     for (int i = 0; i < SPELL_COUNT; ++i) {
         Rectangle s = { hx + i * (slot + gap), hy, slot, slot };
         bool sel = i == player.selected;
-        int cost = player.buzzing(VP_RAZZ) ? 0 : (int)ceilf(SPELLS[i].manaCost * c.manaCostMul);
+        int cost = spellCost(i);
         bool castable = player.mana >= cost;
         DrawRectangleRec(s, { 16, 14, 24, 230 });
         touch::zone(s, KEY_ONE + i);
@@ -426,7 +478,7 @@ void Game::drawMinimap() {
             Color c;
             if (cur) c = { 255, 220, 120, 255 };
             else if (rm.isBoss) c = rm.visited ? Color{ 210, 90, 80, 255 } : Color{ 120, 54, 50, 255 };
-            else if (rm.isShop && rm.visited) c = { 220, 180, 70, 255 };
+            else if (rm.isShop) c = rm.isGalin ? Color{ 90, 150, 220, 255 } : Color{ 220, 180, 70, 255 };   // shown from the start
             else if (rm.visited) c = { 120, 124, 150, 255 };
             else c = { 56, 58, 78, 255 };
             int rx = ox + (x - minX) * (cell + gap), ry = oy + (y - minY) * (cell + gap);
@@ -444,10 +496,22 @@ void Game::drawBossBar() {
     float x = (sw - w) / 2, y = 22;
     drawBossToken(currentBossIndex(), bossArt, { sw / 2.0f - ui::measure(b.name, 20) / 2.0f - 22, y + 9 }, 14);
     ui::textCentered(b.name, sw / 2.0f, y, 20, ui::ACCENT);
-    ui::bar({ x, y + 28, w, 14 }, fight.health(enemies), b.color);
+    float health = fight.health(enemies);
+    ui::bar({ x, y + 28, w, 14 }, health, b.color);
+    for (float mark : { 0.5f, 0.2f }) {          // the notches: something's coming
+        float at = fight.notch(mark);
+        DrawRectangleRec({ x + w * at - 1.5f, y + 24, 3, 22 }, health > at ? WHITE : Fade(WHITE, 0.3f));
+    }
     const char* note = fight.strength > 1.01f ? TextFormat("weak to %s   -   x%.1f strength", b.weakness, fight.strength)
                                               : TextFormat("weak to %s", b.weakness);
     ui::textCentered(note, sw / 2.0f, y + 50, 10, ui::MUTED);
+    float below = y + 66;
+    if (fight.stage == BossFight::Stage::Desperate) {
+        ui::textCentered("HIT THE CORE", sw / 2.0f, below, 20, { 255, 214, 130, 255 });
+        ui::bar({ x + w * 0.2f, below + 24, w * 0.6f, 8 }, fight.coreHp / fight.coreMax, { 255, 190, 90, 255 });
+    }
+    else if (player.hp <= player.maxHp * MERCY_BELOW)
+        ui::textCentered("Mercy: your last 30% counts double", sw / 2.0f, below, 10, ui::GOOD);
 }
 
 // ----------------------------------------------------------------- overlays
@@ -468,7 +532,7 @@ void Game::drawShop() {
         DrawTextureEx(marinTex, { panel.x + 16, panel.y + artH - hgt + 30 }, 0, sc, WHITE);
     }
     ui::text("Marin the Wizard", panel.x + pw * 0.28f, panel.y + artH - 50, 30, ui::ACCENT);
-    ui::text("\"Potions, powers, a little spice... all for honest gold.\"", panel.x + pw * 0.28f, panel.y + artH - 12, 20, ui::MUTED);
+    ui::text("\"Potions, vapes, a little spice... all for honest gold.\"", panel.x + pw * 0.28f, panel.y + artH - 12, 20, ui::MUTED);
     drawAnim(SPR.coin, animFrame(SPR.coin, clock, 8, true), { panel.x + pw - 110, panel.y + 34 }, 2.0f);
     ui::text(TextFormat("%d", player.gold), panel.x + pw - 90, panel.y + 24, 20, ui::ACCENT);
     if (ui::button({ panel.x + pw - 46, panel.y + 12, 32, 32 }, "X", ui::Style::Normal, 20)) { play("ui"); overlay = Overlay::None; }
@@ -477,21 +541,16 @@ void Game::drawShop() {
     for (int i = 0; i < SHOP_COUNT; ++i) {
         const ShopItem& it = SHOP_ITEMS[i];
         Rectangle row = { gx + (i % 2) * (colW + 24), gy + (i / 2) * (rowH + 8), colW, rowH };
-        bool owned = it.skill && player.has((Skill)it.skill);
+        bool owned = it.vape >= 0 && player.has((Vape)it.vape);
         DrawRectangleRec(row, owned ? Color{ 30, 44, 34, 255 } : ui::PANEL_LIGHT);
         DrawRectangleLinesEx(row, 1, Fade(ui::EDGE, 0.8f));
         Vector2 ic = { row.x + 28, row.y + rowH / 2 };
-        if (it.vape >= 0 && SPR.vapes.ok()) drawAnim(SPR.vapes, it.vape, ic, 1.4f);
-        else if (!it.skill) drawAnim(i == 0 ? SPR.flaskRed : SPR.flaskBlue, animFrame(SPR.flaskRed, clock, 6, true), ic, 2.4f);
-        else {
-            DrawCircleV(ic, 16, Fade({ 150, 110, 230, 255 }, 0.35f + 0.15f * sinf(clock * 3 + i)));
-            DrawCircleLinesV(ic, 16, { 200, 170, 255, 255 });
-            ui::textCentered(TextFormat("%c", it.name[0]), ic.x, ic.y - 10, 20, ui::TEXT);
-        }
+        if (it.vape >= 0) drawAnim(SPR.vapes, it.vape, ic, 1.4f);
+        else drawAnim(i == 0 ? SPR.flaskRed : SPR.flaskBlue, animFrame(SPR.flaskRed, clock, 6, true), ic, 2.4f);
         ui::text(it.name, row.x + 54, row.y + 8, 20, ui::TEXT);
         ui::text(it.desc, row.x + 54, row.y + 32, 10, ui::MUTED);
         Rectangle buyBtn = { row.x + colW - 96, row.y + 11, 84, rowH - 22 };
-        if (owned) ui::text("Learned", buyBtn.x + 6, buyBtn.y + 6, 20, ui::GOOD);
+        if (owned) ui::text("Owned", buyBtn.x + 6, buyBtn.y + 6, 20, ui::GOOD);
         else if (ui::button(buyBtn, TextFormat("%d g", it.price), player.gold >= it.price ? ui::Style::Primary : ui::Style::Normal, 20))
             buy(i);
     }
@@ -508,6 +567,76 @@ void Game::drawControlsEditor() {
         play("ui");
         overlay = Overlay::Pause;
     }
+}
+
+void Game::drawWeapon(int weapon, Rectangle box) const {
+    Texture2D tx = weaponTex[weapon];
+    ui::drawContain(tx, { 0, 0, (float)tx.width, (float)tx.height }, box);
+}
+
+void Game::drawGalin() {
+    int sw = GetScreenWidth(), sh = GetScreenHeight();
+    if (shopMsgT > 0) shopMsgT -= GetFrameTime();
+    ui::veil(0.65f);
+    float pw = fminf(1000.0f, sw - 60.0f), ph = fminf(660.0f, sh - 40.0f);
+    Rectangle panel = { (sw - pw) / 2, (sh - ph) / 2, pw, ph };
+    ui::panel(panel);
+
+    // Galin on the left, the purse on the right
+    float artH = ph * 0.30f;
+    ui::drawContain(galinTex, { 0, 0, (float)galinTex.width, (float)galinTex.height }, { panel.x + 14, panel.y + 8, pw * 0.24f, artH });
+    ui::text("Galin", panel.x + pw * 0.28f, panel.y + artH - 62, 30, ui::ACCENT);
+    ui::text("\"Bring me a pack and I'll see what I can do.\"", panel.x + pw * 0.28f, panel.y + artH - 24, 20, ui::MUTED);
+    drawAnim(SPR.coin, animFrame(SPR.coin, clock, 8, true), { panel.x + pw - 110, panel.y + 34 }, 2.0f);
+    ui::text(TextFormat("%d", player.gold), panel.x + pw - 90, panel.y + 24, 20, ui::ACCENT);
+    ui::drawContain(packTex, { 0, 0, (float)packTex.width, (float)packTex.height }, { panel.x + pw - 212, panel.y + 18, 32, 32 });
+    ui::text(TextFormat("%d", player.packs), panel.x + pw - 176, panel.y + 24, 20, ui::ACCENT);
+    if (ui::button({ panel.x + pw - 46, panel.y + 12, 32, 32 }, "X", ui::Style::Normal, 20)) { play("ui"); overlay = Overlay::None; }
+
+    float gy = panel.y + artH + 18, colW = (pw - 72) / 2, rowH = 52, rightX = panel.x + 24 + colW + 24;
+    auto rowAt = [&](float x, int i) { return Rectangle{ x, gy + 30 + i * (rowH + 8), colW, rowH }; };
+    auto rowBack = [&](Rectangle row) {
+        DrawRectangleRec(row, ui::PANEL_LIGHT);
+        DrawRectangleLinesEx(row, 1, Fade(ui::EDGE, 0.8f));
+    };
+
+    // --- weapons ---
+    ui::text("Weapons", panel.x + 24, gy, 20, ui::ACCENT);
+    for (int i = 0; i < WEAPON_COUNT; ++i) {
+        const WeaponDef& w = WEAPONS[i];
+        Rectangle row = rowAt(panel.x + 24, i);
+        rowBack(row);
+        drawWeapon(i, { row.x + 8, row.y + 4, 64, 44 });
+        ui::text(w.name, row.x + 80, row.y + 8, 20, ui::TEXT);
+        ui::text(TextFormat("+%d %s  %.2fs swing  %d reach  %d knockback", w.damage, w.anal ? "Anal damage" : "damage", w.swing, (int)w.reach, (int)w.knockback), row.x + 80, row.y + 32, 10, ui::MUTED);
+        Rectangle btn = { row.x + colW - 96, row.y + 11, 84, rowH - 22 };
+        if (i == player.weapon) ui::textCentered("In hand", btn.x + btn.width / 2, btn.y + 10, 10, ui::GOOD);
+        else if (player.owns(i)) { if (ui::button(btn, "Equip", ui::Style::Good, 20)) buyWeapon(i); }
+        else if (ui::button(btn, TextFormat("%d g", w.price), player.gold >= w.price ? ui::Style::Primary : ui::Style::Normal, 20)) buyWeapon(i);
+    }
+
+    // --- upgrades of the weapon in hand ---
+    ui::text(TextFormat("Upgrades: %s", WEAPONS[player.weapon].name), rightX, gy, 20, ui::ACCENT);
+    for (int u = 0; u < UPGRADE_COUNT; ++u) {
+        const UpgradeDef& up = UPGRADES[u];
+        int level = player.upgrades[player.weapon][u], price = up.gold * (level + 1);
+        Rectangle row = rowAt(rightX, u);
+        rowBack(row);
+        ui::text(up.name, row.x + 12, row.y + 8, 20, ui::TEXT);
+        ui::text(u == UP_SHARPEN && WEAPONS[player.weapon].anal ? "+3 Anal damage" : up.desc, row.x + 12, row.y + 32, 10, ui::MUTED);
+        for (int k = 0; k < UPGRADE_MAX; ++k)     // a pip per level
+            DrawRectangleRec({ row.x + 130 + k * 16, row.y + 20, 12, 12 }, k < level ? ui::ACCENT : Color{ 16, 12, 24, 255 });
+        Rectangle btn = { row.x + colW - 196, row.y + 11, 184, rowH - 22 };
+        if (level >= UPGRADE_MAX) ui::textCentered("Maxed", btn.x + btn.width / 2, btn.y + 10, 10, ui::GOOD);
+        else if (ui::button(btn, TextFormat("%s: 1 pack, %d g", up.name, price),
+            player.packs > 0 && player.gold >= price ? ui::Style::Primary : ui::Style::Normal, 10)) buyUpgrade(u);
+    }
+    ui::textWrapped("Every upgrade burns a cigarette pack. Every Gakev carries one, and chests sometimes hold one.",
+        rightX, rowAt(rightX, UPGRADE_COUNT).y + 8, colW, 10, ui::MUTED);
+
+    if (shopMsgT > 0) ui::textCentered(shopMsg.c_str(), panel.x + pw / 2, panel.y + ph - 36, 20, Fade(ui::ACCENT, fminf(1.0f, shopMsgT)));
+    ui::text(TextFormat("%s %d   Swing %.2fs   Reach %d", WEAPONS[player.weapon].anal ? "Anal damage" : "Damage", bladeDamage(), swingTime(), (int)bladeReach()),
+        panel.x + 24, panel.y + ph - 32, 10, ui::MUTED);
 }
 
 void Game::drawPause() {
@@ -562,7 +691,7 @@ void Game::drawRunComplete() {
     ui::textWrapped("Pyraketh, the Cinder-Maw, lies still. Every boss of the Path has fallen to you.",
         p.x + 28, p.y + 80, pw - 56, 20, ui::TEXT);
     float y = p.y + 150;
-    for (int i = 0; i < BOSS_COUNT; ++i) {      // the five fallen bosses
+    for (int i = 0; i < BOSS_COUNT; ++i) {      // the six fallen bosses
         float slot = (pw - 56) / BOSS_COUNT;
         drawBossToken(i, bossArt, { p.x + 28 + i * slot + slot / 2, y + 50 }, 44);
     }
@@ -580,7 +709,7 @@ void Game::drawRushOver() {
     Rectangle p = { (sw - pw) / 2, (sh - ph) / 2, pw, ph };
     ui::titledPanel(p, rushWon ? "Boss Rush conquered" : "Defeated");
     if (rushWon) {
-        ui::text(TextFormat("All five bosses in %s", ui::clock(rushTime)), p.x + 28, p.y + 90, 30, ui::TEXT);
+        ui::text(TextFormat("All six bosses in %s", ui::clock(rushTime)), p.x + 28, p.y + 90, 30, ui::TEXT);
         ui::text(rushRecord ? "A new record!" : TextFormat("Best: %s", ui::clock(profile.bestRush)), p.x + 28, p.y + 140, 20,
             rushRecord ? ui::ACCENT : ui::MUTED);
     }

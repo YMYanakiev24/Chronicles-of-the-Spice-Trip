@@ -68,7 +68,7 @@ void Dungeon::generate() {
     }
     grid[by][bx].isBoss = true;
 
-    // Marin's market goes in a dead-end room if there is one (any room otherwise).
+    // One shop a floor, Marin's and Galin's in turn, in a dead-end room if there is one (any room otherwise).
     {
         int sx = -1, sy = -1, fallbackX = -1, fallbackY = -1;
         for (int y = 0; y < DUNGEON_G; ++y)
@@ -81,7 +81,8 @@ void Dungeon::generate() {
                 if (fallbackX < 0 || GetRandomValue(0, 2) == 0) { fallbackX = x; fallbackY = y; }
             }
         if (sx < 0) { sx = fallbackX; sy = fallbackY; }
-        if (sx >= 0) { grid[sy][sx].isShop = true; grid[sy][sx].cleared = true; }
+        if (sx >= 0) { grid[sy][sx].isShop = true; grid[sy][sx].isGalin = galinNext; grid[sy][sx].cleared = true; }
+        galinNext = !galinNext;
     }
 
     // The boss key waits in one random combat room.
@@ -301,6 +302,19 @@ bool lineClear(const Room& r, Vector2 a, Vector2 b, float radius) {
     return true;
 }
 
+// Can a body go straight from a to b? Bodies collide as squares (see moveInRoom), and a
+// square's corners catch on walls that a circle of the same radius slips past.
+static bool boxClear(const Room& r, Vector2 a, Vector2 b, float half) {
+    float len = Vector2Distance(a, b);
+    for (float s = 0; ; s += 6) {
+        Vector2 p = Vector2Lerp(a, b, len > 0 ? fminf(1, s / len) : 1);
+        for (float sx : { -half, half })
+            for (float sy : { -half, half })
+                if (!walkable(r, (int)floorf((p.x + sx) / TILE), (int)floorf((p.y + sy) / TILE))) return false;
+        if (s >= len) return true;
+    }
+}
+
 Vector2 nextWaypoint(const Room& r, const FlowField& f, Vector2 from, float radius) {
     int tx = (int)floorf(from.x / TILE), ty = (int)floorf(from.y / TILE);
     int bestX = tx, bestY = ty;
@@ -313,7 +327,12 @@ Vector2 nextWaypoint(const Room& r, const FlowField& f, Vector2 from, float radi
         if (f[ny][nx] < best) { best = f[ny][nx]; bestX = nx; bestY = ny; }
     }
     Vector2 step = { bestX * (float)TILE + TILE / 2.0f, bestY * (float)TILE + TILE / 2.0f };
-    if (radius > 0 && !lineClear(r, from, step, radius))
-        return { tx * (float)TILE + TILE / 2.0f, ty * (float)TILE + TILE / 2.0f };
+    if (radius > 0 && !boxClear(r, from, step, radius)) {
+        Vector2 mid = { tx * (float)TILE + TILE / 2.0f, ty * (float)TILE + TILE / 2.0f };
+        // heading straight along a row or column: keep going while easing onto its centre line
+        if (bestY == ty && bestX != tx) return { from.x + (bestX - tx) * fabsf(from.y - mid.y), mid.y };
+        if (bestX == tx && bestY != ty) return { mid.x, from.y + (bestY - ty) * fabsf(from.x - mid.x) };
+        return mid;
+    }
     return step;
 }
