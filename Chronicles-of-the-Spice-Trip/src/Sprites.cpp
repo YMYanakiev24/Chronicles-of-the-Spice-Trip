@@ -56,12 +56,13 @@ void Sprites::load() {
     oracle = loadStrip("oracle.png", 16);
     flame = loadStrip("flame.png", 32);
     key = loadStrip("key.png", 16);
+    rock = loadStrip("rock.png", 64);
     vapes = loadStrip("vapes.png", 32);
     spellIcons = loadStrip("spell_icons.png", 32);
     enemy[EK_SKELETON] = loadEnemy("skel1");
     enemy[EK_SKELETON2] = loadEnemy("skel2");
     enemy[EK_VAMPIRE] = loadEnemy("vamp");
-    enemy[EK_THIEF] = loadEnemy("thief");
+    enemy[EK_GAKEV] = loadEnemy("thief");
     enemy[EK_MELON] = loadEnemy("melon");
     enemy[EK_TOSHKO] = loadEnemy("toshko", 48);
 }
@@ -70,7 +71,7 @@ void Sprites::unload() {
     auto un = [](Texture2D& t) { if (t.id) UnloadTexture(t); t = Texture2D{}; };
     un(tileset);
     for (Anim* a : { &peaks, &chest, &chestOpen, &torch, &sideTorch, &candle, &candle2,
-                     &flaskRed, &flaskBlue, &flag, &coin, &skull, &oracle, &flame, &key, &vapes, &spellIcons })
+                     &flaskRed, &flaskBlue, &flag, &coin, &skull, &oracle, &flame, &key, &rock, &vapes, &spellIcons })
         un(a->tex);
     for (auto& e : enemy)
         for (Anim* a : { &e.idle, &e.move, &e.attack, &e.hurt, &e.death }) un(a->tex);
@@ -88,6 +89,11 @@ void drawAnim(const Anim& a, int frame, Vector2 center, float scale, bool flipX,
     Rectangle src = { (float)(frame * a.fw), 0, flipX ? -(float)a.fw : (float)a.fw, (float)a.fh };
     float w = a.fw * scale, h = a.fh * scale;
     DrawTexturePro(a.tex, src, { center.x, center.y, w, h }, { w / 2, h / 2 }, rotation, tint);
+}
+
+void drawAnimOnFoot(const Anim& a, int frame, Vector2 foot, float w, float h, float rotation) {
+    if (!a.ok()) return;
+    DrawTexturePro(a.tex, { (float)(frame * a.fw), 0, (float)a.fw, (float)a.fh }, { foot.x, foot.y, w, h }, { w / 2, h }, rotation, WHITE);
 }
 
 void drawTile(int col, int row, float x, float y, Color tint) {

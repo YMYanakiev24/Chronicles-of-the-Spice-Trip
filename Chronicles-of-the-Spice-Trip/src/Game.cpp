@@ -18,6 +18,59 @@ static Texture2D loadArt(const char* file) {
     return t;
 }
 
+// Art that arrives without alpha, on a flat backdrop, is cut out as it loads. Magenta goes
+// everywhere; white only where it reaches in from the edges, as the art has white in it too.
+// Backdrop that shows through gaps in the art goes as well: with a `minHole`, so does any
+// white patch of at least that many pixels.
+static void cutOut(Color* px, int w, int h, int minHole) {
+    for (int i = 0; i < w * h; ++i)
+        if (std::min(px[i].r, px[i].b) - px[i].g > 50) px[i] = BLANK;
+
+    auto patchAt = [&](int start) {     // the white touching a pixel; alpha 254 marks it as seen
+        std::vector<int> patch;
+        auto take = [&](int at) {
+            Color& c = px[at];
+            if (c.a != 255 || c.r < 225 || c.g < 225 || c.b < 225) return;
+            c.a = 254;
+            patch.push_back(at);
+        };
+        take(start);
+        for (size_t i = 0; i < patch.size(); ++i) {
+            int at = patch[i], x = at % w, y = at / w;
+            if (x > 0) take(at - 1);
+            if (x < w - 1) take(at + 1);
+            if (y > 0) take(at - w);
+            if (y < h - 1) take(at + w);
+        }
+        return patch;
+    };
+    auto clear = [&](const std::vector<int>& patch) { for (int at : patch) px[at] = BLANK; };
+    for (int x = 0; x < w; ++x) { clear(patchAt(x)); clear(patchAt((h - 1) * w + x)); }
+    for (int y = 0; y < h; ++y) { clear(patchAt(y * w)); clear(patchAt(y * w + w - 1)); }
+    if (minHole > 0)
+        for (int i = 0; i < w * h; ++i) {
+            auto patch = patchAt(i);
+            if ((int)patch.size() >= minHole) clear(patch);
+        }
+    for (int i = 0; i < w * h; ++i) if (px[i].a == 254) px[i].a = 255;
+}
+
+static Texture2D loadCutout(const char* file, int minHole = 0) {
+    std::string p = findAsset(file);
+    if (p.empty()) return Texture2D{};
+    Image im = LoadImage(p.c_str());
+    if (!im.data) return Texture2D{};
+    ImageFormat(&im, PIXELFORMAT_UNCOMPRESSED_R8G8B8A8);
+    Color* px = (Color*)im.data;
+    if (px[0].a == 255) cutOut(px, im.width, im.height, minHole);   // transparent art is ready (and may well be pink)
+
+    Texture2D t = LoadTextureFromImage(im);
+    UnloadImage(im);
+    GenTextureMipmaps(&t);                          // huge pictures, drawn tiny
+    SetTextureFilter(t, TEXTURE_FILTER_TRILINEAR);
+    return t;
+}
+
 // Fullscreen is a borderless window one pixel taller than the monitor. A window that
 // exactly covers the monitor gets Windows' fullscreen fast path, and screen shares
 // (Discord, OBS window capture) then freeze on the last frame they saw.
@@ -61,6 +114,11 @@ void Game::init(bool windowed) {
     castleTex = loadArt("castle.png");
     marinTex = loadArt("marin.png");
     shopTex = loadArt("shop.png");
+    galinTex = loadCutout("Galin.png");
+    galinShopTex = loadCutout("GalinShop.png", 50);    // the sky between its poles; the cigarette is smaller
+    packTex = loadCutout("Marlboro.png");
+    for (int i = 0; i < WEAPON_COUNT; ++i)
+        weaponTex[i] = loadCutout(WEAPONS[i].art);
     for (int i = 0; i < CHAMPION_COUNT; ++i)
         if (CHAMPIONS[i].art) champTex[i] = loadArt(CHAMPIONS[i].art);
     for (int i = 0; i < CHAMPION_COUNT; ++i) walk[i].load(CHAMPIONS[i].walk);
@@ -76,8 +134,9 @@ void Game::init(bool windowed) {
 void Game::shutdown() {
     SPR.unload();
     bossArt.unload();
-    for (Texture2D* tx : { &menuBg, &castleTex, &marinTex, &shopTex })
+    for (Texture2D* tx : { &menuBg, &castleTex, &marinTex, &shopTex, &galinTex, &galinShopTex, &packTex })
         if (tx->id) UnloadTexture(*tx);
+    for (auto& tx : weaponTex) if (tx.id) UnloadTexture(tx);
     for (auto& tx : champTex) if (tx.id) UnloadTexture(tx);
     for (auto& w : walk) w.unload();
     if (fearTex.id) UnloadTexture(fearTex);
@@ -161,6 +220,7 @@ void Game::startRun() {
     mode = Mode::Run;
     player = freshPlayer(profile.champion, 1);
     player.pos = ROOM_CENTER;
+    dungeon.galinNext = GetRandomValue(0, 1);
     dungeon.generate();
     floor = 1; kills = 0; runTime = 0;
     dialogue.clear(); overlay = Overlay::None; scareT = 0;
@@ -233,11 +293,14 @@ void Game::enterRoom() {
     shots.clear(); enemyShots.clear();
     parts.clear(); popups.clear(); coins.clear(); floaters.clear();
     fight.end();
-    chestOpenT = 99;
-    if (overlay == Overlay::Shop) overlay = Overlay::None;
+    flashes.clear(); arcs.clear(); cracks.clear(); spikes.clear(); rubble.clear();
+    skyFlash = 0; finaleT = 0; slowMo = 0; rewardT = 0;
+    chestOpenT = 99; chestLight = 0; chestLooting = false;
+    castT = 0; hitStop = 0;
+    if (overlay == Overlay::Shop || overlay == Overlay::Galin) overlay = Overlay::None;
 
     Room& r = dungeon.cur();
-    if (r.isShop && !r.visited) showBanner("Marin's Market", "Press E to trade", 2.0f);
+    if (r.isShop && !r.visited) showBanner(r.isGalin ? "Galin's Dobrich Stock" : "Marin's Market", "Press E to trade", 2.0f);
     r.visited = true;
     inFight = false;
     music.setMood(r.isBoss && !r.cleared ? "boss" : "mist");
@@ -267,7 +330,7 @@ void Game::enterRoom() {
 
     if (r.isBoss) {
         const BossDef& b = currentBoss();
-        fight.begin(b, currentStrength(), { ROOM_CENTER.x, ROOM_CENTER.y - 30 }, enemies);
+        fight.begin(b, currentStrength(), { ROOM_CENTER.x, ROOM_CENTER.y - (b.kind == BossKind::Rooted ? 0 : 30) }, enemies);
         std::string sub = std::string(b.epithet) + "  -  weak to " + b.weakness;
         if (mode == Mode::BossRush) sub = TextFormat("Stage %d / %d  -  weak to %s", rushStage + 1, BOSS_COUNT, b.weakness);
         showBanner(b.name, sub, 3.0f);
@@ -284,8 +347,8 @@ void Game::enterRoom() {
             spawn("Hollow Hound", 70 * tough, 110, 14, 26, 13, { 42,31,46,255 }, "Fire", EK_SKELETON2);
         for (int i = 0, n = GetRandomValue(0, 2); i < n; ++i)
             spawn("Wisp", 20 * tough, 85, 5, 10, 10, { 120,180,230,255 }, "Lightning", EK_SKULL);
-        if (GetRandomValue(0, 2) == 0)
-            spawn("Coin Thief", 45 * tough, 120, 9, 30, 12, { 40,60,140,255 }, "Lightning", EK_THIEF);
+        if (GetRandomValue(0, 2) == 0)         // Gakev: the only one who carries cigarette packs
+            spawn("Gakev", 45 * tough, 120, 9, 30, 12, { 40,60,140,255 }, "Lightning", EK_GAKEV);
         if (GetRandomValue(1, 100) <= 30)      // Toshko: snatches 50 gold and runs
             spawn("Toshko", 40 * tough, 175, 0, 40, 12, { 30,30,60,255 }, "Lightning", EK_TOSHKO);
         if (GetRandomValue(0, 2) == 0)
@@ -313,21 +376,30 @@ void Game::bossDefeated() {
     enemyShots.clear();
     fight.end();
     music.setMood("mist");
-    play("quest");
+    play("victory");
+    rubble.clear();
+    for (int k = 0; k < 36; ++k) {             // a shower of stars over the reward
+        float life = frand(0.9f, 1.5f);
+        parts.push_back({ { ROOM_CENTER.x + frand(-50, 50), ROOM_CENTER.y }, Vector2Scale(fromAngle(-PI / 2 + frand(-1.1f, 1.1f)), frand(120, 320)), life, life,
+            frand(3, 6), k % 3 ? Color{ 255, 222, 110, 255 } : Color{ 255, 255, 235, 255 }, 300, false, true });
+    }
+    std::string fell = std::string(b.name) + " falls!";
+    showBanner("BOSS DEFEATED", fell, 3.0f);
+    auto thenShow = [this](Overlay o) { rewardOverlay = o; rewardT = 2.4f; };
 
     if (mode == Mode::Run) {
         profile.deepestFloor = std::max(profile.deepestFloor, floor);
-        if (floor % BOSS_COUNT == 0) { profile.runsCompleted++; overlay = Overlay::RunComplete; }
-        else showBanner(std::string(b.name) + " falls!", "The stairs lead down", 2.5f);
+        if (floor % BOSS_COUNT == 0) { profile.runsCompleted++; thenShow(Overlay::RunComplete); }
+        else showBanner("BOSS DEFEATED", fell + " The stairs lead down", 3.0f);
     }
     else if (rushStage + 1 >= BOSS_COUNT) {
         rushWon = true;
         rushRecord = profile.bestRush <= 0 || rushTime < profile.bestRush;
         if (rushRecord) profile.bestRush = rushTime;
-        overlay = Overlay::RushOver;
+        thenShow(Overlay::RushOver);
     }
     else {
-        showBanner(std::string(b.name) + " falls!", "The next challenger approaches...", 2.5f);
+        showBanner("BOSS DEFEATED", fell + " The next challenger approaches...", 2.5f);
         rushNextT = 2.5f;
     }
     saveProfile();

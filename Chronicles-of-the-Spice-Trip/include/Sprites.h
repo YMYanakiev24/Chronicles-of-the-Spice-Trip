@@ -22,15 +22,18 @@ int animFrame(const Anim& a, float time, float fps, bool loop);
 void drawAnim(const Anim& a, int frame, Vector2 center, float scale, bool flipX = false,
     Color tint = WHITE, float rotation = 0.0f);
 
+// Draw one frame squashed or stretched to w x h, standing on `foot` (it tilts about that point too).
+void drawAnimOnFoot(const Anim& a, int frame, Vector2 foot, float w, float h, float rotation = 0.0f);
+
 // The full animation set for one enemy type (Enemy_Animations_Set).
 struct EnemyAnims { Anim idle, move, attack, hurt, death; };
 
-enum EnemyKind { EK_SKELETON = 0, EK_SKELETON2 = 1, EK_VAMPIRE = 2, EK_SKULL = 3, EK_THIEF = 4, EK_MELON = 5, EK_TOSHKO = 6 };
+enum EnemyKind { EK_SKELETON = 0, EK_SKELETON2 = 1, EK_VAMPIRE = 2, EK_SKULL = 3, EK_GAKEV = 4, EK_MELON = 5, EK_TOSHKO = 6 };
 
 struct Sprites {
     Texture2D tileset{};                       // 16px tiles, 10x10
     Anim peaks, chest, chestOpen, torch, sideTorch, candle, candle2;
-    Anim flaskRed, flaskBlue, flag, coin, skull, oracle, flame, key;
+    Anim flaskRed, flaskBlue, flag, coin, skull, oracle, flame, key, rock;
     Anim vapes, spellIcons;                    // 32px icons: one frame per Vape / SPELLS entry
     EnemyAnims enemy[7];                      // indexed by EnemyKind (skull slot unused)
 
