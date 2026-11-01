@@ -28,14 +28,18 @@ void drawAnimOnFoot(const Anim& a, int frame, Vector2 foot, float w, float h, fl
 // The full animation set for one enemy type (Enemy_Animations_Set).
 struct EnemyAnims { Anim idle, move, attack, hurt, death; };
 
-enum EnemyKind { EK_SKELETON = 0, EK_SKELETON2 = 1, EK_VAMPIRE = 2, EK_SKULL = 3, EK_GAKEV = 4, EK_MELON = 5, EK_TOSHKO = 6 };
+enum EnemyKind { EK_SKELETON = 0, EK_SKELETON2 = 1, EK_VAMPIRE = 2, EK_SKULL = 3, EK_GAKEV = 4, EK_MELON = 5, EK_TOSHKO = 6,
+                 EK_SOLDIER = 7, EK_ORC = 8, EK_DEMON = 9, EK_BLOOD = 10 };
+
+// How fast a kind's attack animation plays: the bow and the axe take their time.
+inline float attackFps(int kind) { return kind == EK_SOLDIER ? 12.0f : kind == EK_ORC ? 9.0f : 16.0f; }
 
 struct Sprites {
     Texture2D tileset{};                       // 16px tiles, 10x10
     Anim peaks, chest, chestOpen, torch, sideTorch, candle, candle2;
-    Anim flaskRed, flaskBlue, flag, coin, skull, oracle, flame, key, rock;
+    Anim flaskRed, flaskBlue, flag, coin, skull, oracle, flame, key, rock, arrow;
     Anim vapes, spellIcons;                    // 32px icons: one frame per Vape / SPELLS entry
-    EnemyAnims enemy[7];                      // indexed by EnemyKind (skull slot unused)
+    EnemyAnims enemy[11];                     // indexed by EnemyKind (skull slot unused)
 
     void load();
     void unload();

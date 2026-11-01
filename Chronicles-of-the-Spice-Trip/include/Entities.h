@@ -34,6 +34,7 @@ enum class ShotKind : unsigned char {
     Ember,      // the Cinder-Maw's fire
     Boot,       // Triceps' magnetic boots, curving in their field
     Ball,       // the iron balls her staff bats at you
+    Arrow,      // a Soldier's arrow
     Rock,       // the boulders the Bad Plasmodium throws
 };
 
@@ -66,7 +67,8 @@ struct Enemy {
     float   hitFlash = 0, atkCd = 0, wobble = 0;
     Vector2 knock{};                   // knocked back: this velocity, dying away
     float   burnT = 0;                 // seconds left on fire (looks only: burning does no damage)
-    float   lunge = 0, lungeCd = 0;    // hounds: short burst of speed at the player
+    float   lunge = 0, lungeCd = 0;    // hounds and demons: short burst of speed at the player
+    bool    swinging = false;          // mid-attack, the blow or shot still to come
     float   flankSide = 1;             // which side this enemy circles toward (+1/-1)
     int     kind = 0;                  // EnemyKind (Sprites.h)
     float   animT = 0;                 // running clock for idle/move loops

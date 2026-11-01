@@ -318,6 +318,7 @@ void Game::enterRoom() {
         e.r = rad; e.color = col; e.weakness = weak; e.kind = kind;
         e.wobble = frand(0, 6.28f); e.animT = frand(0, 1);
         e.flankSide = GetRandomValue(0, 1) ? 1.0f : -1.0f; e.lungeCd = frand(0.5f, 2.0f);
+        e.shootCd = frand(0.8f, 2.2f);
         // a random open floor spot away from the walls
         int tx = 0, ty = 0;
         for (int tries = 0; tries < 100; ++tries) {
@@ -346,11 +347,11 @@ void Game::enterRoom() {
         // deeper floors send more and tougher monsters
         float tough = 1.0f + 0.15f * (floor - 1);
         int extra = (floor - 1) / 2;
-        for (int i = 0, n = 3 + GetRandomValue(0, 2) + extra; i < n; ++i)
+        for (int i = 0, n = 2 + GetRandomValue(0, 2) + extra; i < n; ++i)
             spawn("Mistling", 30 * tough, 60, 6, 12, 12, { 138,168,154,255 }, "Fire", EK_SKELETON);
         for (int i = 0, n = GetRandomValue(0, 1); i < n; ++i)
             spawn("Hollow Hound", 70 * tough, 110, 14, 26, 13, { 42,31,46,255 }, "Fire", EK_SKELETON2);
-        for (int i = 0, n = GetRandomValue(0, 2); i < n; ++i)
+        for (int i = 0, n = GetRandomValue(0, 1); i < n; ++i)
             spawn("Wisp", 20 * tough, 85, 5, 10, 10, { 120,180,230,255 }, "Lightning", EK_SKULL);
         if (GetRandomValue(0, 2) == 0)         // Gakev: the only one who carries cigarette packs
             spawn("Gakev", 45 * tough, 120, 9, 30, 12, { 40,60,140,255 }, "Lightning", EK_GAKEV);
@@ -358,6 +359,16 @@ void Game::enterRoom() {
             spawn("Toshko", 40 * tough, 175, 0, 40, 12, { 30,30,60,255 }, "Lightning", EK_TOSHKO);
         if (GetRandomValue(0, 2) == 0)
             spawn("Melon Warrior", 110 * tough, 50, 16, 24, 14, { 230,150,60,255 }, "Fire", EK_MELON);
+        for (int i = 0, n = 1 + GetRandomValue(0, 1) + extra / 2; i < n; ++i) {  // something that shoots, in every combat room
+            int shooter = GetRandomValue(0, 2);
+            if (shooter == 0) spawn("Soldier", 35 * tough, 70, 8, 20, 12, { 150,160,180,255 }, "Lightning", EK_SOLDIER);
+            else if (shooter == 1) spawn("Wisp", 20 * tough, 85, 5, 10, 10, { 120,180,230,255 }, "Lightning", EK_SKULL);
+            else spawn("Blood Monster", 70 * tough, 60, 10, 24, 14, { 170,30,60,255 }, "Fire", EK_BLOOD);
+        }
+        if (GetRandomValue(1, 100) <= 33)      // Orc: a slow axe you can step away from
+            spawn("Orc", 90 * tough, 75, 16, 28, 13, { 110,150,70,255 }, "Fire", EK_ORC);
+        if (floor >= 2 && GetRandomValue(1, 100) <= 25)  // Demon: leaps at you from across the room
+            spawn("Demon", 55 * tough, 105, 12, 32, 12, { 120,30,40,255 }, "Water", EK_DEMON);
     }
     inFight = true;
 }

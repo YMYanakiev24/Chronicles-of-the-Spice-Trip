@@ -65,13 +65,18 @@ void Sprites::load() {
     enemy[EK_GAKEV] = loadEnemy("thief");
     enemy[EK_MELON] = loadEnemy("melon");
     enemy[EK_TOSHKO] = loadEnemy("toshko", 48);
+    enemy[EK_SOLDIER] = loadEnemy("soldier", 100);
+    enemy[EK_ORC] = loadEnemy("orc", 100);
+    enemy[EK_DEMON] = loadEnemy("demon", 100);
+    enemy[EK_BLOOD] = loadEnemy("blood", 100);
+    arrow = loadStrip("arrow.png", 32);
 }
 
 void Sprites::unload() {
     auto un = [](Texture2D& t) { if (t.id) UnloadTexture(t); t = Texture2D{}; };
     un(tileset);
     for (Anim* a : { &peaks, &chest, &chestOpen, &torch, &sideTorch, &candle, &candle2,
-                     &flaskRed, &flaskBlue, &flag, &coin, &skull, &oracle, &flame, &key, &rock, &vapes, &spellIcons })
+                     &flaskRed, &flaskBlue, &flag, &coin, &skull, &oracle, &flame, &key, &rock, &arrow, &vapes, &spellIcons })
         un(a->tex);
     for (auto& e : enemy)
         for (Anim* a : { &e.idle, &e.move, &e.attack, &e.hurt, &e.death }) un(a->tex);
