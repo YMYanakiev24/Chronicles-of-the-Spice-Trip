@@ -1,0 +1,39 @@
+plugins { id 'com.android.application' }
+
+android {
+    namespace 'com.spicetrip.chronicles'
+    compileSdk 34
+
+    defaultConfig {
+        applicationId 'com.spicetrip.chronicles'
+        minSdk 24
+        targetSdk 34
+        versionCode(System.getenv('VERSION_CODE') ? System.getenv('VERSION_CODE').toInteger() : 1)
+        versionName(System.getenv('VERSION_NAME') ?: '0.1.0')
+        ndk { abiFilters 'arm64-v8a', 'armeabi-v7a' }
+        externalNativeBuild { cmake { arguments '-DANDROID_STL=c++_static' } }
+    }
+
+    // The release workflow provides the signing key through the environment.
+    signingConfigs {
+        release {
+            if (System.getenv('KEYSTORE_FILE')) {
+                storeFile file(System.getenv('KEYSTORE_FILE'))
+                storePassword System.getenv('KEYSTORE_PASSWORD')
+                keyAlias System.getenv('KEY_ALIAS')
+                keyPassword System.getenv('KEYSTORE_PASSWORD')
+            }
+        }
+    }
+    buildTypes {
+        release {
+            minifyEnabled false
+            if (System.getenv('KEYSTORE_FILE')) signingConfig signingConfigs.release
+        }
+    }
+
+    externalNativeBuild { cmake { path 'CMakeLists.txt' } }
+
+    // The game's art goes in as it is, at the root of the APK's assets.
+    sourceSets { main { assets.srcDirs = ['../../assets'] } }
+}

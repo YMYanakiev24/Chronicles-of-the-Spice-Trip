@@ -44,4 +44,7 @@ namespace save {
     bool writeSettings(const Settings& s);
     Settings readSettings();
 
+    bool writeTouchLayout(const TouchLayout& t);
+    TouchLayout readTouchLayout();
+
 } // namespace save

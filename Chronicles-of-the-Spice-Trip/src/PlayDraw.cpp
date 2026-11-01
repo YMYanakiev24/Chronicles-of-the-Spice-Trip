@@ -3,6 +3,7 @@
 // ============================================================================
 #include "Game.h"
 #include "Input.h"
+#include "Touch.h"
 #include "Render.h"
 #include "Ui.h"
 #include <algorithm>
@@ -12,7 +13,8 @@
 void Game::playScreen() {
     float dt = fminf(GetFrameTime(), 0.05f);
     if (in::pressed(KEY_ESCAPE)) {
-        if (overlay == Overlay::Shop || overlay == Overlay::Galin || overlay == Overlay::Pause) overlay = Overlay::None;
+        if (overlay == Overlay::Controls) { save::writeTouchLayout(touch::layout()); overlay = Overlay::Pause; }
+        else if (overlay == Overlay::Shop || overlay == Overlay::Galin || overlay == Overlay::Pause) overlay = Overlay::None;
         else if (overlay == Overlay::None) overlay = Overlay::Pause;
         play("ui");
     }
@@ -47,6 +49,7 @@ void Game::playScreen() {
     case Overlay::Shop:        drawShop(); break;
     case Overlay::Galin:       drawGalin(); break;
     case Overlay::Pause:       drawPause(); break;
+    case Overlay::Controls:    drawControlsEditor(); break;
     case Overlay::RunComplete: drawRunComplete(); break;
     case Overlay::RushOver:    drawRushOver(); break;
     default: break;
@@ -395,6 +398,7 @@ void Game::drawHud() {
         int cost = spellCost(i);
         bool castable = player.mana >= cost;
         DrawRectangleRec(s, { 16, 14, 24, 230 });
+        touch::zone(s, KEY_ONE + i);
         if (SPR.spellIcons.ok()) drawAnim(SPR.spellIcons, i, { s.x + slot / 2, s.y + slot / 2 - 4 }, 1.1f, false, castable ? WHITE : Color{ 90, 90, 100, 255 });
         else DrawRectangle((int)s.x + 8, (int)s.y + 8, (int)slot - 16, 24, SPELLS[i].color);
         DrawRectangleLinesEx(s, sel ? 3.0f : 1.0f, sel ? ui::ACCENT : ui::EDGE);
@@ -405,6 +409,7 @@ void Game::drawHud() {
     {
         Rectangle s = { hx + 3 * (slot + gap) + 14, hy, slot, slot };
         DrawRectangleRec(s, { 30, 20, 40, 235 });
+        touch::zone(s, settings.keys.special);
         if (champTex[player.champion].id) {
             Texture2D tx = champTex[player.champion];
             ui::drawContain(tx, { c.crop.x * tx.width, c.crop.y * tx.height, c.crop.width * tx.width, c.crop.height * tx.height },
@@ -449,7 +454,7 @@ void Game::drawHud() {
     }
 
     // --- a reminder of the controls, in the first room only ---
-    if (r.isStart && mode == Mode::Run && floor == 1)
+    if (r.isStart && mode == Mode::Run && floor == 1 && !touch::enabled())
         ui::textCentered(TextFormat("WASD move   LMB blade   RMB/Enter cast   1-3 power   %s special   %s roll   %s interact   Esc pause",
             keyName(settings.keys.special), keyName(settings.keys.roll), E), sw / 2.0f, sh - 18.0f, 10, Fade(ui::MUTED, 0.9f));
 }
@@ -554,6 +559,16 @@ void Game::drawShop() {
         panel.x + 24, panel.y + ph - 32, 10, ui::MUTED);
 }
 
+// Over the live game, so the buttons can be placed around the real HUD.
+void Game::drawControlsEditor() {
+    ui::veil(0.35f);
+    if (touch::editFrame()) {
+        save::writeTouchLayout(touch::layout());
+        play("ui");
+        overlay = Overlay::Pause;
+    }
+}
+
 void Game::drawWeapon(int weapon, Rectangle box) const {
     Texture2D tx = weaponTex[weapon];
     ui::drawContain(tx, { 0, 0, (float)tx.width, (float)tx.height }, box);
@@ -638,7 +653,12 @@ void Game::drawPause() {
         play(ok ? "quest" : "hurt");
     }
     if (ui::button({ bx, by + 2 * (bh + gap), bw, bh }, "Main Menu", ui::Style::Danger)) { play("ui"); toMenu(); return; }
-    if (saveMsgT > 0) ui::textCentered(saveMsg.c_str(), bx + bw / 2, by + 3 * (bh + gap) + 6, 20, Fade(ui::GOOD, fminf(1.0f, saveMsgT)));
+    float msgY = by + 3 * (bh + gap);
+    if (touch::enabled()) {
+        if (ui::button({ bx, msgY, bw, bh }, "Touch Controls")) { play("ui"); overlay = Overlay::Controls; }
+        msgY += bh + gap;
+    }
+    if (saveMsgT > 0) ui::textCentered(saveMsg.c_str(), bx + bw / 2, msgY + 6, 20, Fade(ui::GOOD, fminf(1.0f, saveMsgT)));
 
     // controls and the champion's kit
     Rectangle card = { sw / 2.0f + 10, by - 10, 380, 300 };

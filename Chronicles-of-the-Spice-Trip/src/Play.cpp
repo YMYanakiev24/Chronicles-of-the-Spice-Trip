@@ -3,6 +3,7 @@
 // ============================================================================
 #include "Game.h"
 #include "Input.h"
+#include "Touch.h"
 #include "Render.h"
 #include <algorithm>
 #include <cmath>
@@ -23,7 +24,16 @@ Camera2D Game::camera() const {
     return cam;
 }
 
-Vector2 Game::mouseWorld() const { return GetScreenToWorld2D(in::mouse(), camera()); }
+Vector2 Game::mouseWorld() const {
+    if (!touch::enabled()) return GetScreenToWorld2D(in::mouse(), camera());
+    // No pointer on a phone: aim at the nearest enemy, or wherever you're heading.
+    const Enemy* best = nullptr;
+    for (auto& e : enemies)
+        if (e.alive && (!best || Vector2Distance(e.pos, player.pos) < Vector2Distance(best->pos, player.pos))) best = &e;
+    if (best) return best->pos;
+    Vector2 dir = touch::stickDir();
+    return Vector2Add(player.pos, Vector2Scale(dir.x || dir.y ? dir : player.facing, 100));
+}
 
 float Game::hurtMul() const { return player.has(VP_MINT) ? 0.85f : 1.0f; }
 

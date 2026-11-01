@@ -97,6 +97,7 @@
     <ClCompile Include="src\Audio.cpp" />
     <ClCompile Include="src\Ui.cpp" />
     <ClCompile Include="src\Input.cpp" />
+    <ClCompile Include="src\Touch.cpp" />
     <ClCompile Include="src\Save.cpp" />
     <ClCompile Include="src\Autopilot.cpp" />
   </ItemGroup>

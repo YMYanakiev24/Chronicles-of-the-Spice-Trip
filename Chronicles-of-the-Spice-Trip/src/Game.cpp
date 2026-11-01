@@ -3,6 +3,7 @@
 // ============================================================================
 #include "Game.h"
 #include "Input.h"
+#include "Touch.h"
 #include "Render.h"
 #include "Ui.h"
 #include "rlgl.h"
@@ -81,7 +82,7 @@ static int g_winW = SCREEN_W, g_winH = SCREEN_H;
 bool isFullscreen() { return g_fullscreen; }
 
 void setFullscreen(bool on) {
-    if (on == g_fullscreen) return;
+    if (on == g_fullscreen || touch::enabled()) return;     // phones are always fullscreen
     if (on) {
         g_winPos = GetWindowPosition(); g_winW = GetScreenWidth(); g_winH = GetScreenHeight();
         int mon = GetCurrentMonitor();
@@ -100,6 +101,7 @@ void setFullscreen(bool on) {
 
 void Game::init(bool windowed) {
     settings = save::readSettings();
+    touch::setLayout(save::readTouchLayout());
     profile = save::readProfile();
     if (profile.champion < 0 || profile.champion >= CHAMPION_COUNT) profile.champion = 0;
     player.champion = profile.champion;
@@ -179,6 +181,7 @@ void Game::frame() {
     music.vol = 0.5f * settings.musicVol;
     music.update();
 
+    touch::update(screen == Screen::Play && overlay == Overlay::None, settings.keys);
     ui::beginFrame();
     BeginDrawing();
     ClearBackground(ui::INK);
@@ -186,10 +189,12 @@ void Game::frame() {
     case Screen::Menu:      menuScreen(); break;
     case Screen::Champions: championsScreen(); break;
     case Screen::Settings:  settingsScreen(); break;
+    case Screen::Controls:  controlsScreen(); break;
     case Screen::Intro:     introScreen(); break;
     case Screen::Play:      playScreen(); break;
     }
-    drawCursor();
+    if (touch::enabled()) touch::draw(settings.keys);
+    else drawCursor();
     if (!pendingShot.empty()) {            // the autopilot's screenshot, taken before the buffers swap
         rlDrawRenderBatchActive();
         Image shot = LoadImageFromScreen();

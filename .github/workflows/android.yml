@@ -1,0 +1,80 @@
+# Builds the Android APK. Pushing a tag like v0.1.0 also publishes it as a GitHub release.
+name: Android
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    env:
+      PROJECT: Chronicles-of-the-Spice-Trip/android
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.7'
+
+      # Add a keystore as the ANDROID_KEYSTORE_BASE64 and ANDROID_KEYSTORE_PASSWORD secrets
+      # so that new versions install over old ones. Without them a throwaway key is used.
+      - name: Prepare signing key
+        env:
+          KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          KEYSTORE_PW: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+        run: |
+          file="$RUNNER_TEMP/release.keystore"
+          if [ -n "$KEYSTORE_B64" ]; then
+            echo "$KEYSTORE_B64" | base64 -d > "$file"
+            password="$KEYSTORE_PW"
+          else
+            password="$(openssl rand -hex 16)"
+            keytool -genkeypair -keystore "$file" -storepass "$password" -keypass "$password" \
+              -alias spicetrip -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Spice Trip"
+          fi
+          echo "::add-mask::$password"
+          echo "KEYSTORE_FILE=$file" >> "$GITHUB_ENV"
+          echo "KEYSTORE_PASSWORD=$password" >> "$GITHUB_ENV"
+          echo "KEY_ALIAS=spicetrip" >> "$GITHUB_ENV"
+
+      - name: Build
+        run: |
+          export VERSION_CODE="$GITHUB_RUN_NUMBER"
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then export VERSION_NAME="${GITHUB_REF_NAME#v}"; fi
+          set -o pipefail
+          gradle -p "$PROJECT" assembleRelease --console=plain --no-daemon 2>&1 | tee build.log
+
+      - name: Show build errors
+        if: failure()
+        run: grep -E "error:|What went wrong|FAILED|Could not" -A2 build.log | head -40 | sed 's/^/::error::/'
+
+      - name: Collect APK
+        run: cp "$PROJECT"/app/build/outputs/apk/release/app-release.apk ChroniclesOfTheSpiceTrip.apk
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ChroniclesOfTheSpiceTrip-apk
+          path: ChroniclesOfTheSpiceTrip.apk
+
+      - name: Publish release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ChroniclesOfTheSpiceTrip.apk
+          generate_release_notes: true
+          body: |
+            Android build of Chronicles of the Spice Trip. Download the APK on your phone, open it,
+            and allow installing from this source when Android asks.
+
+            Move with the left side of the screen. Blade, Cast, Roll and E are on the right, and
+            tap a spell on the bar to select it.

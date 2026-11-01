@@ -6,6 +6,8 @@
 #include "Autopilot.h"
 #include "Game.h"
 #include "Input.h"
+#include "Save.h"
+#include "Touch.h"
 #include "Ui.h"
 #include <cmath>
 
@@ -1286,4 +1288,49 @@ void Autopilot::build() {
             return true;
         });
     add("bosses done", 1, [this](Game&, float) { keepAlive = false; return true; });
+
+    // ===== touch controls editor =====
+    add("open controls editor", 3, [this](Game& g, float t) {
+        if (t == 0) { touch::setEnabled(true); g.overlay = Overlay::Controls; return false; }
+        return t > 0.2f;
+    });
+    add("grab a button", 2, [this](Game&, float) {
+        markP = touch::controlPos(TC_BLADE);
+        in::moveMouse(markP);
+        in::click(MOUSE_BUTTON_LEFT);
+        in::holdMouse(MOUSE_BUTTON_LEFT, true);
+        return true;
+    });
+    add("drag it", 2, [this](Game&, float t) {
+        in::moveMouse({ markP.x - 300, markP.y - 200 });
+        if (t < 0.2f) return false;
+        in::holdMouse(MOUSE_BUTTON_LEFT, false);
+        check("dragging moves a touch button", Vector2Distance(touch::controlPos(TC_BLADE), { markP.x - 300, markP.y - 200 }) < 2);
+        return true;
+    });
+    add("resize it", 2, [this](Game& g, float t) {
+        for (auto& h : ui::hits()) {
+            if (h.label != std::string("Size")) continue;
+            if (t == 0) {
+                markF = touch::layout().r[TC_BLADE];
+                in::moveMouse({ h.rect.x + h.rect.width, h.rect.y + 6 });
+                in::click(MOUSE_BUTTON_LEFT);
+                in::holdMouse(MOUSE_BUTTON_LEFT, true);
+                return false;
+            }
+        }
+        if (t < 0.2f) return false;
+        in::holdMouse(MOUSE_BUTTON_LEFT, false);
+        check("the size slider resizes the selected button", touch::layout().r[TC_BLADE] > markF + 10);
+        shot(g, "touch-editor");
+        return true;
+    });
+    add("finish editing", 2, [](Game&, float t) { return t > 0.1f && clickLabel("Done"); });
+    add("layout saved", 2, [this](Game& g, float t) {
+        if (t < 0.2f) return false;
+        TouchLayout saved = save::readTouchLayout();
+        check("Done saves the layout and returns to pause", g.overlay == Overlay::Pause && saved.custom && saved.r[TC_BLADE] > 80);
+        touch::setEnabled(false);
+        return true;
+    });
 }

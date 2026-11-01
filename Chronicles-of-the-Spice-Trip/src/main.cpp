@@ -6,10 +6,13 @@
 //    --autopilot <dir>   play through every system with scripted input, save
 //                        screenshots and a PASS/FAIL log in <dir>, then quit
 //    --savedir <dir>     keep saves somewhere other than the working directory
+//    --touch             show the phone controls (the mouse plays the fingers)
 // ============================================================================
 #include "Game.h"
 #include "Autopilot.h"
 #include "Input.h"
+#include "Platform.h"
+#include "Touch.h"
 #include <cstring>
 #include <filesystem>
 #include <string>
@@ -20,6 +23,15 @@ int main(int argc, char** argv) {
         if (!strcmp(argv[i], "--autopilot")) autopilotDir = argv[++i];
         else if (!strcmp(argv[i], "--savedir")) saveDir = argv[++i];
     }
+    for (int i = 1; i < argc; ++i) if (!strcmp(argv[i], "--touch")) touch::setEnabled(true);
+#ifdef PLATFORM_ANDROID
+    touch::setEnabled(true);
+    saveDir = platform::dataDir();
+    int windowW, windowH;
+    platform::windowSize(windowW, windowH);
+#else
+    int windowW = SCREEN_W, windowH = SCREEN_H;
+#endif
     bool autopilot = !autopilotDir.empty();
     if (autopilot) {
         // The autopilot checks first-time things, so it always starts from an empty save of its own.
@@ -32,7 +44,7 @@ int main(int argc, char** argv) {
     if (autopilot) flags |= FLAG_WINDOW_UNFOCUSED;      // don't steal focus while it plays
     SetConfigFlags(flags);
     SetTraceLogLevel(LOG_WARNING);
-    InitWindow(SCREEN_W, SCREEN_H, "Chronicles of the Spice Trip");
+    InitWindow(windowW, windowH, "Chronicles of the Spice Trip");
     SetWindowMinSize(960, 540);
     SetTargetFPS(60);
     SetExitKey(KEY_NULL);                               // Esc is handled by the game

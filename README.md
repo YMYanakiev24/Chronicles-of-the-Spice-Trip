@@ -181,7 +181,7 @@ through the menus, fights a room, opens a chest, shops, beats all six bosses
 (and checks each of Triceps' attacks),
 completes a run, saves and continues, wins a Boss Rush, and tries every
 champion's special, Momiche's scare on a boss, Gakev's coins and casting with
-Enter. It writes a PASS/FAIL line for each check (146) to
+Enter. It writes a PASS/FAIL line for each check (155) to
 `<folder>/autopilot.log`, saves screenshots next to it, and exits with the
 number of failures:
 
@@ -191,3 +191,7 @@ build\x64\Release\ChroniclesOfTheSpiceTrip.exe --autopilot autopilot
 
 It uses its own save folder (`<folder>/save`, emptied first), so your saves are
 never touched. `--savedir <folder>` moves the normal saves too.
+
+## Android
+
+Pushing a tag like `v0.2.0` makes GitHub Actions build the APK (.github/workflows/android.yml) and publish it as a release. The Android project is in `Chronicles-of-the-Spice-Trip/android`. Run the desktop build with `--touch` to try the phone controls with the mouse.

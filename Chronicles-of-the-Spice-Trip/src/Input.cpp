@@ -12,6 +12,8 @@ namespace in {
         bool g_held[KEYS] = {}, g_tapped[KEYS] = {};
         bool g_mouseHeld[BUTTONS] = {}, g_mouseTapped[BUTTONS] = {};
         Vector2 g_mouse{};
+        bool g_vHeld[KEYS] = {}, g_vTapped[KEYS] = {}, g_vMouse[BUTTONS] = {};
+        bool g_captured = false;
         std::deque<int> g_queue;
 
         bool validKey(int k) { return k > 0 && k < KEYS; }
@@ -19,12 +21,15 @@ namespace in {
     }
 
     bool down(int key) {
-        if (!g_scripted) return IsKeyDown(key);
+        if (!g_scripted) return IsKeyDown(key) || (validKey(key) && g_vHeld[key]);
         return validKey(key) && (g_held[key] || g_tapped[key]);
     }
 
     bool pressed(int key) {
-        if (!g_scripted) return IsKeyPressed(key);
+        if (!g_scripted) {
+            if (key == KEY_ESCAPE && IsKeyPressed(KEY_BACK)) return true;      // Android's back gesture
+            return IsKeyPressed(key) || (validKey(key) && g_vTapped[key]);
+        }
         return validKey(key) && g_tapped[key];
     }
 
@@ -36,16 +41,31 @@ namespace in {
     }
 
     bool mouseDown(int button) {
-        if (!g_scripted) return IsMouseButtonDown(button);
+        if (!g_scripted) {
+            if (g_captured) return validButton(button) && g_vMouse[button];
+            return IsMouseButtonDown(button);
+        }
         return validButton(button) && (g_mouseHeld[button] || g_mouseTapped[button]);
     }
 
     bool mousePressed(int button) {
-        if (!g_scripted) return IsMouseButtonPressed(button);
+        if (!g_scripted) {
+            if (g_captured) return validButton(button) && g_vMouse[button];    // holding keeps swinging
+            return IsMouseButtonPressed(button);
+        }
         return validButton(button) && g_mouseTapped[button];
     }
 
     Vector2 mouse() { return g_scripted ? g_mouse : GetMousePosition(); }
+
+    void clearVirtual() {
+        for (auto& k : g_vHeld) k = false;
+        for (auto& b : g_vMouse) b = false;
+    }
+    void virtualHold(int key, bool on) { if (validKey(key)) g_vHeld[key] = on; }
+    void virtualTap(int key) { if (validKey(key)) g_vTapped[key] = true; }
+    void virtualMouse(int button, bool on) { if (validButton(button)) g_vMouse[button] = on; }
+    void setCaptured(bool on) { g_captured = on; }
 
     void setScripted(bool on) { g_scripted = on; releaseAll(); }
     bool scripted() { return g_scripted; }
@@ -67,6 +87,7 @@ namespace in {
     void endFrame() {
         for (auto& k : g_tapped) k = false;
         for (auto& b : g_mouseTapped) b = false;
+        for (auto& k : g_vTapped) k = false;
         g_queue.clear();
     }
 
