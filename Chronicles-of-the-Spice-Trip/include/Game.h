@@ -85,6 +85,7 @@ struct Game {
     void hurtPlayer(float damage, float invuln);
     void killEnemy(Enemy& e);
     void finalBlow(const Enemy& e);     // the last of the boss: freeze, slow down, fall apart
+    void enemyShoot(const Enemy& e);    // an arrow, a magic orb or a gob of blood at the player
     void checkRoomExits();
     void buy(int item);
     void buyWeapon(int weapon);         // buys it, or just equips it if it's owned
@@ -244,6 +245,11 @@ inline constexpr UpgradeDef UPGRADES[UPGRADE_COUNT] = {
 
 // Every Gakev drops a cigarette pack. This is the chance (in percent) that a chest holds one too.
 inline constexpr int CHEST_PACK_PERCENT = 25;
+
+// Soldiers hold their ground this far from you, and back off when you get closer than this.
+inline constexpr float SOLDIER_RANGE = 220, SOLDIER_CLOSE = 130;
+inline constexpr float ARROW_SPEED = 300, ORB_SHOT_SPEED = 190;
+inline constexpr float ORC_REACH = 24;          // an orc's axe lands this far beyond touching you
 
 // The feel of combat.
 inline constexpr float HIT_FREEZE = 0.05f;      // seconds the world stops on a blade hit

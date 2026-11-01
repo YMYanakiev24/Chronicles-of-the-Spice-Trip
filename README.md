@@ -87,6 +87,19 @@ Bat, and the Pink Sword. Each has its own knockback (bosses stand their ground)
 and hit sound. To add one, raise `WEAPON_COUNT` and give it a line with its PNG
 from `assets/` and the angle its art rises from hilt to tip.
 
+### The enemies
+
+Alongside the Mistlings, Hollow Hounds, Melon Warriors, Gakev and Toshko, every
+combat room has a random pick of things that shoot at you:
+
+- **Soldier:** an archer who stops at range and backs away if you crowd him.
+- **Wisp:** weaves toward you, firing magic orbs.
+- **Blood Monster:** spits blood, and bursts into two smaller, faster halves when
+  it dies.
+
+Then there are the **Orc**, tough, with a slow overhead axe you can step away
+from, and from floor 2 the **Demon**, which leaps at you from across the room.
+
 ### The bosses
 
 Every boss fight builds the same way. The notches on its health bar show what's
@@ -181,7 +194,7 @@ through the menus, fights a room, opens a chest, shops, beats all six bosses
 (and checks each of Triceps' attacks),
 completes a run, saves and continues, wins a Boss Rush, and tries every
 champion's special, Momiche's scare on a boss, Gakev's coins and casting with
-Enter. It writes a PASS/FAIL line for each check (155) to
+Enter. It writes a PASS/FAIL line for each check (171) to
 `<folder>/autopilot.log`, saves screenshots next to it, and exits with the
 number of failures:
 

@@ -574,6 +574,26 @@ void Game::spellEnded(const Projectile& p, const Enemy* hit) {
 }
 
 // ------------------------------------------------------------------- enemies
+// Who shoots at you, and how long between shots.
+static float shotGap(const Enemy& e) {
+    if (e.bossForm >= 0) return 0;
+    if (e.kind == EK_SOLDIER) return 2.4f;
+    if (e.kind == EK_SKULL) return 2.8f;
+    return e.kind == EK_BLOOD && e.scale >= 1 ? 3.2f : 0;     // its halves have only their claws
+}
+
+void Game::enemyShoot(const Enemy& e) {
+    Projectile p;
+    p.pos = { e.pos.x, e.pos.y - e.r * 0.6f };
+    bool arrow = e.kind == EK_SOLDIER;
+    p.vel = Vector2Scale(Vector2Normalize(Vector2Subtract(player.pos, p.pos)), arrow ? ARROW_SPEED : ORB_SHOT_SPEED);
+    p.r = arrow ? 4.0f : 5.0f; p.life = 3; p.damage = e.dmg;
+    p.kind = arrow ? ShotKind::Arrow : ShotKind::Orb;
+    p.color = e.color;
+    enemyShots.push_back(p);
+    play("throw");
+}
+
 // A gentle push away from nearby walls, so monsters round corners instead of
 // scraping along them and snagging.
 static Vector2 wallAvoid(const Room& room, Vector2 pos, float r, bool doorsOpen) {
@@ -628,7 +648,7 @@ void Game::updateEnemies(float dt, float slow) {
         if (e.bossForm < 0 && scared) {
             if (fabsf(to.x) > 2) e.flip = to.x > 0;            // facing away, running
             e.moving = true;
-            e.lunge = 0; e.atkAnim = 0;
+            e.lunge = 0; e.atkAnim = 0; e.swinging = false;
             Vector2 away = d > 0.01f ? Vector2Scale(to, -1.0f / d) : Vector2{ 1, 0 };
             e.pos = moveInRoom(e.pos, Vector2Scale(away, e.speed * FLEE_SPEED * edt), e.r, room, doorsOpen);
         }
@@ -654,7 +674,11 @@ void Game::updateEnemies(float dt, float slow) {
             e.moving = d > 1 && e.atkAnim <= 0 && Vector2LengthSqr(e.knock) < 400;     // plant feet while swinging or reeling
             e.lunge = fmaxf(0, e.lunge - edt);
             e.lungeCd = fmaxf(0, e.lungeCd - edt);
-            if (e.moving) {
+            if (e.kind == EK_SOLDIER && d < SOLDIER_RANGE && d > 0.01f && lineClear(room, e.pos, player.pos, e.r + 4)) {
+                e.moving = e.moving && d < SOLDIER_CLOSE;       // in bowshot: he stands, backing off if you crowd him
+                if (e.moving) e.pos = moveInRoom(e.pos, Vector2Scale(to, -e.speed * edt / d), e.r, room, doorsOpen);
+            }
+            else if (e.moving) {
                 bool sees = lineClear(room, e.pos, player.pos, e.r + 4);
                 Vector2 goal;
                 if (!sees) goal = nextWaypoint(room, flow, e.pos, e.r);   // route around walls
@@ -673,8 +697,11 @@ void Game::updateEnemies(float dt, float slow) {
                 }
                 // only out in the open: a push off the path pins a wide body on a corner in a tight lane
                 if (sees) dir = Vector2Normalize(Vector2Add(dir, Vector2Scale(wallAvoid(room, e.pos, e.r, doorsOpen), 1.2f)));
-                // hounds that see you crouch and lunge
-                if (e.kind == EK_SKELETON2 && sees && d < 130 && d > 40 && e.lungeCd <= 0) { e.lunge = 0.35f; e.lungeCd = 2.5f; }
+                // hounds that see you crouch and lunge; demons leap from further off
+                bool leaps = e.kind == EK_SKELETON2 || e.kind == EK_DEMON;
+                if (leaps && sees && d < (e.kind == EK_DEMON ? 190 : 130) && d > 40 && e.lungeCd <= 0) { e.lunge = 0.35f; e.lungeCd = 2.5f; }
+                if (e.kind == EK_DEMON && e.lunge > 0 && frand(0, 1) < edt * 70)     // a streak of embers behind it
+                    parts.push_back({ { e.pos.x + frand(-6, 6), e.pos.y - frand(0, 16) }, { frand(-12, 12), frand(-24, 6) }, 0.35f, 0.35f, frand(1.5f, 3.2f), { 200, 40, 50, 255 }, 0, true });
                 float spd = e.speed * (e.lunge > 0 ? 2.6f : 1.0f);
                 e.pos = moveInRoom(e.pos, Vector2Scale(dir, spd * edt), e.r, room, doorsOpen);
             }
@@ -699,12 +726,40 @@ void Game::updateEnemies(float dt, float slow) {
             e.pos = moveInRoom(e.pos, Vector2Scale(n, (need - sd) * 0.5f), e.r, room, doorsOpen);
         }
 
+        // A swing takes a moment: what it does comes partway through the animation
+        if (e.swinging && e.atkAnim <= (e.kind == EK_SOLDIER ? 2 : 3) / attackFps(e.kind)) {
+            e.swinging = false;
+            if (e.kind != EK_ORC) enemyShoot(e);
+            else if (d < e.r + PLAYER_R + ORC_REACH && !untouchable) {
+                hurtPlayer((float)e.dmg, 0.4f);
+                shake = fmaxf(shake, 0.2f);
+                play("bonk");
+                untouchable = true;
+            }
+        }
+        if (shotGap(e) > 0 && !scared && (e.shootCd -= edt) <= 0 && d < 340 && lineClear(room, e.pos, player.pos, 4)) {
+            e.shootCd = shotGap(e);
+            if (e.kind == EK_SKULL) enemyShoot(e);     // a wisp has no wind-up to show
+            else {
+                e.swinging = true;
+                e.atkAnim = SPR.enemy[e.kind].attack.length(attackFps(e.kind));
+            }
+        }
+        if (e.kind == EK_ORC) {                    // it winds up, so you can step out of the way
+            if (!e.swinging && e.atkCd <= 0 && d < e.r + PLAYER_R + 5 && !scared) {
+                e.swinging = true; e.atkCd = 1.6f;
+                e.atkAnim = SPR.enemy[e.kind].attack.length(attackFps(e.kind));
+                play("swing");
+            }
+            continue;
+        }
+
         // Toshko doesn't hit you: he snatches up to 50 gold and runs
         if (e.kind == EK_TOSHKO) {
             if (e.stolen == 0 && d < e.r + PLAYER_R + 4 && !scared && player.gold > 0) {
                 e.stolen = std::min(50, player.gold);
                 player.gold -= e.stolen;
-                e.atkAnim = SPR.enemy[e.kind].attack.length(16);
+                e.atkAnim = SPR.enemy[e.kind].attack.length(attackFps(e.kind));
                 showBanner(TextFormat("Toshko snatched %d gold!", e.stolen), "Kill him before he gets away", 2.0f);
                 play("coin");
             }
@@ -715,7 +770,7 @@ void Game::updateEnemies(float dt, float slow) {
         if (d < e.r + PLAYER_R + 4 && e.atkCd <= 0 && !untouchable && !scared) {
             hurtPlayer((float)e.dmg, 0.4f);
             e.atkCd = 1.0f;
-            if (e.kind != EK_SKULL && e.bossForm < 0) e.atkAnim = SPR.enemy[e.kind].attack.length(16);
+            if (e.kind != EK_SKULL && e.bossForm < 0) e.atkAnim = SPR.enemy[e.kind].attack.length(attackFps(e.kind));
             untouchable = true;
         }
     }
@@ -759,6 +814,15 @@ void Game::killEnemy(Enemy& e) {
         showBanner("Your gold is back", "", 1.6f);
     }
     for (int k = 0; k < n; ++k) coins.push_back({ e.pos, { frand(-90, 90), frand(-140, -40) }, 0 });
+    if (e.kind == EK_BLOOD && e.scale >= 1)    // it bursts into two smaller ones
+        for (float side : { -1.0f, 1.0f }) {
+            Enemy half = e;
+            half.alive = true; half.hp = half.maxHp = e.maxHp * 0.35f;
+            half.scale = 0.7f; half.r = 10; half.speed = e.speed * 1.4f; half.xp = e.xp / 3;
+            half.pos.x += side * 12; half.knock = { side * 120, 0 };
+            half.hitFlash = 0; half.burnT = 0;
+            spawned.push_back(half);
+        }
     if (e.kind == EK_GAKEV)
         coins.push_back({ e.pos, { frand(-40, 40), -160 }, 0, true });
     burst(parts, e.pos, 14, 120, 0.7f, e.color);

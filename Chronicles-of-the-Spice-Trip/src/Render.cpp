@@ -65,6 +65,7 @@ void drawTurnaround(const WalkSheet& w, Rectangle box, float time) {
 // Sprite scale per enemy kind (frames are 32px; the creature fills ~16px).
 static float enemyScale(const Enemy& e) {
     if (e.boss) return 3.2f;
+    if (e.kind >= EK_SOLDIER) return 1.5f * e.scale;               // 100px frames they fill ~22px of
     if (e.kind == EK_SKULL) return 2.0f;
     if (e.kind == EK_GAKEV || e.kind == EK_MELON) return 1.05f;   // these fill ~28px of the frame
     if (e.kind == EK_TOSHKO) return 0.7f;                          // 48px frames he fills ~44px of
@@ -90,7 +91,7 @@ void drawEnemy(const Enemy& e) {
             const Anim* a = &A.idle; float t = e.animT; float fps = 8; bool loop = true;
             if (e.dying) { a = &A.death; t = e.deathT; fps = 14; loop = false; }
             else if (e.hitFlash > 0) { a = &A.hurt; t = 0.12f - e.hitFlash; fps = 40; loop = false; }
-            else if (e.atkAnim > 0) { a = &A.attack; t = A.attack.length(16) - e.atkAnim; fps = 16; loop = false; }
+            else if (e.atkAnim > 0) { fps = attackFps(e.kind); a = &A.attack; t = A.attack.length(fps) - e.atkAnim; loop = false; }
             else if (e.moving) { a = &A.move; fps = 12; }
             int frame = animFrame(*a, t, fps, loop);
             drawAnim(*a, frame, at, sc, e.flip);
@@ -195,6 +196,9 @@ void drawProjectile(const Projectile& p, float t) {
             Vector2Add(Vector2Add(p.pos, Vector2Scale(d, 9)), Vector2Scale(side, 5)), 2.5f, { 54, 58, 70, 255 });   // the sole
         break;
     }
+    case ShotKind::Arrow:
+        drawAnim(SPR.arrow, 0, p.pos, 1.2f, false, WHITE, ang * RAD2DEG);
+        break;
     case ShotKind::Ball: {      // an iron ball off the end of her staff
         Vector2 d = fromAngle(ang);
         DrawLineEx(Vector2Subtract(p.pos, Vector2Scale(d, 18)), p.pos, 3, Fade(WHITE, 0.3f));
