@@ -15,6 +15,8 @@ struct Keybinds {
     int roll = KEY_SPACE;
     int interact = KEY_E;
     int special = KEY_Q;
+    int potionHp = KEY_R;       // drink from the belt
+    int potionMana = KEY_F;
 };
 
 struct Settings {
@@ -22,11 +24,13 @@ struct Settings {
     float sfxVol = 0.8f;
     bool  fullscreen = true;
     Keybinds keys;
+    bool  vibrate = true;       // phones: buzz when you're hit
 };
 
 // The phone controls. Positions are fractions of the screen, so a layout
 // survives a different screen shape; sizes are radii on the 720-line screen.
-enum TouchControl { TC_BLADE, TC_CAST, TC_ROLL, TC_INTERACT, TC_PAUSE, TC_STICK, TC_COUNT };
+// TC_BAR is the hotbar (potions, powers, special): moved and sized like the buttons, but never pressed.
+enum TouchControl { TC_BLADE, TC_CAST, TC_ROLL, TC_INTERACT, TC_PAUSE, TC_STICK, TC_BAR, TC_COUNT };
 
 struct TouchLayout {
     bool  custom = false;       // false: the default layout for this screen

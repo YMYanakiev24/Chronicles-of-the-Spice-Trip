@@ -63,7 +63,7 @@ void drawTurnaround(const WalkSheet& w, Rectangle box, float time) {
 }
 
 // Sprite scale per enemy kind (frames are 32px; the creature fills ~16px).
-static float enemyScale(const Enemy& e) {
+static float kindScale(const Enemy& e) {
     if (e.boss) return 3.2f;
     if (e.kind >= EK_SOLDIER) return 1.5f * e.scale;               // 100px frames they fill ~22px of
     if (e.kind == EK_SKULL) return 2.0f;
@@ -72,12 +72,33 @@ static float enemyScale(const Enemy& e) {
     return e.kind == EK_SKELETON2 ? 1.9f : 1.7f;
 }
 
+static float enemyScale(const Enemy& e) { return kindScale(e) * (e.elite ? 1.5f : 1.0f); }
+
+// A Mimic: a chest with legs, its lid snapping open and shut as it comes for you.
+static void drawMimic(const Enemy& e) {
+    if (!e.dying) drawShadow(e.pos, e.r);
+    bool open = e.atkAnim > 0 || fmodf(e.animT * (e.moving ? 5.0f : 2.0f), 1.0f) < 0.5f;
+    const Anim& a = open ? SPR.chestOpen : SPR.chest;
+    Color tint = e.dying ? Fade(WHITE, fmaxf(0, 1 - e.deathT / 0.6f)) : e.hitFlash > 0 ? Color{ 255, 150, 150, 255 } : WHITE;
+    Vector2 at = { e.pos.x, e.pos.y - 10 - (e.moving ? fabsf(sinf(e.animT * 12)) * 4 : 0) };
+    if (a.ok()) drawAnim(a, open ? a.frames - 1 : 0, at, 2.2f, e.flip, tint);
+    else DrawRectangle((int)e.pos.x - 12, (int)e.pos.y - 18, 24, 18, { 120, 78, 40, 255 });
+    if (open && !e.dying)                                   // teeth along the lip
+        for (int i = 0; i < 4; ++i)
+            DrawTriangle({ at.x - 10 + i * 6.0f, at.y - 2 }, { at.x - 7 + i * 6.0f, at.y + 4 }, { at.x - 4 + i * 6.0f, at.y - 2 }, RAYWHITE);
+}
+
 void drawEnemy(const Enemy& e) {
     bool hasSprite = e.kind == EK_SKULL ? SPR.skull.ok() : SPR.enemy[e.kind].idle.ok();
-    if (hasSprite) {
+    if (e.kind == EK_MIMIC) drawMimic(e);
+    else if (hasSprite) {
         float sc = enemyScale(e);
         Vector2 at = { e.pos.x, e.pos.y - e.r * 0.6f };
         if (!e.dying) drawShadow(e.pos, e.r);
+        if (e.elite && !e.dying) {                          // a mini-boss stands in a ring of gold
+            DrawCircleLinesV(e.pos, e.r + 6, Fade({ 255, 210, 90, 255 }, 0.9f));
+            DrawCircleLinesV(e.pos, e.r + 8 + sinf(e.animT * 4) * 2, Fade({ 255, 210, 90, 255 }, 0.4f));
+        }
         if (e.kind == EK_SKULL) {
             // floating wisp: bob up and down, flash when struck
             at.y += sinf(e.wobble) * 3.0f - 6.0f;

@@ -38,6 +38,12 @@ struct Room {
     bool isShop = false;      // the floor's shop: no enemies, no clutter
     bool isGalin = false;     // a shop room: Galin's stall instead of Marin's market
     bool hasKey = false;      // the boss key lies here once the room is cleared
+    bool hasSilverKey = false;// the treasure room's key lies here once the room is cleared
+    bool isTreasure = false;  // behind a silver-locked door: a hoard of gold
+    bool isChallenge = false; // survive the waves for CHALLENGE_TIME seconds
+    bool isCasino = false;    // Toshko's roulette table
+    bool isElite = false;     // a mini-boss waits among the monsters
+    bool mimic = false;       // its chest turned out to be a Mimic
     int  doors = 0;           // bitmask of neighbours that exist
     unsigned char tiles[ROOM_TH][ROOM_TW] = {};   // interior layout (RoomTile)
     bool hasChest = false, chestOpened = false;
@@ -47,6 +53,7 @@ struct Room {
 
     void buildLayout();       // walls, traps and maybe a chest
     bool isFloor(int tx, int ty) const;   // walkable, trap-free interior tile
+    bool special() const { return isStart || isBoss || isShop || isTreasure || isChallenge || isCasino; }
 };
 
 struct Dungeon {
@@ -54,6 +61,7 @@ struct Dungeon {
     int  cx = DUNGEON_G / 2;     // current room
     int  cy = DUNGEON_G / 2;
     bool keyFound = false;       // the boss lair stays locked until this floor's key is found
+    bool silverFound = false;    // and the treasure room until its silver key is found
     bool galinNext = false;      // the next floor's shop: Marin and Galin take turns
 
     void  generate();          // a fresh floor: start room, combat rooms, one shop, the boss
@@ -62,6 +70,7 @@ struct Dungeon {
     const Room& cur() const { return grid[cy][cx]; }
     // Does the door on side `dir` of the current room lead into the still-locked lair?
     bool bossDoorLocked(int dir) const;
+    int  doorLock(int dir) const;          // 0 open, 1 the lair (gold key), 2 the treasure room (silver key)
 };
 
 // Pixel size of a room (world units).

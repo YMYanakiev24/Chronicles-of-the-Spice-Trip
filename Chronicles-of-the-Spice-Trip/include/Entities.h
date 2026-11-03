@@ -78,6 +78,7 @@ struct Enemy {
     float   bestDist = 1e9f, stuckT = 0, ghostT = 0;   // jammed in a crowd: slip past allies a moment
     int     lastRollHit = -1;          // Pupesh's roll hits each enemy once per roll
     int     stolen = 0;                // Toshko: gold he snatched and is running off with
+    bool    elite = false;             // a floor's mini-boss: bigger, tougher, richer
     float   fleeT = 0;                 // Toshko: seconds spent running away
 
     // Boss bodies (bossForm >= 0) are moved and fired by the BossFight.
@@ -122,11 +123,13 @@ enum Vape {
     VP_RAZZ,        // powers cost 20% less mana
     VP_MELON,       // +4 blade damage
     VP_MINT,        // take 15% less damage
+    VP_GRAPE,       // mana refills 50% faster
+    VP_PEACH,       // a quarter of the coins you pick up count double
     VP_COUNT
 };
 
 // Weapons Galin sells (the table is in Game.h). Each one keeps its own upgrades.
-inline constexpr int WEAPON_COUNT = 5;
+inline constexpr int WEAPON_COUNT = 7;
 
 // A weapon's upgrades at Galin's stall. Each level takes a cigarette pack.
 enum Upgrade {
@@ -136,6 +139,12 @@ enum Upgrade {
     UPGRADE_COUNT
 };
 inline constexpr int UPGRADE_MAX = 3;
+
+// What a run has been like, for the summary at its end.
+struct RunStats {
+    int  goldEarned = 0, goldLost = 0, damageDealt = 0, damageTaken = 0, deaths = 0, spins = 0;
+    char killer[40] = {};
+};
 
 struct Player {
     Vector2 pos{};
@@ -151,6 +160,10 @@ struct Player {
     unsigned weaponsOwned = 1;        // a bit per weapon: everyone starts with the Rusty Sword
     bool  owns(int w) const { return (weaponsOwned >> w) & 1u; }
     int   upgrades[WEAPON_COUNT][UPGRADE_COUNT] = {};   // levels, per weapon
+    int   potions[2] = {};            // the belt: health and mana potions (POTION_MAX of each)
+    int   bonusDamage = 0;            // won on the prize wheel
+    float speedBonus = 0;             // won on the prize wheel (fraction)
+    int   spins = 0;                  // level-ups whose prize wheel hasn't been spun yet
     float castCd = 0, meleeCd = 0, meleeAnim = 0, roll = 0, rollCd = 0, invuln = 0, hitFlash = 0;
     Vector2 rollDir{ 0, 1 };
 

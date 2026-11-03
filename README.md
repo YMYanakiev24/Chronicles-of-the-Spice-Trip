@@ -63,6 +63,29 @@ Movement, run, roll, interact and the special can be rebound in **Settings**.
   Records (deepest floor, bosses beaten, best Boss Rush) and settings are kept
   between runs.
 
+### Runs, rooms and rewards
+
+- **New Run** asks for a **difficulty** (Easy, Normal, Hard: monster health and
+  damage) and whether to play **hardcore**: one life, and dying ends the run and
+  deletes the save. Otherwise dying sends you back to the entrance, and Toshko
+  picks 30% of your gold from your pockets.
+- **Level-ups** spin a prize wheel: max health, max mana, blade damage, speed,
+  gold, a cigarette pack, the jackpot, or Toshko stealing the prize.
+- **Special rooms** on every floor (shown on the minimap): a **treasure room**
+  behind a silver door (its silver key lies in a combat room) with a hoard of
+  gold, two packs, a full heal and a free vape; a **challenge room** where waves
+  keep coming for 30 seconds; and **Toshko's Roulette**, where you bet gold on red,
+  black (x2) or Toshko's zero (x14). One combat room a floor holds a **mini-boss**,
+  and some chests are **Mimics**.
+- **Floors** each have their own look: the Mistwood Depths, the Drowned Crypt,
+  the Ember Halls, the Bone Gardens, the Toxic Sewers and the Gilded Vault.
+- **Potions** from Marin go into your belt (three of each): **R** drinks health,
+  **F** mana.
+- **Every boss has its own theme**, and a run that ends shows a summary: kills,
+  gold, damage, deaths and what got you.
+- The game **saves itself** whenever you change rooms and every 20 seconds in a
+  safe room.
+
 ### The shops
 
 Every floor has one shop, and the minimap shows it from the start (gold for
@@ -208,3 +231,8 @@ never touched. `--savedir <folder>` moves the normal saves too.
 ## Android
 
 Pushing a tag like `v0.2.0` makes GitHub Actions build the APK (.github/workflows/android.yml) and publish it as a release. The Android project is in `Chronicles-of-the-Spice-Trip/android`. Run the desktop build with `--touch` to try the phone controls with the mouse.
+
+To sign every APK with the same key (so new versions install over old ones), add
+the repository secrets `ANDROID_KEYSTORE_BASE64` and `ANDROID_KEYSTORE_PASSWORD`.
+Without them each build uses a throwaway key. On phones, the game buzzes when
+you're hit (Settings > Vibration).

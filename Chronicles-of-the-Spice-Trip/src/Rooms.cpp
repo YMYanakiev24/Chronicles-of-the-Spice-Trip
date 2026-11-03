@@ -87,17 +87,53 @@ void Dungeon::generate() {
         galinNext = !galinNext;
     }
 
-    // The boss key waits in one random combat room.
-    {
-        int kx = -1, ky = -1, n = 0;
+    // The special rooms, each in a room nothing else has claimed, as long as two plain
+    // combat rooms are left for the keys: a treasure room (a dead end if there is one),
+    // a challenge room and Toshko's casino. One combat room also gets a mini-boss.
+    auto pick = [&](bool deadEnd, bool combatOk) -> Room* {
+        Room* chosen = nullptr;
+        int n = 0;
         for (int y = 0; y < DUNGEON_G; ++y)
             for (int x = 0; x < DUNGEON_G; ++x) {
-                const Room& rm = grid[y][x];
-                if (!rm.exists || rm.isStart || rm.isBoss || rm.isShop) continue;
-                if (GetRandomValue(0, n++) == 0) { kx = x; ky = y; }
+                Room& rm = grid[y][x];
+                if (!rm.exists || rm.special() || (!combatOk && rm.isElite)) continue;
+                int doors = 0;
+                for (int b : { DIR_N, DIR_E, DIR_S, DIR_W }) if (rm.doors & b) doors++;
+                if (deadEnd && doors != 1) continue;
+                if (GetRandomValue(0, n++) == 0) chosen = &rm;
             }
-        if (kx >= 0) grid[ky][kx].hasKey = true;
-        keyFound = kx < 0;
+        return chosen;
+    };
+    auto plainRooms = [&]() {
+        int n = 0;
+        for (auto& row : grid) for (auto& rm : row) n += rm.exists && !rm.special();
+        return n;
+    };
+    Room* treasure = nullptr;
+    if (plainRooms() > 2) {
+        treasure = pick(true, false);
+        if (!treasure) treasure = pick(false, false);
+        if (treasure) { treasure->isTreasure = true; treasure->cleared = true; }
+    }
+    if (plainRooms() > 2)
+        if (Room* c = pick(false, false)) c->isChallenge = true;
+    if (plainRooms() > 2) {
+        Room* casino = pick(true, false);
+        if (!casino) casino = pick(false, false);
+        if (casino) { casino->isCasino = true; casino->cleared = true; }
+    }
+    if (Room* e = pick(false, false)) e->isElite = true;
+
+    // The boss key waits in one combat room, the silver key (if there's a treasure room) in another.
+    Room* gold = pick(false, true);
+    if (gold) gold->hasKey = true;
+    keyFound = gold == nullptr;
+    silverFound = treasure == nullptr;
+    if (treasure) {
+        Room* silver = nullptr;
+        for (int tries = 0; tries < 20 && (!silver || silver == gold); ++tries) silver = pick(false, true);
+        if (silver) silver->hasSilverKey = true;
+        else silverFound = true;
     }
 
     for (int y = 0; y < DUNGEON_G; ++y)
@@ -105,18 +141,23 @@ void Dungeon::generate() {
             if (grid[y][x].exists) grid[y][x].buildLayout();
 }
 
-bool Dungeon::bossDoorLocked(int dir) const {
-    if (keyFound || !(cur().doors & dir)) return false;
+int Dungeon::doorLock(int dir) const {
+    if (!(cur().doors & dir)) return 0;
     int nx = cx + (dir == DIR_E) - (dir == DIR_W), ny = cy + (dir == DIR_S) - (dir == DIR_N);
-    if (nx < 0 || ny < 0 || nx >= DUNGEON_G || ny >= DUNGEON_G) return false;
-    return grid[ny][nx].isBoss;
+    if (nx < 0 || ny < 0 || nx >= DUNGEON_G || ny >= DUNGEON_G) return 0;
+    const Room& n = grid[ny][nx];
+    if (n.isBoss && !keyFound) return 1;
+    if (n.isTreasure && !silverFound) return 2;
+    return 0;
 }
+
+bool Dungeon::bossDoorLocked(int dir) const { return doorLock(dir) == 1; }
 
 void Dungeon::generateArena() {
     for (auto& row : grid) for (auto& r : row) r = Room{};
     cx = cy = DUNGEON_G / 2;
     Room& arena = grid[cy][cx];
-    keyFound = true;                                      // nothing to unlock in the arena
+    keyFound = silverFound = true;                        // nothing to unlock in the arena
     arena.exists = arena.isBoss = arena.visited = true;   // no doors: the only way out is through
     arena.buildLayout();
 }
@@ -214,7 +255,7 @@ void Room::buildLayout() {
     for (auto& row : tiles) for (auto& c : row) c = RT_FLOOR;
     hasChest = chestOpened = false;
     flamerCount = 0;
-    if (isStart || isBoss || isShop) return;    // start, boss and shop rooms stay plain rectangles
+    if (isStart || isBoss || isShop || isTreasure || isCasino) return;    // start, boss and shop rooms stay plain rectangles
 
     int midX = ROOM_TW / 2, midY = ROOM_TH / 2;
     switch (GetRandomValue(0, 5)) {

@@ -36,9 +36,12 @@ namespace touch {
             b[TC_INTERACT] = { { sw - 206, sh - 192 }, 44, "" };      // labelled with its key, like the prompts
             b[TC_PAUSE] = { { 44, 190 }, 28, "II" };
             b[TC_STICK] = { { 140, sh - 130 }, 70, "Move" };
+            b[TC_BAR] = { { sw / 2, sh - 64 }, 60, "Spells" };
             if (!g_layout.custom) return;
-            for (int i = 0; i < TC_COUNT; ++i)
-                { b[i].pos = { g_layout.x[i] * sw, g_layout.y[i] * sh }; b[i].r = g_layout.r[i]; }
+            for (int i = 0; i < TC_COUNT; ++i) {
+                if (i == TC_BAR && g_layout.x[i] < 0) continue;      // a layout from before the bar could move
+                b[i].pos = { g_layout.x[i] * sw, g_layout.y[i] * sh }; b[i].r = g_layout.r[i];
+            }
         }
 
         // The layout on screen becomes the player's own, ready to change.
@@ -55,6 +58,12 @@ namespace touch {
 #ifndef PLATFORM_ANDROID
             if (n == 0 && IsMouseButtonDown(MOUSE_BUTTON_LEFT)) { pos.push_back(GetMousePosition()); ids.push_back(0); }
 #endif
+        }
+
+        // The hotbar's outline, as the editor shows it.
+        Rectangle barRect(const Button& b) {
+            float w = hotbarWidth(b.r);
+            return { b.pos.x - w / 2, b.pos.y - b.r / 2, w, b.r + 18 };
         }
 
         int findFinger(int id) {
@@ -111,6 +120,12 @@ namespace touch {
         Button b[TC_COUNT];
         place(b);
         return b[control].pos;
+    }
+
+    float controlSize(int control) {
+        Button b[TC_COUNT];
+        place(b);
+        return b[control].r;
     }
 
     void update(bool playing, const Keybinds& keys) {
@@ -192,7 +207,8 @@ namespace touch {
         Rectangle reset = { bar.x + pw - 226, bar.y + 40, 104, 44 }, done = { bar.x + pw - 112, bar.y + 40, 100, 44 };
         ui::track("Size", track);
 
-        float minR = g_selected == TC_STICK ? 44.0f : 26.0f, maxR = g_selected == TC_STICK ? 130.0f : 100.0f;
+        float minR = g_selected == TC_STICK ? 44.0f : g_selected == TC_BAR ? 40.0f : 26.0f;
+        float maxR = g_selected == TC_STICK ? 130.0f : g_selected == TC_BAR ? 80.0f : 100.0f;
         bool onPanelControl = CheckCollisionPointRec(m, grabTrack) || CheckCollisionPointRec(m, reset) || CheckCollisionPointRec(m, done);
         if (!held) g_dragging = g_sizing = false;
         if (pressed && CheckCollisionPointRec(m, grabTrack)) g_sizing = true;
@@ -201,7 +217,8 @@ namespace touch {
             float best = 1e9f;
             for (int i = 0; i < TC_COUNT; ++i) {
                 float d = Vector2Distance(m, b[i].pos);
-                if (d > b[i].r + 10 || d >= best) continue;
+                bool hit = i == TC_BAR ? CheckCollisionPointRec(m, barRect(b[i])) : d <= b[i].r + 10;
+                if (!hit || d >= best) continue;
                 best = d; g_selected = i; g_dragging = true;
                 g_grab = Vector2Subtract(b[i].pos, m);
             }
@@ -211,12 +228,25 @@ namespace touch {
         if (g_sizing) s.r = Lerp(minR, maxR, Clamp((m.x - track.x) / track.width, 0, 1));
         if (g_dragging) s.pos = Vector2Add(m, g_grab);
         if (g_dragging || g_sizing) {
-            s.pos = { Clamp(s.pos.x, s.r, sw - s.r), Clamp(s.pos.y, s.r, sh - s.r) };
+            float hw = g_selected == TC_BAR ? hotbarWidth(s.r) / 2 : s.r, hh = g_selected == TC_BAR ? s.r / 2 + 18 : s.r;
+            s.pos = { Clamp(s.pos.x, hw, sw - hw), Clamp(s.pos.y, hh, sh - hh) };
             makeCustom(b);
         }
 
         for (int i = 0; i < TC_COUNT; ++i) {
             bool sel = i == g_selected;
+            if (i == TC_BAR) {                              // the hotbar: its six slots
+                Rectangle r = barRect(b[i]);
+                DrawRectangleRec(r, Fade(BLACK, sel ? 0.55f : 0.35f));
+                DrawRectangleLinesEx(r, sel ? 3.0f : 1.0f, sel ? ui::ACCENT : Fade(RAYWHITE, 0.6f));
+                float slot = b[i].r, gap = slot / 6, x = r.x;
+                for (int k = 0; k < 6; ++k) {
+                    DrawRectangleLinesEx({ x, r.y, slot, slot }, 1, Fade(RAYWHITE, 0.4f));
+                    x += slot + (k == 1 || k == 4 ? 14 : gap);
+                }
+                ui::textCentered("Hotbar", b[i].pos.x, r.y + slot + 2, 10, RAYWHITE);
+                continue;
+            }
             DrawCircleV(b[i].pos, b[i].r, Fade(BLACK, sel ? 0.6f : 0.4f));
             DrawCircleLinesV(b[i].pos, b[i].r, sel ? ui::ACCENT : Fade(RAYWHITE, 0.6f));
             if (sel) DrawCircleLinesV(b[i].pos, b[i].r + 2, ui::ACCENT);

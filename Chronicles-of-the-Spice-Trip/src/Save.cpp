@@ -2,6 +2,7 @@
 //  Save.cpp — binary save files.
 // ============================================================================
 #include "Save.h"
+#include <cstdio>
 #include <cstring>
 #include <filesystem>
 #include <fstream>
@@ -11,7 +12,7 @@
 namespace save {
 
     namespace {
-        constexpr unsigned RUN_MAGIC = 0x53504336;       // "SPC6": five weapons, packs, permanent vapes
+        constexpr unsigned RUN_MAGIC = 0x53504337;       // "SPC7": difficulty, hardcore, special rooms, the belt, seven weapons
         constexpr unsigned PROFILE_MAGIC = 0x53505031;   // "SPP1"
         constexpr unsigned SETTINGS_MAGIC = 0x53505331;  // "SPS1"
         constexpr unsigned TOUCH_MAGIC = 0x53505431;     // "SPT1"
@@ -27,15 +28,17 @@ namespace save {
         }
 
         template <typename T>
-        bool readPod(const char* file, T& value, unsigned magic) {
+        // grows: the struct gained fields at its end since older files were written; those keep their defaults
+        bool readPod(const char* file, T& value, unsigned magic, bool grows = false) {
             static_assert(std::is_trivially_copyable_v<T>);
             std::ifstream in(path(file), std::ios::binary | std::ios::ate);
-            if (!in || (size_t)in.tellg() != sizeof(T)) return false;
-            std::vector<char> data(sizeof(T));
+            size_t size = in ? (size_t)in.tellg() : 0;
+            if (!in || (grows ? size < sizeof(unsigned) || size > sizeof(T) : size != sizeof(T))) return false;
+            std::vector<char> data(size);
             in.seekg(0);
-            in.read(data.data(), sizeof(T));
+            in.read(data.data(), size);
             bool ok = in.good() && *(const unsigned*)data.data() == magic;
-            if (ok) memcpy((void*)&value, data.data(), sizeof(T));
+            if (ok) memcpy((void*)&value, data.data(), size);
             return ok;
         }
 
@@ -59,6 +62,8 @@ namespace save {
 
     bool readRun(RunSave& run) { return readPod("savegame.dat", run, RUN_MAGIC); }
 
+    bool deleteRun() { return std::remove(path("savegame.dat").c_str()) == 0; }
+
     bool hasRun() {
         static RunSave probe;
         return readRun(probe);
@@ -71,7 +76,7 @@ namespace save {
 
     Profile readProfile() {
         Profile p;
-        if (!readPod("profile.dat", p, PROFILE_MAGIC)) p = Profile{};
+        if (!readPod("profile.dat", p, PROFILE_MAGIC, true)) p = Profile{};
         return p;
     }
 
@@ -79,14 +84,22 @@ namespace save {
 
     Settings readSettings() {
         SettingsFile f{};
-        return readPod("settings.dat", f, SETTINGS_MAGIC) ? f.settings : Settings{};
+        return readPod("settings.dat", f, SETTINGS_MAGIC, true) ? f.settings : Settings{};
     }
 
     bool writeTouchLayout(const TouchLayout& t) { return writePod("touch.dat", TouchFile{ TOUCH_MAGIC, t }); }
 
     TouchLayout readTouchLayout() {
         TouchFile f{};
-        return readPod("touch.dat", f, TOUCH_MAGIC) ? f.layout : TouchLayout{};
+        if (readPod("touch.dat", f, TOUCH_MAGIC)) return f.layout;
+        // a layout from before the movable hotbar: six controls, the bar where it always was
+        struct OldTouch { unsigned magic; bool custom; float x[6], y[6], r[6]; } old{};
+        if (!readPod("touch.dat", old, TOUCH_MAGIC)) return TouchLayout{};
+        TouchLayout t;
+        t.custom = old.custom;
+        for (int i = 0; i < 6; ++i) { t.x[i] = old.x[i]; t.y[i] = old.y[i]; t.r[i] = old.r[i]; }
+        t.x[TC_BAR] = -1;
+        return t;
     }
 
 } // namespace save

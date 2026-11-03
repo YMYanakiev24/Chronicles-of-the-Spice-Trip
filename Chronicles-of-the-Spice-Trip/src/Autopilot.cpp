@@ -41,7 +41,7 @@ namespace {
         return false;
     }
 
-    bool isCombatRoom(const Room& r) { return !r.isStart && !r.isShop && !r.isBoss; }
+    bool isCombatRoom(const Room& r) { return !r.special(); }
 
     int countShots(const Game& g, ShotKind k) {
         int n = 0;
@@ -77,6 +77,7 @@ void Autopilot::start(Game& g, const std::string& d) {
     dir = d;
     log = fopen((dir + "/autopilot.log").c_str(), "w");
     in::setScripted(true);
+    g.testMode = true;
     build();
 }
 
@@ -167,6 +168,12 @@ void Autopilot::build() {
     add("new run", 4, [this](Game& g, float t) {
         if (t < 0.3f) return false;
         return clickLabel("New Run");
+    });
+    add("run setup", 4, [this](Game& g, float t) {
+        if (t < 0.4f) return false;
+        check("New Run asks for a difficulty first", g.screen == Screen::Setup);
+        shot(g, "setup");
+        return clickLabel("Begin");
     });
     add("intro", 5, [this](Game& g, float t) {
         if (t < 2.0f) return false;
@@ -616,7 +623,7 @@ void Autopilot::build() {
     });
     add("bought", 3, [this](Game& g, float t) {
         if (t < 0.2f) return false;
-        check("buying a Health Potion takes 8 gold and heals", g.player.gold == 192 && g.player.hp > g.player.maxHp - 40);
+        check("buying a Health Potion takes 8 gold and puts it in the belt", g.player.gold == 192 && g.player.potions[0] == 1);
         check("Marin sells potions and vapes, nothing else", SHOP_COUNT == 2 + VP_COUNT);
         return clickLabel("30 g");              // Mango Haze
     });
@@ -1493,6 +1500,33 @@ void Autopilot::build() {
         TouchLayout saved = save::readTouchLayout();
         check("Done saves the layout and returns to pause", g.overlay == Overlay::Pause && saved.custom && saved.r[TC_BLADE] > 80);
         touch::setEnabled(false);
+        return true;
+    });
+
+    // ===== the prize wheel, and a hardcore death =====
+    add("drink", 2, [this](Game& g, float t) {
+        if (t == 0) { g.overlay = Overlay::None; g.player.potions[0] = 1; g.player.hp = g.player.maxHp - 40; in::tap(g.settings.keys.potionHp); return false; }
+        if (t < 0.2f) return false;
+        check("R drinks a health potion from the belt", g.player.potions[0] == 0 && g.player.hp > g.player.maxHp - 40);
+        return true;
+    });
+    add("prize wheel", 12, [this](Game& g, float t) {
+        if (t == 0) { g.testMode = false; g.overlay = Overlay::None; g.rewardT = 0; g.player.spins = 1; markF = (float)g.stats.spins; return false; }
+
+        if (g.overlay != Overlay::Roulette) return false;
+        if (!g.wheel.spinning && !g.wheel.done) { clickLabel("SPIN"); return false; }
+        if (!g.wheel.done) return false;
+        check("a level-up spins the prize wheel, and it pays out", g.wheel.result >= 0 && g.stats.spins == (int)markF + 1);
+        shot(g, "prize-wheel");
+        clickLabel("Collect");
+        return true;
+    });
+    add("hardcore death", 4, [this](Game& g, float t) {
+        if (t == 0) { g.testMode = true; g.overlay = Overlay::None; g.saveRun(); g.hardcore = true; g.player.invuln = 0; g.player.hp = 0; return false; }
+        if (t < 0.3f) return false;
+        check("a hardcore death ends the run with a summary and deletes the save", g.overlay == Overlay::Summary && !save::hasRun());
+        shot(g, "summary");
+        g.hardcore = false;
         return true;
     });
 }
