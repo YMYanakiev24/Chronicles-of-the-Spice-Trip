@@ -418,7 +418,7 @@ void Game::updateWheel(float dt) {
     wheel.speed = fmaxf(0, wheel.speed - (90 + wheel.speed * 0.55f) * dt);
     if (wheel.speed > 0) return;
     wheel.spinning = false;
-    int n = wheel.casino ? CASINO_SLOTS : PZ_COUNT;
+    int n = CASINO_SLOTS;
     float under = fmodf(270.0f - wheel.angle + 720.0f, 360.0f);     // the pointer sits at the top
     wheel.result = std::min(n - 1, (int)(under / (360.0f / n)));
     wheelLanded();
@@ -426,22 +426,6 @@ void Game::updateWheel(float dt) {
 
 void Game::wheelLanded() {
     wheel.done = true;
-    if (!wheel.casino) {            // the level-up prize
-        stats.spins++;
-        switch (wheel.result) {
-        case PZ_HEALTH:  player.maxHp += 25; player.hp = fminf(player.maxHp, player.hp + 25); break;
-        case PZ_MANA:    player.maxMana += 20; player.mana = fminf(player.maxMana, player.mana + 20); break;
-        case PZ_DAMAGE:  player.bonusDamage += 5; break;
-        case PZ_SPEED:   player.speedBonus += 0.08f; break;
-        case PZ_GOLD:    player.gold += 40; stats.goldEarned += 40; break;
-        case PZ_PACK:    player.packs++; break;
-        case PZ_JACKPOT: player.gold += 120; stats.goldEarned += 120; break;
-        default: break;             // Toshko took it
-        }
-        wheel.message = PRIZES[wheel.result].won;
-        play(wheel.result == PZ_TOSHKO ? "hurt" : wheel.result == PZ_JACKPOT ? "victory" : "levelup");
-        return;
-    }
     int colour = wheel.result == 0 ? 2 : wheel.result % 2 ? 0 : 1;      // 0 red, 1 black, 2 Toshko's zero
     if (colour == wheel.pick) {
         int win = wheel.bet * (colour == 2 ? 14 : 2);
@@ -1136,7 +1120,6 @@ void Game::killEnemy(Enemy& e) {
         player.maxHp += 18; player.hp = player.maxHp;
         player.maxMana += 10; player.mana = player.maxMana;
         showBanner("The Unmarked grows stronger", TextFormat("Level %d", player.level), 2.5f);
-        if (mode == Mode::Run) player.spins++;     // the prize wheel comes up as soon as it can
         play("levelup");
     }
 }

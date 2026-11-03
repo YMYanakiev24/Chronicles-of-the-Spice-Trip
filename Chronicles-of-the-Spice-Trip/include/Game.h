@@ -27,7 +27,7 @@
 
 enum class Screen { Video, Menu, Setup, Champions, Settings, Controls, Intro, Play };
 enum class Mode { Run, BossRush };
-enum class Overlay { None, Pause, Controls, Shop, Galin, RunComplete, RushOver, Roulette, Casino, Summary, Drip };
+enum class Overlay { None, Pause, Controls, Shop, Galin, RunComplete, RushOver, Casino, Summary, Drip };
 
 struct Popup { const Anim* anim; Vector2 pos; float t; };        // a flask rising from a chest
 struct Coin { Vector2 pos, vel; float t; bool pack = false; };    // loot that flies to you (gold, or a cigarette pack)
@@ -41,7 +41,7 @@ struct VasilArt {
     Texture2D seated{}, story[2]{}, sign{}, stool{}, portrait{}, crowd{};
 };
 
-// A roulette wheel: the prize wheel of a level-up, or Toshko's casino.
+// Toshko's roulette wheel, in Todor's casino.
 struct Wheel {
     bool  casino = false;
     bool  spinning = false, done = false;
@@ -177,7 +177,6 @@ struct Game {
     void drawRunComplete();
     void drawRushOver();
     void drawWheel(Vector2 c, float radius);
-    void drawRoulette();
     void drawCasino();
     void drawSummary();
     void drawMenuBackground();
@@ -246,7 +245,7 @@ struct Game {
     RunStats stats;
     float challengeT = 0, challengeWaveT = 0;   // a challenge room: seconds left, and to the next wave
     float autosaveT = 0;
-    bool  testMode = false;             // the autopilot: no mimics, and level-ups skip the prize wheel
+    bool  testMode = false;             // the autopilot: no mimics
     Wheel wheel;
     bool  summaryWon = false;           // the summary: a finished run, or a hardcore death
     float banner = 0;
@@ -322,20 +321,6 @@ struct EliteDef { const char* name; int type; };
 inline constexpr EliteDef ELITES[5] = {
     { "Orc Warlord", MT_ORC }, { "Gakev the Elder", MT_GAKEV }, { "Captain of the Guard", MT_SOLDIER },
     { "Mega Melon", MT_MELON }, { "Alpha Hound", MT_HOUND },
-};
-
-// The prize wheel spun on every level-up.
-enum Prize { PZ_HEALTH, PZ_MANA, PZ_DAMAGE, PZ_SPEED, PZ_GOLD, PZ_PACK, PZ_TOSHKO, PZ_JACKPOT, PZ_COUNT };
-struct PrizeDef { const char* label; const char* won; Color color; };
-inline constexpr PrizeDef PRIZES[PZ_COUNT] = {
-    { "+25 HP",    "+25 max health",          { 180,  50,  60, 255 } },
-    { "+20 MANA",  "+20 max mana",            {  50,  90, 190, 255 } },
-    { "+5 DMG",    "+5 blade damage",         { 200, 120,  40, 255 } },
-    { "SPEED",     "You move 8% faster",      {  60, 150,  90, 255 } },
-    { "+40 GOLD",  "+40 gold",                { 190, 160,  50, 255 } },
-    { "PACK",      "A cigarette pack",        { 140,  90,  60, 255 } },
-    { "TOSHKO",    "Toshko stole the prize!", {  40,  40,  60, 255 } },
-    { "JACKPOT",   "JACKPOT! +120 gold",      { 230, 200,  90, 255 } },
 };
 
 // Toshko's casino: his green zero, then red and black. Colours pay double, the zero fourteen times.

@@ -1745,22 +1745,24 @@ void Autopilot::build() {
         return true;
     });
 
-    // ===== the prize wheel, and a hardcore death =====
+    // ===== a level-up, and a hardcore death =====
     add("drink", 2, [this](Game& g, float t) {
         if (t == 0) { g.overlay = Overlay::None; g.player.potions[0] = 1; g.player.hp = g.player.maxHp - 40; in::tap(g.settings.keys.potionHp); return false; }
         if (t < 0.2f) return false;
         check("R drinks a health potion from the belt", g.player.potions[0] == 0 && g.player.hp > g.player.maxHp - 40);
         return true;
     });
-    add("prize wheel", 12, [this](Game& g, float t) {
-        if (t == 0) { g.testMode = false; g.overlay = Overlay::None; g.rewardT = 0; g.player.spins = 1; markF = (float)g.stats.spins; return false; }
-
-        if (g.overlay != Overlay::Roulette) return false;
-        if (!g.wheel.spinning && !g.wheel.done) { clickLabel("SPIN"); return false; }
-        if (!g.wheel.done) return false;
-        check("a level-up spins the prize wheel, and it pays out", g.wheel.result >= 0 && g.stats.spins == (int)markF + 1);
-        shot(g, "prize-wheel");
-        clickLabel("Collect");
+    add("level up", 3, [this](Game& g, float t) {
+        if (t == 0) {
+            g.testMode = false; g.overlay = Overlay::None; g.rewardT = 0;
+            markF = (float)g.player.level;
+            g.player.xp = g.player.xpNext - 1;
+            Enemy e = dummy(g.player.pos); e.xp = 5; e.hp = 0;
+            g.enemies.push_back(e);                 // falls this frame, and the xp tips you over
+            return false;
+        }
+        if (t < 1.0f) return false;
+        check("a level-up just levels you up: no prize wheel comes up", g.player.level == (int)markF + 1 && g.overlay == Overlay::None);
         return true;
     });
     add("hardcore death", 4, [this](Game& g, float t) {

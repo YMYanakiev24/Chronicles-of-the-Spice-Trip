@@ -46,11 +46,6 @@ void Game::playScreen() {
         else if (overlay == Overlay::Controls) drawControlsEditor();
         return;
     }
-    // a level-up's prize wheel comes up once the moment is calm
-    if (overlay == Overlay::None && player.spins > 0 && mode == Mode::Run && finaleT <= 0 && rewardT <= 0 && hitStop <= 0) {
-        if (testMode) player.spins = 0;             // the autopilot measures exact numbers: no surprise prizes
-        else { wheel = Wheel{}; overlay = Overlay::Roulette; }
-    }
     if (overlay == Overlay::None) updatePlay(dt);
     if (screen != Screen::Play) return;            // left for the menu this frame
     if (hall.active) { drawCastle(); drawCastleHud(); return; }     // just went through the castle door
@@ -87,7 +82,6 @@ void Game::playScreen() {
     case Overlay::Controls:    drawControlsEditor(); break;
     case Overlay::RunComplete: drawRunComplete(); break;
     case Overlay::RushOver:    drawRushOver(); break;
-    case Overlay::Roulette:    drawRoulette(); break;
     case Overlay::Casino:      drawCasino(); break;
     case Overlay::Summary:     drawSummary(); break;
     default: break;
@@ -929,8 +923,8 @@ void Game::drawRunComplete() {
     }
     ui::text(TextFormat("Floor %d   Time %s   Kills %d   Gold %d   Level %d", floor, ui::clock(runTime), kills, player.gold, player.level),
         p.x + 28, y + 120, 20, ui::MUTED);
-    ui::text(TextFormat("Damage dealt %d   taken %d   Deaths %d   Prize spins %d   %s%s", stats.damageDealt, stats.damageTaken,
-        stats.deaths, stats.spins, DIFFICULTIES[difficulty].name, hardcore ? ", hardcore" : ""), p.x + 28, y + 150, 10, ui::MUTED);
+    ui::text(TextFormat("Damage dealt %d   taken %d   Deaths %d   %s%s", stats.damageDealt, stats.damageTaken,
+        stats.deaths, DIFFICULTIES[difficulty].name, hardcore ? ", hardcore" : ""), p.x + 28, y + 150, 10, ui::MUTED);
     float bw = 240, by = p.y + ph - 76;
     if (ui::button({ p.x + pw / 2 - bw - 10, by, bw, 50 }, "Descend deeper", ui::Style::Primary)) { play("ui"); descend(); }
     if (ui::button({ p.x + pw / 2 + 10, by, bw, 50 }, "Main menu", ui::Style::Normal)) { play("ui"); toMenu(); }
@@ -956,54 +950,25 @@ void Game::drawRushOver() {
     if (ui::button({ p.x + pw / 2 + 10, by, bw, 50 }, "Main menu", ui::Style::Normal)) { play("ui"); toMenu(); }
 }
 
-// ------------------------------------------------------------- the wheels
+// ------------------------------------------------------------- Toshko's wheel
 void Game::drawWheel(Vector2 c, float R) {
-    int n = wheel.casino ? CASINO_SLOTS : PZ_COUNT;
+    int n = CASINO_SLOTS;
     float step = 360.0f / n;
     DrawCircleV(c, R + 10, { 60, 40, 20, 255 });
     DrawCircleV(c, R + 4, { 200, 160, 60, 255 });
     for (int i = 0; i < n; ++i) {
         float a0 = wheel.angle + i * step;
-        Color col = wheel.casino ? (i == 0 ? Color{ 40, 140, 60, 255 } : i % 2 ? Color{ 170, 30, 40, 255 } : Color{ 25, 22, 30, 255 })
-                                 : PRIZES[i].color;
+        Color col = i == 0 ? Color{ 40, 140, 60, 255 } : i % 2 ? Color{ 170, 30, 40, 255 } : Color{ 25, 22, 30, 255 };
         if (wheel.done && i == wheel.result && fmodf(clock * 4, 1) < 0.5f) col = ColorBrightness(col, 0.45f);
         DrawCircleSector(c, R, a0, a0 + step, 12, col);
         DrawLineEx(c, { c.x + cosf(a0 * DEG2RAD) * R, c.y + sinf(a0 * DEG2RAD) * R }, 2, { 230, 200, 120, 255 });
         float mid = (a0 + step / 2) * DEG2RAD;
-        const char* label = wheel.casino ? (i == 0 ? "T" : TextFormat("%d", i)) : PRIZES[i].label;
+        const char* label = i == 0 ? "T" : TextFormat("%d", i);
         ui::textCentered(label, c.x + cosf(mid) * R * 0.66f, c.y + sinf(mid) * R * 0.66f - 5, 10, RAYWHITE);
     }
     DrawCircleV(c, R * 0.14f, { 200, 160, 60, 255 });
     DrawCircleV(c, R * 0.08f, { 90, 60, 20, 255 });
     DrawTriangle({ c.x, c.y - R + 16 }, { c.x + 13, c.y - R - 16 }, { c.x - 13, c.y - R - 16 }, RAYWHITE);   // the pointer
-}
-
-void Game::drawRoulette() {
-    int sw = GetScreenWidth(), sh = GetScreenHeight();
-    updateWheel(GetFrameTime());
-    ui::veil(0.72f);
-    ui::textCentered("LEVEL UP!", sw / 2.0f, 34, 40, ui::ACCENT);
-    ui::textCentered(TextFormat("Level %d  -  spin the wheel for a prize", player.level), sw / 2.0f, 82, 20, ui::TEXT);
-    float R = fminf(190.0f, sh * 0.3f);
-    Vector2 c = { sw / 2.0f - R * 0.9f, sh / 2.0f + 40 };
-    drawWheel(c, R);
-    float x = c.x + R + 60, y = c.y - R * 0.6f;
-    for (int i = 0; i < PZ_COUNT; ++i) {
-        DrawRectangle((int)x, (int)(y + i * 24), 14, 14, PRIZES[i].color);
-        ui::text(PRIZES[i].won, x + 22, y + i * 24, 10, ui::TEXT);
-    }
-    float by = y + PZ_COUNT * 24 + 16;
-    if (!wheel.spinning && !wheel.done) {
-        if (ui::button({ x, by, 200, 52 }, "SPIN", ui::Style::Primary) || in::pressed(KEY_SPACE)) spinWheel();
-    }
-    else if (wheel.done) {
-        ui::text(wheel.message.c_str(), x, by, 20, wheel.result == PZ_TOSHKO ? ui::BAD : ui::GOOD);
-        if (ui::button({ x, by + 34, 200, 52 }, "Collect", ui::Style::Good) || in::pressed(KEY_SPACE)) {
-            play("ui");
-            if (--player.spins > 0) wheel = Wheel{};
-            else overlay = Overlay::None;
-        }
-    }
 }
 
 void Game::drawCasino() {
@@ -1058,10 +1023,10 @@ void Game::drawSummary() {
         { "Floor reached", TextFormat("%d", floor) }, { "Time", ui::clock(runTime) }, { "Level", TextFormat("%d", player.level) },
         { "Kills", TextFormat("%d", kills) }, { "Gold earned", TextFormat("%d", stats.goldEarned) }, { "Gold lost", TextFormat("%d", stats.goldLost) },
         { "Damage dealt", TextFormat("%d", stats.damageDealt) }, { "Damage taken", TextFormat("%d", stats.damageTaken) },
-        { "Deaths", TextFormat("%d", stats.deaths) }, { "Prize spins", TextFormat("%d", stats.spins) },
+        { "Deaths", TextFormat("%d", stats.deaths) },
     };
     float ry = y + 100;
-    for (int i = 0; i < 10; ++i) {
+    for (int i = 0; i < (int)(sizeof rows / sizeof rows[0]); ++i) {
         float cx = x + (i % 2) * (pw / 2 - 10), cy = ry + (i / 2) * 30;
         ui::text(rows[i][0], cx, cy, 20, ui::MUTED);
         ui::textRight(rows[i][1], cx + pw / 2 - 60, cy, 20, ui::TEXT);
