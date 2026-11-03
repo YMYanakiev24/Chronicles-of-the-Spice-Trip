@@ -203,20 +203,30 @@ void Autopilot::build() {
         check("holding D walks right", g.player.pos.x > markX + 40);
         return true;
     });
-    add("oracle", 4, [this](Game& g, float t) {
-        if (t == 0) { g.player.pos = { ORACLE_POS.x + 24, ORACLE_POS.y + 16 }; return false; }
+    add("vasil greets", 5, [this](Game& g, float t) {
+        if (t < 0.2f || g.banner > 0) return false;     // his call waits for the floor's name to fade
+        check("Vasil calls you over as the floor begins", g.vasilGreetT > 0 && g.dungeon.cur().isStart);
+        shot(g, "vasil-greets");
+        return true;
+    });
+    add("vasil", 4, [this](Game& g, float t) {
+        if (t == 0) { g.player.pos = { VASIL_POS.x + 30, VASIL_POS.y + 18 }; return false; }
         if (t < 0.2f) return false;
         in::tap(g.settings.keys.interact);
         return true;
     });
-    add("oracle speaks", 4, [this](Game& g, float t) {
-        if (t < 0.3f) return false;
-        check("E talks to the oracle", !g.dialogue.empty());
-        shot(g, "oracle");
+    add("vasil tells", 4, [this](Game& g, float t) {
+        if (t < 0.6f) return false;
+        check("E has Vasil tell the floor's tale", !g.dialogue.empty() && g.dialogue == g.vasilTale().front());
+        check("Vasil's art is all there", g.vasil.seated.id && g.vasil.story[0].id && g.vasil.story[1].id && g.vasil.portrait.id && g.vasil.crowd.id);
+        shot(g, "vasil");
         return true;
     });
-    add("oracle done", 4, [](Game& g, float) {
-        if (g.dialogue.empty()) return true;
+    add("vasil done", 4, [this](Game& g, float) {
+        if (g.dialogue.empty()) {
+            check("he takes a bow at the end", g.vasilBowT > 0);
+            return true;
+        }
         in::tap(g.settings.keys.interact);      // each press shows the next line
         return false;
     });
@@ -741,8 +751,20 @@ void Autopilot::build() {
                 g.player.pos = ROOM_CENTER;           // stand on the stairs once the loot is in
                 if (g.floor != index + 2) return false;
                 check(TextFormat("the stairs lead down to floor %d", index + 2), g.dungeon.cur().isStart);
+                check(TextFormat("Vasil waits there with floor %d's own tale", index + 2), g.vasilGreetT > 0
+                    && g.vasilGreeting().find(THEMES[index + 1].name) != std::string::npos
+                    && g.vasilTale().front().find(THEMES[index + 1].name + 4) != std::string::npos);   // "The Drowned Crypt" -> "Drowned Crypt"
                 return true;
             });
+        if (index == 0) {                         // hear the start of floor 2's tale
+            add("floor 2 tale", 6, [this](Game& g, float t) {
+                if (g.banner > 0) return false;
+                if (g.dialogue.empty()) { g.player.pos = { VASIL_POS.x + 30, VASIL_POS.y + 18 }; in::tap(g.settings.keys.interact); return false; }
+                shot(g, "vasil-floor-2");
+                return true;
+            });
+            add("floor 2 tale ends", 2, [](Game& g, float) { g.dialogue.clear(); return true; });
+        }
     };
 
     // floor 1: the Good Plazmodium
@@ -1054,6 +1076,7 @@ void Autopilot::build() {
                 case Special::Drink:       g.player.hp = 50; break;
                 case Special::CoinBarrage: g.player.charge = COIN_POWER_MAX; break;
                 case Special::Scare:       g.enemies.front().speed = 70; g.enemies.front().dmg = 10; break;   // close enough to bite
+                case Special::CreatineCpp: g.enemies.push_back(dummy({ ROOM_CENTER.x - 50, ROOM_CENTER.y })); break;   // one behind him too
                 case Special::MugShield: {
                     Projectile p;
                     p.pos = { ROOM_CENTER.x - 60, ROOM_CENTER.y }; p.vel = { 200, 0 };
@@ -1067,7 +1090,7 @@ void Autopilot::build() {
                 in::tap(g.settings.keys.special);
                 return false;
             }
-            float checkAt = c.kind == Special::CoinBarrage || c.kind == Special::Koi ? 0.05f : 0.8f;
+            float checkAt = c.kind == Special::CoinBarrage || c.kind == Special::Koi ? 0.05f : c.kind == Special::CreatineCpp ? 0.12f : 0.8f;
             if (t < checkAt) return false;
             const Enemy* d = g.enemies.empty() ? nullptr : &g.enemies.front();
             int coinShots = 0, koi = 0;
@@ -1085,9 +1108,16 @@ void Autopilot::build() {
             case Special::Koi:         ok = koi == 3; break;
             case Special::Blink:       ok = g.player.pos.x > markX + 100 && g.player.charge < DUST_MAX; break;
             case Special::Scare:       ok = g.scareT > 0 && d && d->pos.x > ROOM_CENTER.x + 40 && g.player.hp == g.player.maxHp; break;
+            case Special::CreatineCpp: {               // the lasers hit the one ahead, the creatine shoves the one behind
+                const Enemy* b = g.enemies.size() > 1 ? &g.enemies[1] : nullptr;
+                ok = d && d->hp <= d->maxHp - CPP_DAMAGE && b && b->hp <= b->maxHp - CREATINE_DAMAGE && b->pos.x < ROOM_CENTER.x - 52
+                    && g.lasers.size() == CPP_BEAMS;
+                break;
+            }
             }
             check(TextFormat("%s's special (%s) works", c.name, c.special), ok);
             if (c.kind == Special::Koi) shot(g, "koi");
+            if (c.kind == Special::CreatineCpp) shot(g, "gymrat-special");
             return true;
         });
     }

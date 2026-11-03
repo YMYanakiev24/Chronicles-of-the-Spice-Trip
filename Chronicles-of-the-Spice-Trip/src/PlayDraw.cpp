@@ -33,7 +33,6 @@ void Game::playScreen() {
     float target = r.isBoss && !r.cleared ? (painted ? 0.16f : 0.38f) : 0.0f;
     gloom += (target - gloom) * fminf(1.0f, dt * 2.5f);
 
-    updateCamera(dt);
     Camera2D cam = camera();
     if (shake > 0 && overlay == Overlay::None) {
         shake = fmaxf(0, shake - dt);
@@ -209,8 +208,6 @@ void Game::drawRoom() {
         for (int i = 0; i < 4; ++i)
             drawAnim(SPR.flag, animFrame(SPR.flag, clock + i * 0.3f, 6, true), { (2 + i * 5 + (i > 1 ? 2 : 0)) * (float)TILE + 16, 14 }, 2.0f);
     if (r.isStart && mode == Mode::Run) {
-        drawAnim(SPR.candle, animFrame(SPR.candle, clock, 7, true), { ORACLE_POS.x - 34, ORACLE_POS.y - 4 }, 2.0f);
-        drawAnim(SPR.candle, animFrame(SPR.candle, clock + 0.3f, 7, true), { ORACLE_POS.x + 34, ORACLE_POS.y - 4 }, 2.0f);
         drawAnim(SPR.candle2, animFrame(SPR.candle2, clock + 0.5f, 7, true), { ROOM_PX_W - 3 * TILE, 2.5f * TILE }, 2.0f);
         drawAnim(SPR.candle2, animFrame(SPR.candle2, clock + 0.1f, 7, true), { ROOM_PX_W - 3 * TILE, ROOM_PX_H - 2.5f * TILE }, 2.0f);
     }
@@ -313,15 +310,7 @@ void Game::drawActors() {
             drawAnim(SPR.coin, animFrame(SPR.coin, clock + i * 0.25f, 10, true), { m.x - 30 + i * 30.0f, m.y + 40 }, 1.2f);
     }
 
-    if (r.isStart && mode == Mode::Run) {
-        drawShadow(ORACLE_POS, 12);
-        if (SPR.oracle.ok())
-            drawAnim(SPR.oracle, animFrame(SPR.oracle, clock, 5, true), { ORACLE_POS.x, ORACLE_POS.y - 6 }, 2.2f, player.pos.x < ORACLE_POS.x);
-        else {
-            DrawRectangle((int)ORACLE_POS.x - 7, (int)ORACLE_POS.y - 12, 14, 22, { 202, 168, 232, 255 });
-            DrawCircle((int)ORACLE_POS.x, (int)ORACLE_POS.y - 14, 6, { 244, 226, 250, 255 });
-        }
-    }
+    if (r.isStart && mode == Mode::Run) drawVasil();
 
     auto drawBody = [&](const Enemy& e) {
         if (e.bossForm >= 0) drawBossBody(e, currentBossIndex(), bossArt);
@@ -378,6 +367,19 @@ void Game::drawActors() {
 
     for (auto& p : shots) drawProjectile(p, clock);
     for (auto& p : enemyShots) drawProjectile(p, clock);
+    for (auto& l : lasers) {                // the Gym Rat's C++: green lasers, bits racing along them
+        float k = 1 - l.t / GYM_POSE_TIME, len = Vector2Distance(l.a, l.b);
+        Vector2 d = Vector2Scale(Vector2Subtract(l.b, l.a), 1 / fmaxf(len, 1));
+        BeginBlendMode(BLEND_ADDITIVE);
+        DrawLineEx(l.a, l.b, 8 * k, Fade({ 40, 255, 90, 255 }, 0.22f * k));
+        DrawLineEx(l.a, l.b, 3, Fade({ 80, 255, 120, 255 }, 0.75f * k));
+        DrawLineEx(l.a, l.b, 1.2f, Fade({ 225, 255, 225, 255 }, k));
+        for (float s2 = fmodf(l.t * 420, 22); s2 < len; s2 += 22) {
+            Vector2 p = Vector2Add(l.a, Vector2Scale(d, s2));
+            DrawRectangleV({ p.x - 1.5f, p.y - 1.5f }, { 3, 3 }, Fade({ 190, 255, 200, 255 }, k));
+        }
+        EndBlendMode();
+    }
     drawBus(fight.bus, clock);
     drawLabAir(fight, clock);
     drawArenaAir(fight, clock);
@@ -392,6 +394,58 @@ void Game::drawActors() {
     for (auto& f : flashes) drawFlash(f);
     for (auto& pu : popups)
         drawAnim(*pu.anim, animFrame(*pu.anim, pu.t, 8, true), pu.pos, 2.0f, false, Fade(WHITE, fminf(1.0f, 1.4f - pu.t)));
+}
+
+// Vasil on his stool by his sign, a few listeners round him (a different few every floor).
+// Telling the tale he stands up beside the stool, glowing; at the end he takes a bow.
+void Game::drawVasil() {
+    const Vector2 v = VASIL_POS;
+    const float S = 46.0f / 211;               // his art to the world: standing, a champion's height
+    auto draw = [](Texture2D tx, Vector2 foot, float scale, bool flip = false, float rot = 0, float squash = 1) {
+        if (!tx.id) return;
+        float w = tx.width * scale, h = tx.height * scale * squash;
+        DrawTexturePro(tx, { 0, 0, flip ? -(float)tx.width : (float)tx.width, (float)tx.height }, { foot.x, foot.y, w, h }, { w / 2, h }, rot, WHITE);
+    };
+    bool telling = !dialogue.empty(), bowing = !telling && vasilBowT > 0;
+    auto shadowAt = [](Vector2 foot, float r) { drawShadow({ foot.x, foot.y - r * 0.7f - 1 }, r); };   // under the feet
+
+    // the sign behind him to the left
+    shadowAt({ v.x - 52, v.y - 2 }, 6);
+    draw(vasil.sign, { v.x - 52, v.y - 2 }, 0.36f);
+
+    if (telling || bowing) {
+        if (telling) {                          // the warm light of a story being told
+            BeginBlendMode(BLEND_ADDITIVE);
+            float pulse = 1 + 0.06f * sinf(clock * 3);
+            DrawCircleGradient((int)v.x, (int)(v.y - 26), 40 * pulse, Fade({ 255, 200, 110, 255 }, 0.30f), Fade({ 255, 200, 110, 255 }, 0));
+            EndBlendMode();
+        }
+        shadowAt({ v.x + 24, v.y + 2 }, 8);
+        draw(vasil.stool, { v.x + 24, v.y + 2 }, 0.26f);
+        shadowAt({ v.x, v.y + 2 }, 11);
+        float bow = bowing ? sinf((1 - vasilBowT / 1.2f) * PI) : 0;
+        bool flip = player.pos.x < v.x - 6;     // he tells it to you
+        float bob = telling ? fabsf(sinf(clock * 2.6f)) * 1.5f : 0;
+        draw(vasil.story[telling ? dialogueIdx % 2 : 1], { v.x, v.y + 2 - bob }, S, flip, bow * (flip ? -10.0f : 10.0f), 1 - 0.1f * bow);
+    }
+    else {                                      // sitting, breathing, waiting for a listener
+        shadowAt({ v.x, v.y + 2 }, 12);
+        draw(vasil.seated, { v.x, v.y + 2 }, S, false, 0, 1 + 0.012f * sinf(clock * 2.2f));
+    }
+
+    // the listeners, in front of him
+    if (vasil.crowd.id) {
+        static const Vector2 spots[3] = { { -54, 30 }, { 50, 28 }, { 88, 12 } };
+        int fw = vasil.crowd.width / VasilArt::CROWD, fh = vasil.crowd.height;
+        for (int i = 0; i < 3; ++i) {
+            int who = (floor * 7 + i * 3) % VasilArt::CROWD;
+            Vector2 foot = Vector2Add(v, spots[i]);
+            float sc = 0.40f, lean = telling ? sinf(clock * 2 + i * 1.7f) * 1.2f : 0;
+            shadowAt(foot, 8);
+            DrawTexturePro(vasil.crowd, { (float)(who * fw), 0, (float)(spots[i].x > 0 ? -fw : fw), (float)fh },
+                { foot.x, foot.y, fw * sc, fh * sc }, { fw * sc / 2, fh * sc }, lean, WHITE);
+        }
+    }
 }
 
 // ---------------------------------------------------------------------- HUD
@@ -434,8 +488,8 @@ void Game::drawHud() {
         prompt(cam, { ROOM_CENTER.x, ROOM_CENTER.y - 54 }, E, "open the hoard");
     if (r.isCasino && overlay == Overlay::None && Vector2Distance(player.pos, MERCHANT_POS) < 60)
         prompt(cam, { MERCHANT_POS.x, MERCHANT_POS.y - 70 }, E, "gamble with Toshko");
-    if (r.isStart && mode == Mode::Run && dialogue.empty() && Vector2Distance(player.pos, ORACLE_POS) < 48)
-        prompt(cam, { ORACLE_POS.x, ORACLE_POS.y - 40 }, E, "talk");
+    if (r.isStart && mode == Mode::Run && dialogue.empty() && Vector2Distance(player.pos, VASIL_POS) < 56)
+        prompt(cam, { VASIL_POS.x, VASIL_POS.y - 62 }, E, "hear the tale");
     if (mode == Mode::Run && r.isBoss && r.cleared && Vector2Distance(player.pos, ROOM_CENTER) < 70)
         ui::textCentered("Descend", GetWorldToScreen2D({ ROOM_CENTER.x, ROOM_CENTER.y - 46 }, cam).x,
             GetWorldToScreen2D({ ROOM_CENTER.x, ROOM_CENTER.y - 46 }, cam).y, 20, ui::ACCENT);
@@ -570,15 +624,42 @@ void Game::drawHud() {
     drawMinimap();
     if (fight.active()) drawBossBar();
 
-    // --- the oracle's words ---
+    // --- Vasil: his call as a floor begins, then the tale itself ---
+    if (r.isStart && mode == Mode::Run && dialogue.empty() && vasilGreetT > 0 && banner <= 0) {
+        std::string say = vasilGreeting();
+        float a = fminf(1, vasilGreetT);
+        float bw = 250, th = ui::wrappedHeight(say.c_str(), bw - 24, 10);
+        Vector2 tip = GetWorldToScreen2D({ VASIL_POS.x + 4, VASIL_POS.y - 52 }, cam);
+        Rectangle b = { tip.x - 30, tip.y - th - 30, bw, th + 20 };
+        DrawRectangleRounded(b, 0.25f, 6, Fade({ 250, 242, 222, 255 }, 0.95f * a));
+        DrawTriangle({ tip.x - 14, b.y + b.height - 1 }, { tip.x, tip.y - 2 }, { tip.x + 2, b.y + b.height - 1 }, Fade({ 250, 242, 222, 255 }, 0.95f * a));
+        DrawRectangleRoundedLinesEx(b, 0.25f, 6, 2, Fade({ 120, 84, 50, 255 }, a));
+        ui::textWrapped(say.c_str(), b.x + 12, b.y + 10, bw - 24, 10, Fade({ 60, 40, 30, 255 }, a));
+    }
     if (!dialogue.empty()) {
-        float w = fminf(760.0f, sw - 80.0f);
-        Rectangle d = { (sw - w) / 2, hy - 140, w, 112 };
+        float w = fminf(800.0f, sw - 80.0f);
+        Rectangle d = { (sw - w) / 2, hy - 150, w, 122 };
         ui::panel(d);
-        ui::text("Theira, the Last Oracle", d.x + 24, d.y + 16, 20, { 202, 168, 232, 255 });
-        ui::textWrapped(dialogue.c_str(), d.x + 24, d.y + 46, w - 48, 20, ui::TEXT);
+        Rectangle face = { d.x + 16, d.y + 16, 90, 90 };
+        DrawRectangleRec(face, { 12, 12, 20, 255 });
+        if (vasil.portrait.id) ui::drawContain(vasil.portrait, { 0, 0, (float)vasil.portrait.width, (float)vasil.portrait.height }, face);
+        DrawRectangleLinesEx(face, 2, ui::ACCENT);
+        float tx = face.x + face.width + 18;
+        ui::text("Vasil, the Storyteller", tx, d.y + 16, 20, { 120, 150, 240, 255 });
+        ui::textWrapped(dialogue.c_str(), tx, d.y + 46, d.x + w - 24 - tx, 20, ui::TEXT);
+        int lines = (int)vasilTale().size();
+        ui::text(TextFormat("%d / %d", dialogueIdx + 1, lines), d.x + w - 160, d.y + d.height - 24, 10, ui::MUTED);
         ui::keycap(E, d.x + w - 110, d.y + d.height - 26);
-        ui::text("continue", d.x + w - 92, d.y + d.height - 24, 10, ui::MUTED);
+        ui::text(dialogueIdx + 1 < lines ? "continue" : "thank him", d.x + w - 92, d.y + d.height - 24, 10, ui::MUTED);
+    }
+
+    // --- the Gym Rat shouts what he's throwing ---
+    if (gymT > 0) {
+        float k = gymT / GYM_POSE_TIME, rise = (1 - k) * 16, a = fminf(1, k * 2.5f);
+        Vector2 ahead = GetWorldToScreen2D({ player.pos.x + gymDir.x * 50, player.pos.y - 34 + gymDir.y * 26 - rise }, cam);
+        Vector2 behind = GetWorldToScreen2D({ player.pos.x - gymDir.x * 50, player.pos.y - 34 - gymDir.y * 26 - rise }, cam);
+        ui::textCentered("C++", ahead.x, ahead.y, 20, Fade({ 90, 255, 120, 255 }, a));
+        ui::textCentered("CREATINE", behind.x, behind.y, 20, Fade({ 245, 245, 255, 255 }, a));
     }
 
     // --- banner ---

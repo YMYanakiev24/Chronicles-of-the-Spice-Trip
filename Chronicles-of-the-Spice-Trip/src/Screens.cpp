@@ -307,6 +307,21 @@ void Game::introScreen() {
     DrawCircle(sw - 220, 150, 70, Fade({ 220, 226, 240, 255 }, 0.9f));
     for (int i = 0; i < 200; ++i) DrawPixel((i * 137) % sw, (i * 89) % sh, Fade(WHITE, 0.15f + 0.1f * sinf(clock + i)));
     DrawRectangle(0, sh - 160, sw, 160, { 8, 12, 14, 255 });
+    // Vasil tells it, off to the left, if there's room beside the words
+    Texture2D v = vasil.story[0];
+    float textW = 0;
+    for (const char* line : PROPHECY) textW = fmaxf(textW, (float)ui::measure(line, 30));
+    float vh = fminf(300.0f, sh * 0.42f), vw = v.id ? v.width * vh / v.height : 0, vx = (sw - textW) / 4;
+    if (v.id && vx - vw / 2 > 12) {
+        float a = Clamp(t * 1.5f, 0, 1);
+        BeginBlendMode(BLEND_ADDITIVE);
+        DrawCircleGradient((int)vx, (int)(sh - 160 - vh * 0.45f), vh * 0.5f, Fade({ 255, 200, 110, 255 }, 0.16f * a), Fade({ 255, 200, 110, 255 }, 0));
+        EndBlendMode();
+        DrawEllipse((int)vx, sh - 156, vw * 0.4f, 8, Fade(BLACK, 0.6f * a));
+        DrawTexturePro(v, { 0, 0, (float)v.width, (float)v.height }, { vx - vw / 2, sh - 150 - vh, vw, vh }, { 0, 0 }, 0, Fade(WHITE, a));
+        const char* name = "Vasil, the Storyteller";
+        ui::textCentered(name, fmaxf(vx, ui::measure(name, 20) / 2.0f + 16), sh - 132.0f, 20, Fade({ 120, 150, 240, 255 }, a));
+    }
     for (int i = 0; i < 4; ++i) {
         float a = Clamp(t - i * 1.6f - 0.5f, 0, 1);
         ui::textCentered(PROPHECY[i], sw / 2.0f, 230 + i * 56.0f, 30, Fade({ 230, 224, 210, 255 }, a));

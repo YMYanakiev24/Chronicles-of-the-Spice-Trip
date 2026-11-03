@@ -53,7 +53,6 @@ void Sprites::load() {
     flag = loadStrip("flag.png", 16);
     coin = loadStrip("coin.png", 16);
     skull = loadStrip("skull.png", 16);
-    oracle = loadStrip("oracle.png", 16);
     flame = loadStrip("flame.png", 32);
     key = loadStrip("key.png", 16);
     keySilver = loadStrip("key_silver.png", 16);
@@ -77,7 +76,7 @@ void Sprites::unload() {
     auto un = [](Texture2D& t) { if (t.id) UnloadTexture(t); t = Texture2D{}; };
     un(tileset);
     for (Anim* a : { &peaks, &chest, &chestOpen, &torch, &sideTorch, &candle, &candle2,
-                     &flaskRed, &flaskBlue, &flag, &coin, &skull, &oracle, &flame, &key, &keySilver, &rock, &arrow, &vapes, &spellIcons })
+                     &flaskRed, &flaskBlue, &flag, &coin, &skull, &flame, &key, &keySilver, &rock, &arrow, &vapes, &spellIcons })
         un(a->tex);
     for (auto& e : enemy)
         for (Anim* a : { &e.idle, &e.move, &e.attack, &e.hurt, &e.death }) un(a->tex);
