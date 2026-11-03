@@ -1,8 +1,11 @@
-# Temporary: builds the Visual Studio project to check it compiles and links.
-name: Windows check
+# Builds the Visual Studio project on Windows (Debug and Release) for every push to main and
+# every pull request, so a change that breaks the Windows build shows up straight away.
+name: Windows build
 on:
   push:
-    branches: [ci-windows-check]
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
 jobs:
   build:
     runs-on: windows-latest

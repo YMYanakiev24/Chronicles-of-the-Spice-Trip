@@ -49,6 +49,20 @@ struct ChampionDef {
 };
 
 inline constexpr int CHAMPION_COUNT = 12;
+
+// Beray's outfits. Every champion can wear each one; their walking figure in it is
+// assets/outfits/<key>/<their walk sheet> (made by tools/outfits.py). 0 is their own clothes.
+struct OutfitDef { const char* key; const char* name; const char* desc; int price; Color colors[2]; };
+inline constexpr int OUTFIT_COUNT = 7;
+inline constexpr OutfitDef OUTFITS[OUTFIT_COUNT] = {
+    { nullptr,    "Own Clothes",        "What they walked in with.",                        0, { { 120, 110, 140, 255 }, { 70, 64, 84, 255 } } },
+    { "drip",     "Drip Puffer",        "Purple puffer, teal drips, a cap and a chain.",  150, { { 123, 63, 196, 255 }, { 34, 194, 180, 255 } } },
+    { "midnight", "Midnight Tracksuit", "Black tracksuit, white stripes, gold chain.",    100, { { 28, 28, 38, 255 }, { 240, 240, 246, 255 } } },
+    { "gold",     "Gold Rush",          "Gold jacket, cream trousers, gold chain.",       180, { { 217, 165, 32, 255 }, { 236, 229, 210, 255 } } },
+    { "camo",     "Camo Fatigues",      "Borrowed from The Sergeant. Cap included.",      120, { { 94, 106, 60, 255 }, { 110, 90, 58, 255 } } },
+    { "pink",     "Pink Velour",        "Soft, pink, and not up for discussion.",          90, { { 224, 69, 154, 255 }, { 255, 159, 208, 255 } } },
+    { "ice",      "Ice Cold",           "White and ice blue, a cap and a chain.",         140, { { 210, 236, 250, 255 }, { 95, 183, 239, 255 } } },
+};
 extern const ChampionDef CHAMPIONS[CHAMPION_COUNT];
 
 // Coin Barrage and Blink run on a meter instead of only a cooldown.

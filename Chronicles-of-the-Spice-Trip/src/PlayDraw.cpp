@@ -14,10 +14,28 @@ void Game::playScreen() {
     float dt = fminf(GetFrameTime(), 0.05f);
     if (in::pressed(KEY_ESCAPE)) {
         if (overlay == Overlay::Controls) { save::writeTouchLayout(touch::layout()); overlay = Overlay::Pause; }
-        else if (overlay == Overlay::Shop || overlay == Overlay::Galin || overlay == Overlay::Pause) overlay = Overlay::None;
+        else if (overlay == Overlay::Shop || overlay == Overlay::Galin || overlay == Overlay::Drip || overlay == Overlay::Pause) overlay = Overlay::None;
         else if (overlay == Overlay::Casino && !wheel.spinning) overlay = Overlay::None;
         else if (overlay == Overlay::None) overlay = Overlay::Pause;
         play("ui");
+    }
+    if (hall.active) {                              // the castle: its own rooms, shopkeepers and HUD
+        if (overlay == Overlay::None) updateCastle(dt);
+        if (screen != Screen::Play) return;
+        if (hall.active) {
+            drawCastle();
+            drawCastleHud();
+            switch (overlay) {
+            case Overlay::Shop:     drawShop(); break;
+            case Overlay::Galin:    drawGalin(); break;
+            case Overlay::Casino:   drawCasino(); break;
+            case Overlay::Drip:     drawDrip(); break;
+            case Overlay::Pause:    drawPause(); break;
+            case Overlay::Controls: drawControlsEditor(); break;
+            default: break;
+            }
+            return;
+        }
     }
     if (hunt.active) {                              // the toilets: their own map, rules and HUD
         if (overlay == Overlay::None) updateToilet(dt);
@@ -35,6 +53,8 @@ void Game::playScreen() {
     }
     if (overlay == Overlay::None) updatePlay(dt);
     if (screen != Screen::Play) return;            // left for the menu this frame
+    if (hall.active) { drawCastle(); drawCastleHud(); return; }     // just went through the castle door
+    if (hunt.active) { drawToilet(); drawToiletHud(); return; }     // or down Triceps' stairs
 
     // the lair darkens while its boss lives (painted arenas less, so the art shows)
     Room& r = dungeon.cur();
@@ -217,6 +237,21 @@ void Game::drawRoom() {
         for (int i = 0; i < 4; ++i)
             drawAnim(SPR.flag, animFrame(SPR.flag, clock + i * 0.3f, 6, true), { (2 + i * 5 + (i > 1 ? 2 : 0)) * (float)TILE + 16, 14 }, 2.0f);
     if (r.isStart && mode == Mode::Run) {
+        // the castle door in the top wall: an arched double door, studded, under a gold plaque
+        float dx = CASTLE_DOOR_X, w = 52, top = 2, bot = TILE + 4;
+        DrawRectangle((int)(dx - w / 2 - 4), (int)top - 2, (int)w + 8, (int)(bot - top) + 4, { 34, 30, 40, 255 });
+        DrawCircleSector({ dx, top + 12 }, w / 2 + 4, 180, 360, 16, { 34, 30, 40, 255 });
+        DrawRectangle((int)(dx - w / 2), (int)top + 10, (int)w, (int)(bot - top) - 10, { 96, 58, 32, 255 });
+        DrawCircleSector({ dx, top + 12 }, w / 2, 180, 360, 16, { 96, 58, 32, 255 });
+        for (int k = -2; k <= 2; ++k)                        // planks
+            DrawLine((int)(dx + k * w / 5.0f), (int)top + 2, (int)(dx + k * w / 5.0f), (int)bot, { 70, 40, 22, 255 });
+        DrawLine((int)dx, (int)top - 12, (int)dx, (int)bot, { 40, 24, 14, 255 });
+        for (float by : { top + 8.0f, bot - 8.0f })          // iron bands and studs
+            DrawRectangle((int)(dx - w / 2), (int)by, (int)w, 3, { 50, 48, 56, 255 });
+        DrawCircle((int)dx - 5, (int)(top + bot) / 2 + 4, 2.5f, { 230, 190, 90, 255 });
+        DrawCircle((int)dx + 5, (int)(top + bot) / 2 + 4, 2.5f, { 230, 190, 90, 255 });
+        float glow = 0.5f + 0.5f * sinf(clock * 2);
+        DrawRectangle((int)(dx - w / 2), (int)bot, (int)w, 4, Fade({ 255, 200, 110, 255 }, 0.25f + 0.25f * glow));   // light under the door
         drawAnim(SPR.candle2, animFrame(SPR.candle2, clock + 0.5f, 7, true), { ROOM_PX_W - 3 * TILE, 2.5f * TILE }, 2.0f);
         drawAnim(SPR.candle2, animFrame(SPR.candle2, clock + 0.1f, 7, true), { ROOM_PX_W - 3 * TILE, ROOM_PX_H - 2.5f * TILE }, 2.0f);
     }
@@ -252,19 +287,6 @@ void Game::drawActors() {
         const Anim& a = r.chestOpened ? SPR.chestOpen : SPR.chest;
         if (a.ok()) drawAnim(a, r.chestOpened ? a.frames - 1 : 0, { ROOM_CENTER.x, ROOM_CENTER.y - 8 }, 3.4f);
     }
-    if (r.isCasino) {               // Toshko's roulette table, Toshko behind it
-        Vector2 tp = { MERCHANT_POS.x, MERCHANT_POS.y + 22 };
-        const Anim& ta = SPR.enemy[EK_TOSHKO].idle;
-        if (ta.ok()) drawAnim(ta, animFrame(ta, clock, 6, true), { MERCHANT_POS.x, MERCHANT_POS.y - 24 }, 0.8f);
-        DrawRectangleRounded({ tp.x - 74, tp.y - 16, 148, 48 }, 0.4f, 8, { 90, 50, 30, 255 });
-        DrawRectangleRounded({ tp.x - 68, tp.y - 12, 136, 40 }, 0.4f, 8, { 30, 110, 60, 255 });
-        float spin = clock * 120;
-        for (int i = 0; i < 8; ++i)
-            DrawCircleSector({ tp.x - 30, tp.y + 8 }, 15, spin + i * 45, spin + i * 45 + 45, 4,
-                i == 0 ? Color{ 40, 160, 70, 255 } : i % 2 ? Color{ 170, 30, 40, 255 } : Color{ 25, 22, 30, 255 });
-        for (int i = 0; i < 3; ++i) drawAnim(SPR.coin, 0, { tp.x + 18 + i * 14, tp.y + 8 - i * 3 }, 1.2f);
-    }
-
     if (r.hasKey && r.cleared && !dungeon.keyFound) {      // the boss key, bobbing and glinting
         Vector2 k = { ROOM_CENTER.x, ROOM_CENTER.y - 6 + sinf(clock * 3) * 3 };
         drawShadow({ ROOM_CENTER.x, ROOM_CENTER.y + 8 }, 8);
@@ -295,29 +317,6 @@ void Game::drawActors() {
     }
 
     if (chestLight > 0) drawChestLight({ r.chestTx * (float)TILE + 16, r.chestTy * (float)TILE + 12 }, chestLight, clock);
-
-    if (r.isShop && r.isGalin) {   // the stall on its patch of grass, Galin's feet where Marin's would be
-        const float size = 170;
-        ui::drawContain(galinShopTex, { 0, 0, (float)galinShopTex.width, (float)galinShopTex.height },
-            { MERCHANT_POS.x - size / 2, MERCHANT_POS.y + 26 - size * 0.88f, size, size });
-    }
-    else if (r.isShop) {        // rug, candles and the merchant, gently bobbing
-        Vector2 m = MERCHANT_POS;
-        Texture2D who = marinTex;
-        Rectangle rug = { m.x - 70, m.y - 6, 140, 60 };
-        DrawRectangleRec(rug, { 70, 34, 70, 255 });
-        DrawRectangleLinesEx(rug, 3, { 200, 160, 80, 255 });
-        drawAnim(SPR.candle, animFrame(SPR.candle, clock, 7, true), { m.x - 54, m.y + 6 }, 2.0f);
-        drawAnim(SPR.candle, animFrame(SPR.candle, clock + 0.4f, 7, true), { m.x + 54, m.y + 6 }, 2.0f);
-        drawShadow({ m.x, m.y + 14 }, 16);
-        if (who.id) {
-            float hgt = 70, sc = hgt / who.height, bob = sinf(clock * 2.2f) * 2;
-            DrawTextureEx(who, { m.x - who.width * sc / 2, m.y - hgt + 26 + bob }, 0, sc, WHITE);
-        }
-        else DrawCircleV(m, 14, { 90, 60, 160, 255 });
-        for (int i = 0; i < 3; ++i)
-            drawAnim(SPR.coin, animFrame(SPR.coin, clock + i * 0.25f, 10, true), { m.x - 30 + i * 30.0f, m.y + 40 }, 1.2f);
-    }
 
     if (r.isStart && mode == Mode::Run) drawVasil();
 
@@ -364,7 +363,7 @@ void Game::drawActors() {
     if (player.dashT > 0 || player.rollAtkT > 0)
         DrawCircleV(player.pos, PLAYER_R + 4, Fade(player.rollAtkT > 0 ? Color{ 110, 200, 80, 255 } : Color{ 245, 210, 110, 255 }, 0.35f));
     // walking as their own figure, facing the way they walk (or aim, standing still)
-    drawChampion(walk[player.champion], player.pos, heroMoving ? heroMoveDir : player.facing, heroMoving, clock,
+    drawChampion(figure(player.champion), player.pos, heroMoving ? heroMoveDir : player.facing, heroMoving, clock,
         player.facing, player.meleeAnim, player.hitFlash > 0, champ().cloak,
         { weaponTex[player.weapon], WEAPONS[player.weapon].slant, bladeReach() * 0.95f }, lift);
     if (player.shieldT > 0) {
@@ -491,12 +490,11 @@ void Game::drawHud() {
     Vector2 chestPos = { r.chestTx * (float)TILE + 16, r.chestTy * (float)TILE + 16 };
     if (r.hasChest && !r.chestOpened && r.cleared && Vector2Distance(player.pos, chestPos) < 40)
         prompt(cam, { chestPos.x, chestPos.y - 34 }, E, "open");
-    if (r.isShop && overlay == Overlay::None && Vector2Distance(player.pos, MERCHANT_POS) < 56)
-        prompt(cam, { MERCHANT_POS.x, MERCHANT_POS.y - (r.isGalin ? 136 : 66) }, E, r.isGalin ? "trade with Galin" : "trade with Marin");
     if (r.isTreasure && !r.chestOpened && Vector2Distance(player.pos, ROOM_CENTER) < 48)
         prompt(cam, { ROOM_CENTER.x, ROOM_CENTER.y - 54 }, E, "open the hoard");
-    if (r.isCasino && overlay == Overlay::None && Vector2Distance(player.pos, MERCHANT_POS) < 60)
-        prompt(cam, { MERCHANT_POS.x, MERCHANT_POS.y - 70 }, E, "gamble with Toshko");
+    if (r.isStart && mode == Mode::Run && overlay == Overlay::None && dialogue.empty()
+        && fabsf(player.pos.x - CASTLE_DOOR_X) < 30 && player.pos.y < CASTLE_DOOR_FRONT.y + 10)
+        prompt(cam, { CASTLE_DOOR_X, TILE * 1.0f + 6 }, E, "Castle Corridor");
     if (r.isStart && mode == Mode::Run && dialogue.empty() && Vector2Distance(player.pos, VASIL_POS) < 56)
         prompt(cam, { VASIL_POS.x, VASIL_POS.y - 62 }, E, "hear the tale");
     if (mode == Mode::Run && r.isBoss && r.cleared && Vector2Distance(player.pos, ROOM_CENTER) < 70)
@@ -709,15 +707,14 @@ void Game::drawMinimap() {
             Color c;
             if (cur) c = { 255, 220, 120, 255 };
             else if (rm.isBoss) c = rm.visited ? Color{ 210, 90, 80, 255 } : Color{ 120, 54, 50, 255 };
-            else if (rm.isShop) c = rm.isGalin ? Color{ 90, 150, 220, 255 } : Color{ 220, 180, 70, 255 };   // shown from the start
             else if (rm.isTreasure) c = rm.chestOpened ? Color{ 110, 80, 140, 255 } : Color{ 190, 120, 255, 255 };
-            else if (rm.isCasino) c = { 70, 170, 90, 255 };
             else if (rm.isChallenge && rm.visited) c = rm.cleared ? Color{ 150, 110, 70, 255 } : Color{ 230, 140, 60, 255 };
             else if (rm.visited) c = { 120, 124, 150, 255 };
             else c = { 56, 58, 78, 255 };
             int rx = ox + (x - minX) * (cell + gap), ry = oy + (y - minY) * (cell + gap);
             DrawRectangle(rx, ry, cell, cell, c);
             if (rm.isBoss) DrawRectangle(rx + 5, ry + 5, cell - 10, cell - 10, { 30, 10, 10, 255 });
+            if (rm.isStart) { DrawRectangle(rx + 5, ry + 3, 6, 6, { 120, 70, 40, 255 }); DrawRectangle(rx + 7, ry + 5, 2, 4, { 236, 196, 110, 255 }); }   // the castle door
             if (cur) DrawRectangleLinesEx({ (float)rx - 2, (float)ry - 2, cell + 4.0f, cell + 4.0f }, 2, RAYWHITE);
         }
 }

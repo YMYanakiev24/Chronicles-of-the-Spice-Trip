@@ -118,7 +118,6 @@ void Game::init(bool windowed) {
     marinTex = loadArt("marin.png");
     shopTex = loadArt("shop.png");
     galinTex = loadCutout("Galin.png");
-    galinShopTex = loadCutout("GalinShop.png", 50);    // the sky between its poles; the cigarette is smaller
     packTex = loadCutout("Marlboro.png");
     for (int i = 0; i < WEAPON_COUNT; ++i)
         weaponTex[i] = loadCutout(WEAPONS[i].art);
@@ -139,6 +138,12 @@ void Game::init(bool windowed) {
     toiletMap = loadArt("arenas/toilets.png");
     sergeantTex = loadArt("sergeant.png");
     sergeantWalk.load("walk-sergeant.png");
+    for (int p = 0; p < castle::PLACE_COUNT; ++p) castleArt[p] = loadArt(castle::place(p).art);
+    berayTex = loadArt("castle/beray.png");
+    for (int i = 0; i < CHAMPION_COUNT; ++i) {                // what each champion is wearing
+        int k = profile.outfit[i];
+        if (k > 0 && k < OUTFIT_COUNT) dressed[i].load(CHAMPIONS[i].walk, TextFormat("outfits/%s/", OUTFITS[k].key));
+    }
     SPR.load();
     bossArt.load();
     fight.sfx = [this](const char* s) { play(s); };
@@ -148,10 +153,13 @@ void Game::init(bool windowed) {
 void Game::shutdown() {
     SPR.unload();
     bossArt.unload();
-    for (Texture2D* tx : { &menuBg, &castleTex, &marinTex, &shopTex, &galinTex, &galinShopTex, &packTex,
+    for (Texture2D* tx : { &menuBg, &castleTex, &marinTex, &shopTex, &galinTex, &packTex,
                            &vasil.seated, &vasil.story[0], &vasil.story[1], &vasil.sign, &vasil.stool, &vasil.portrait, &vasil.crowd,
-                           &toiletMap, &sergeantTex })
+                           &toiletMap, &sergeantTex, &berayTex })
         if (tx->id) UnloadTexture(*tx);
+    for (auto& tx : castleArt) if (tx.id) UnloadTexture(tx);
+    for (auto& w : dressed) w.unload();
+    for (auto& [k, w] : outfitLooks) w.unload();
     for (auto& tx : weaponTex) if (tx.id) UnloadTexture(tx);
     for (auto& tx : champTex) if (tx.id) UnloadTexture(tx);
     for (auto& w : walk) w.unload();
@@ -240,10 +248,10 @@ static Player freshPlayer(int champion, int level) {
 }
 
 void Game::startRun() {
+    hall = castle::Hall{};
     mode = Mode::Run;
     player = freshPlayer(profile.champion, 1);
     player.pos = ROOM_CENTER;
-    dungeon.galinNext = GetRandomValue(0, 1);
     dungeon.generate();
     floor = 1; kills = 0; runTime = 0;
     stats = RunStats{}; wheel = Wheel{}; challengeT = 0; autosaveT = 0;
@@ -256,6 +264,7 @@ void Game::startRun() {
 }
 
 void Game::startBossRush() {
+    hall = castle::Hall{};
     hunt = toilet::Level{};
     mode = Mode::BossRush;
     player = freshPlayer(profile.champion, 5);
@@ -270,6 +279,7 @@ void Game::startBossRush() {
 }
 
 bool Game::continueRun() {
+    hall = castle::Hall{};
     hunt = toilet::Level{};
     static RunSave run;                 // a Dungeon is large; keep it off the stack
     if (!save::readRun(run)) { hasSave = false; return false; }
@@ -298,6 +308,7 @@ bool Game::saveRun() {
 }
 
 void Game::toMenu() {
+    hall = castle::Hall{};
     hunt = toilet::Level{};
     fight.end();
     overlay = Overlay::None;
@@ -344,12 +355,10 @@ void Game::enterRoom() {
     skyFlash = 0; finaleT = 0; slowMo = 0; rewardT = 0;
     chestOpenT = 99; chestLight = 0; chestLooting = false;
     castT = 0; hitStop = 0; challengeT = 0;
-    if (overlay == Overlay::Shop || overlay == Overlay::Galin || overlay == Overlay::Casino) overlay = Overlay::None;
+    if (overlay == Overlay::Shop || overlay == Overlay::Galin || overlay == Overlay::Casino || overlay == Overlay::Drip) overlay = Overlay::None;
 
     Room& r = dungeon.cur();
-    if (r.isShop && !r.visited) showBanner(r.isGalin ? "Galin's Dobrich Stock" : "Marin's Market", "Press E to trade", 2.0f);
-    else if (r.isCasino && !r.visited) showBanner("Toshko's Roulette", "Press E to gamble", 2.0f);
-    else if (r.isTreasure && !r.visited) showBanner("Treasure room", "Press E to open the hoard", 2.0f);
+    if (r.isTreasure && !r.visited) showBanner("Treasure room", "Press E to open the hoard", 2.0f);
     r.visited = true;
     inFight = false;
     music.setMood(r.isBoss && !r.cleared ? TextFormat("boss%d", currentBossIndex()) : "mist");

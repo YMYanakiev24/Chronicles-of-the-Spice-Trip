@@ -368,7 +368,7 @@ void Game::drawToilet() {
 
     // you and her, nearer the bottom in front
     auto drawYou = [&]() {
-        drawFigure(walk[player.champion], L.pos, L.face, L.moving, clock);
+        drawFigure(figure(player.champion), L.pos, L.face, L.moving, clock);
         if (L.hiddenIn < 0 && L.peeT > 0) {                  // the stream
             Vector2 a = { L.pos.x + L.face.x * 6, L.pos.y - FIGURE_H * 0.36f }, b = Vector2Add(L.pos, Vector2Scale(L.face, 14));
             for (int k = 0; k < 10; ++k) {

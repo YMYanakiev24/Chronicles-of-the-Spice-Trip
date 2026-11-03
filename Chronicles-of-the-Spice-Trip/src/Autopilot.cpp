@@ -624,21 +624,73 @@ void Autopilot::build() {
         check("a chest can hold a cigarette pack", g.player.packs == (int)markF + 1);
         return true;
     });
-    add("shop", 4, [this](Game& g, float t) {
+    // ===== the castle: the corridor, then Marin's, Galin's, Todor's and Beray's =====
+    // In through the castle door in the first room, out again by the corridor's side door.
+    auto intoCastle = [this, add](const char* name) {
+        add(name, 4, [this](Game& g, float t) {
+            if (t == 0) {
+                if (!g.dungeon.cur().isStart) goToRoom(g, [](const Room& r) { return r.isStart; });
+                g.player.pos = CASTLE_DOOR_FRONT;
+                return false;
+            }
+            if (t < 0.2f) return false;
+            in::tap(g.settings.keys.interact);
+            return true;
+        });
+    };
+    auto useExit = [this, add](const char* name, Vector2 at) {          // stand there and press E
+        add(name, 4, [this, at](Game& g, float t) {
+            if (t == 0) { g.hall.pos = at; return false; }
+            if (t < 0.15f) return false;
+            in::tap(g.settings.keys.interact);
+            return true;
+        });
+    };
+    auto visit = [this, add, useExit](int place, const char* shotName) {
+        Vector2 door{};
+        for (auto& e : castle::place(castle::CORRIDOR).exits) if (e.to == place) door = e.at;
+        useExit(TextFormat("door to %d", place), door);
+        add(TextFormat("in room %d", place), 4, [this, place, shotName](Game& g, float t) {
+            if (t < 0.5f) return false;
+            check(TextFormat("a door in the corridor leads into %s", castle::place(place).name), g.hall.active && g.hall.place == place);
+            shot(g, shotName);
+            g.hall.pos = castle::place(place).keeper;
+            return true;
+        });
+        add(TextFormat("keeper %d", place), 3, [](Game& g, float t) {
+            if (t < 0.2f) return false;
+            in::tap(g.settings.keys.interact);
+            return true;
+        });
+    };
+
+    add("castle door", 4, [this](Game& g, float t) {
         if (t == 0) {
-            check("the floor has its shop", goToRoom(g, [](const Room& r) { return r.isShop; }));
-            g.dungeon.cur().isGalin = false;    // whichever it rolled, see Marin's first
+            check("the first room has the castle door", goToRoom(g, [](const Room& r) { return r.isStart; }));
             g.player.gold = 200;
-            g.player.pos = { MERCHANT_POS.x, MERCHANT_POS.y + 40 };
+            g.player.pos = CASTLE_DOOR_FRONT;
+            markF = 0;
             return false;
         }
         if (t < 0.2f) return false;
+        if (markF == 0) { shot(g, "castle-door"); markF = 1; return false; }   // the door, then through it
+        markF = 0;
         in::tap(g.settings.keys.interact);
         return true;
     });
+    add("castle corridor", 4, [this](Game& g, float t) {
+        if (t < 0.6f) return false;
+        check("E at the door goes into the castle corridor", g.hall.active && g.hall.place == castle::CORRIDOR);
+        bool art = g.berayTex.id != 0;
+        for (auto& tx : g.castleArt) art = art && tx.id;
+        check("the corridor and the four rooms have their art, and Beray his", art);
+        shot(g, "castle-corridor");
+        return true;
+    });
+    visit(castle::MARIN, "marin-room");
     add("shop open", 4, [this](Game& g, float t) {
         if (t < 0.4f) return false;
-        check("E opens Marin's shop", g.overlay == Overlay::Shop);
+        check("E at Marin's counter opens his shop", g.overlay == Overlay::Shop);
         shot(g, "shop");
         g.player.hp = g.player.maxHp - 40;
         return clickLabel("8 g");
@@ -656,6 +708,20 @@ void Autopilot::build() {
         in::tap(KEY_ESCAPE);
         return true;
     });
+    useExit("out of marin's", { 805, 700 });
+    add("back in the corridor", 3, [this](Game& g, float t) {
+        if (t < 0.3f) return false;
+        check("the carpet at the bottom leads back to the corridor, by Marin's door", g.hall.active && g.hall.place == castle::CORRIDOR
+            && fabsf(g.hall.pos.x - 268) < 10);
+        return true;
+    });
+    useExit("out of the castle", { 78, 488 });
+    add("back in the dungeon", 3, [this](Game& g, float t) {
+        if (t < 0.3f) return false;
+        check("the corridor's side door leads back to the first room, at the castle door",
+            !g.hall.active && g.dungeon.cur().isStart && Vector2Distance(g.player.pos, CASTLE_DOOR_FRONT) < 4);
+        return true;
+    });
     add("vape speed", 3, [this](Game& g, float t) {
         if (t == 0) {
             g.player.pos = { ROOM_CENTER.x - 200, ROOM_CENTER.y + 60 };
@@ -670,27 +736,14 @@ void Autopilot::build() {
         return true;
     });
 
-    // ===== Galin's stall =====
-    add("galin", 4, [this](Game& g, float t) {
-        if (t == 0) {
-            g.dungeon.cur().isGalin = true;
-            g.player.gold = 200; g.player.packs = 0;
-            g.player.pos = { MERCHANT_POS.x, MERCHANT_POS.y + 40 };
-            return false;
-        }
-        if (t < 0.2f) return false;
-        shot(g, "galin-room");
-        return true;
-    });
-    add("trade with galin", 3, [this](Game& g, float t) {
-        if (t < 0.1f) return false;
-        in::tap(g.settings.keys.interact);
-        return true;
-    });
+    // ===== Galin's =====
+    add("galin", 2, [](Game& g, float) { g.player.gold = 200; g.player.packs = 0; return true; });
+    intoCastle("into the castle for galin");
+    visit(castle::GALIN, "galin-room");
     add("galin open", 4, [this](Game& g, float t) {
         if (t < 0.4f) return false;
-        check("E opens Galin's stall", g.overlay == Overlay::Galin);
-        check("Galin, the stall and the pack have their art", g.galinTex.id && g.galinShopTex.id && g.packTex.id);
+        check("E at Galin's counter opens his shop", g.overlay == Overlay::Galin);
+        check("Galin and the pack have their art", g.galinTex.id && g.packTex.id);
         bool armed = true;
         for (auto& tx : g.weaponTex) armed = armed && tx.id;
         check("every weapon has its own art", armed);
@@ -726,6 +779,78 @@ void Autopilot::build() {
         if (t < 0.2f) return false;
         check("the upgrades come back with the weapon", g.player.weapon == 1 && g.bladeDamage() == (int)markF + 3);
         in::tap(KEY_ESCAPE);
+        return true;
+    });
+
+    // ===== Todor's casino =====
+    useExit("out of galin's", { 78, 488 });
+    visit(castle::CASINO, "casino-room");
+    add("casino open", 4, [this](Game& g, float t) {
+        if (t < 0.4f) return false;
+        check("E at Todor's table opens the roulette", g.overlay == Overlay::Casino && g.wheel.casino);
+        markF = (float)g.player.gold;
+        return clickLabel(TextFormat("Spin for %d gold", g.wheel.bet));
+    });
+    add("casino spun", 9, [this](Game& g, float t) {
+        if (!g.wheel.done) return false;
+        int spent = (int)markF - g.player.gold, bet = g.wheel.bet;
+        check("a spin takes the bet, and pays double or fourteen times on a win", spent == bet || spent == bet - 2 * bet || spent == bet - 14 * bet);
+        shot(g, "casino");
+        in::tap(KEY_ESCAPE);
+        return true;
+    });
+
+    // ===== Beray's Drip Locker =====
+    useExit("out of the casino", { 805, 700 });
+    visit(castle::DRIP, "drip-room");
+    add("drip open", 4, [this](Game& g, float t) {
+        if (t < 0.4f) return false;
+        check("E by Beray opens his Drip Locker, dressing the champion you play", g.overlay == Overlay::Drip && g.dripChampion == g.player.champion);
+        bool sheets = true;
+        for (int i = 0; i < CHAMPION_COUNT; ++i)
+            for (int k = 1; k < OUTFIT_COUNT; ++k) {
+                const WalkSheet& w = g.outfitLook(i, k);
+                sheets = sheets && &w != &g.walk[i] && w.frames == g.walk[i].frames && w.fw == g.walk[i].fw;
+            }
+        check(TextFormat("every champion has every outfit (%d x %d)", CHAMPION_COUNT, OUTFIT_COUNT - 1), sheets);
+        g.player.gold = 300;
+        shot(g, "drip");
+        return clickLabel("outfit 1");          // the Drip Puffer, 150 g
+    });
+    add("outfit bought", 3, [this](Game& g, float t) {
+        if (t < 0.3f) return false;
+        int c = g.player.champion;
+        check("buying the Drip Puffer takes 150 gold, and they put it on", g.player.gold == 150 && g.ownsOutfit(c, 1) && g.profile.outfit[c] == 1);
+        check("they walk in it now", &g.figure(c) == &g.dressed[c] && g.dressed[c].ok());
+        shot(g, "drip-bought");
+        return clickLabel("dress Momiche");
+    });
+    add("dress another", 3, [this](Game& g, float t) {
+        if (t < 0.3f) return false;
+        check("Beray dresses any champion", TextIsEqual(CHAMPIONS[g.dripChampion].name, "Momiche"));
+        return clickLabel("outfit 6");          // Ice Cold, 140 g
+    });
+    add("dressed another", 3, [this](Game& g, float t) {
+        if (t < 0.3f) return false;
+        int m = g.dripChampion;
+        check("each champion's outfits are their own, and kept between runs",
+            g.player.gold == 10 && g.ownsOutfit(m, 6) && !g.ownsOutfit(m, 1) && save::readProfile().outfit[m] == 6);
+        shot(g, "drip-momiche");
+        return clickLabel("outfit 0");          // back into her own clothes
+    });
+    add("own clothes", 3, [this](Game& g, float t) {
+        if (t < 0.3f) return false;
+        int m = g.dripChampion;
+        check("their own clothes are always there to go back to", g.profile.outfit[m] == 0 && &g.figure(m) == &g.walk[m]);
+        in::tap(KEY_ESCAPE);
+        return true;
+    });
+    useExit("out of beray's", { 250, 750 });
+    useExit("out of the castle again", { 78, 488 });
+    add("left the castle", 3, [this](Game& g, float t) {
+        if (t < 0.3f) return false;
+        check("and out of the castle again", !g.hall.active);
+        g.enemies.clear();
         return true;
     });
     for (int i = 0; i < WEAPON_COUNT; ++i)
@@ -1275,22 +1400,17 @@ void Autopilot::build() {
         g.enemies.clear();
         return true;
     });
-    add("one shop a floor", 3, [this](Game&, float) {
+    add("no shops down here", 3, [this](Game&, float) {
         static Dungeon d;                   // a Dungeon is large; keep it off the stack
-        int floors = 200, oneShop = 0, turns = 0;
-        bool wasGalin = false;
+        int floors = 200, clean = 0;
         for (int i = 0; i < floors; ++i) {
             d.generate();
-            int shops = 0;
-            bool galin = false;
+            int shops = 0, starts = 0;
             for (auto& row : d.grid) for (auto& r : row)
-                if (r.exists && r.isShop) { shops++; galin = r.isGalin; }
-            oneShop += shops == 1;
-            turns += i > 0 && galin != wasGalin;
-            wasGalin = galin;
+                if (r.exists) { shops += r.isShop || r.isCasino; starts += r.isStart; }
+            clean += shops == 0 && starts == 1;
         }
-        check(TextFormat("every floor has one shop (%d of %d)", oneShop, floors), oneShop == floors);
-        check(TextFormat("Marin and Galin take turns, so Galin is there by floor 2 (%d of %d)", turns, floors - 1), turns == floors - 1);
+        check(TextFormat("no floor has a shop or a casino room any more, and each has its first room (%d of %d)", clean, floors), clean == floors);
         return true;
     });
     add("rooms as they really spawn", 5, [this](Game& g, float) {

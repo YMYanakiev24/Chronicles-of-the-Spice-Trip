@@ -42,7 +42,7 @@ static void drawPortrait(const Game& g, int i, Rectangle dst) {
     if (tx.id) ui::drawContain(tx, { c.crop.x * tx.width, c.crop.y * tx.height, c.crop.width * tx.width, c.crop.height * tx.height }, dst);
     else if (g.walk[i].ok()) {   // Spellwoven has no sheet: their figure, standing, facing you
         DrawRectangleRec(dst, { 14, 16, 26, 255 });
-        drawFigureIn(g.walk[i], FACE_DOWN, 0, { dst.x + dst.width * 0.15f, dst.y + dst.height * 0.08f, dst.width * 0.7f, dst.height * 0.84f });
+        drawFigureIn(g.figure(i), FACE_DOWN, 0, { dst.x + dst.width * 0.15f, dst.y + dst.height * 0.08f, dst.width * 0.7f, dst.height * 0.84f });
     }
     else {                  // no figure either: the hero drawn in code, clipped to the frame
         DrawRectangleRec(dst, { 14, 16, 26, 255 });
@@ -158,7 +158,7 @@ void Game::championsScreen() {
         DrawRectangleRec(card, over ? ColorBrightness(ui::PANEL_LIGHT, 0.12f) : ui::PANEL_LIGHT);
         drawPortrait(*this, i, { card.x + 6, card.y + 6, card.width - 12, chh - 12 - turnH });
         // ...and the figure they walk as, from the front, the left, the back and the right
-        drawTurnaround(walk[i], { card.x + 6, card.y + chh - 2 - turnH, card.width - 12, turnH }, clock);
+        drawTurnaround(figure(i), { card.x + 6, card.y + chh - 2 - turnH, card.width - 12, turnH }, clock);
         DrawRectangleLinesEx(card, sel ? 3.0f : 2.0f, sel ? ui::GOOD : (over ? ui::ACCENT : ui::EDGE));
         drawName(i, card.x + card.width / 2, card.y + chh + 4, 10, sel ? ui::GOOD : ui::TEXT, true);
         if (over && in::mousePressed(MOUSE_BUTTON_LEFT) && !sel) {
@@ -172,7 +172,7 @@ void Game::championsScreen() {
     DrawRectangleRec(d, Fade(ui::INK, 0.6f));
     DrawRectangleLinesEx(d, 1, ui::EDGE);
     float turnW = (detailH - 24) * 3 / 4 * 4 + 12;
-    drawTurnaround(walk[shown], { d.x + d.width - turnW - 14, d.y + 12, turnW, detailH - 24 }, clock);
+    drawTurnaround(figure(shown), { d.x + d.width - turnW - 14, d.y + 12, turnW, detailH - 24 }, clock);
     drawName(shown, d.x + 18, d.y + 14, 30, ui::ACCENT);
     float nameW = ui::measure(c.name, 30) + (c.fearFace ? 30 * 1.2f + 3 : 0);
     if (shown == profile.champion) ui::text("chosen", d.x + 26 + nameW, d.y + 26, 10, ui::GOOD);

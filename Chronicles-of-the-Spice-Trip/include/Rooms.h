@@ -35,13 +35,13 @@ struct Room {
     bool cleared = false;     // enemies defeated -> doors open
     bool isStart = false;
     bool isBoss = false;
-    bool isShop = false;      // the floor's shop: no enemies, no clutter
-    bool isGalin = false;     // a shop room: Galin's stall instead of Marin's market
+    bool isShop = false;      // (no longer made: the shops are in the castle; kept so old saves load)
+    bool isGalin = false;     // (likewise)
     bool hasKey = false;      // the boss key lies here once the room is cleared
     bool hasSilverKey = false;// the treasure room's key lies here once the room is cleared
     bool isTreasure = false;  // behind a silver-locked door: a hoard of gold
     bool isChallenge = false; // survive the waves for CHALLENGE_TIME seconds
-    bool isCasino = false;    // Toshko's roulette table
+    bool isCasino = false;    // (likewise: Todor's casino is in the castle)
     bool isElite = false;     // a mini-boss waits among the monsters
     bool mimic = false;       // its chest turned out to be a Mimic
     int  doors = 0;           // bitmask of neighbours that exist
@@ -62,7 +62,7 @@ struct Dungeon {
     int  cy = DUNGEON_G / 2;
     bool keyFound = false;       // the boss lair stays locked until this floor's key is found
     bool silverFound = false;    // and the treasure room until its silver key is found
-    bool galinNext = false;      // the next floor's shop: Marin and Galin take turns
+    bool galinNext = false;      // (no longer used; kept so old saves load)
 
     void  generate();          // a fresh floor: start room, combat rooms, one shop, the boss
     void  generateArena();     // a single sealed boss room (Boss Rush)

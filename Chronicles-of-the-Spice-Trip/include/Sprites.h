@@ -62,7 +62,7 @@ struct WalkSheet {
     Texture2D tex{};
     int frames = 0, fw = 0, fh = 0;
     bool ok() const { return tex.id != 0; }
-    void load(const char* file);
+    void load(const char* file, const char* dir = "walk/");   // dir: under assets/
     void unload();
     // The frame index for standing (0), or stepping through the walk cycle at 8 frames a second.
     int  frameAt(bool walking, float time) const;
