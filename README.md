@@ -9,8 +9,8 @@ Cinder-Maw.
 ## Building and running
 
 You need Visual Studio 2026 with the **Desktop development with C++** workload.
-raylib is included in `Chronicles-of-the-Spice-Trip/vendor/`, so there is
-nothing else to install.
+raylib (and pl_mpeg, which plays the intro video) is included in
+`Chronicles-of-the-Spice-Trip/vendor/`, so there is nothing else to install.
 
 1. Open `Chronicles-of-the-Spice-Trip/Chronicles-of-the-Spice-Trip.slnx`.
 2. Pick **Release | x64** (or Debug) and press **F5**.
@@ -47,14 +47,21 @@ Movement, run, roll, interact and the special can be rebound in **Settings**.
 
 ## What's in the game
 
-- **The dungeon.** Each floor is a grid of single-screen rooms. Doors stay
-  barred until a room is cleared. There are spike traps, chests, a start room
-  with Theira the Oracle, and one shop a floor: Marin's Market or Galin's stall
-  (see below).
+- **Marin's video.** Every time the game starts, Marin's video plays once
+  before the main menu: the vape, the coughing fit, and waking up in the valley
+  below the castle. A click, a tap or any of Enter, Space and Esc skips it. It
+  is `assets/intro/marin-trip.mpg` (MPEG-1 video with MP2 sound, which
+  `src/Video.cpp` plays). To swap in another video, convert it with ffmpeg:
+  `ffmpeg -i in.mp4 -vf scale=480:640:flags=area -r 30 -c:v mpeg1video -q:v 4 -c:a mp2 -b:a 192k -ar 44100 -f mpeg marin-trip.mpg`
+
+- **The dungeon.** Each floor is a grid of single-screen rooms, and the whole
+  room is always on screen. Doors stay barred until a room is cleared. There are
+  spike traps, chests, a start room with Vasil the Storyteller (see below), and
+  one shop a floor: Marin's Market or Galin's stall (see below).
 - **Boss fights.** The last room of every floor holds a boss (see below).
-- **Champions.** Eleven champions, each with a passive perk and a special on **Q**:
+- **Champions.** Twelve champions, each with a passive perk and a special on **Q**:
   Arcane Surge, Aura of Calmness, Coin Dash, Mug-Shield, Melon Roll, Drink,
-  Bear Jump, Coin Barrage, Release the Koi, Blink and Scare. Each one walks as
+  Bear Jump, Coin Barrage, Release the Koi, Blink, Scare and Creatine & C++. Each one walks as
   their own figure, seen from the front, the back and both sides, and the
   champion select shows every champion from all four sides.
 - **Boss Rush.** All six bosses back to back at level 5, timed. The best time
@@ -169,6 +176,26 @@ Below half health she walks less, throws two grenades and kicks five boots, and
 her circuit has five nodes. She is weak to Water. Momiche's scare sends her
 running, but a grenade or circuit she has already started keeps going.
 
+### Vasil the Storyteller
+
+Vasil sits on his stool in the first room of every floor, beside his
+*Stories by Vasil* sign, with a few listeners round him (a different few on each
+floor). As a floor begins he calls you over. Walk up and press **E**: he stands
+up and tells that floor's tale, a line per press, about the floor and the boss
+waiting at the bottom of it (and what it's weak to). The first floor's tale
+also teaches the basics. At the end he takes a bow. He tells the prophecy on the
+intro screen too. His art is in `assets/vasil/`, cut from his asset pack.
+
+### The Gym Rat
+
+Creatine in one hand, C++ in the other. His perk: +15 max health and +2 blade
+damage. His special, **Creatine & C++** (Q, 6 s cooldown), throws both arms out:
+five green C++ lasers fan out the way you aim, each running on until a wall
+stops it and hitting everything it touches for 22, while a cloud of creatine out
+of the other hand hits whatever is behind him for 8 and shoves it away. His walk
+sheet (`assets/walk/walk-gymrat.png`) is cut from his character sheet
+(`assets/gymrat.png`).
+
 ### Momiche, Gakev and the walking figures
 
 - **Momiche😨** walks with the frames cut from her own sprite sheet. Her
@@ -205,19 +232,23 @@ Chronicles-of-the-Spice-Trip/
   src/Input.cpp       keyboard and mouse (real or scripted)
   src/Save.cpp        savegame.dat, profile.dat, settings.dat
   src/Autopilot.cpp   the automated play-through (see below)
+  src/Video.cpp       plays the intro video (MPEG-1) with its sound
   assets/             art; assets/arenas/ holds the bosses' painted arenas,
-                      assets/walk/ the champions' and Triceps' walk sheets
+                      assets/walk/ the champions' and Triceps' walk sheets,
+                      assets/vasil/ Vasil the Storyteller and his listeners
   vendor/raylib/      raylib headers and library
+  vendor/pl_mpeg/     pl_mpeg, the MPEG-1 decoder (MIT, one header)
 ```
 
 ## Automated play-through
 
-`--autopilot <folder>` plays the whole game with scripted input. It clicks
-through the menus, fights a room, opens a chest, shops, beats all six bosses
+`--autopilot <folder>` plays the whole game with scripted input. It watches
+the start of Marin's video and skips it, clicks through the menus, fights a room, opens a chest, shops, beats all six bosses
 (and checks each of Triceps' attacks),
-completes a run, saves and continues, wins a Boss Rush, and tries every
+completes a run, saves and continues, wins a Boss Rush, checks Vasil has each
+floor's tale, and tries every
 champion's special, Momiche's scare on a boss, Gakev's coins and casting with
-Enter. It writes a PASS/FAIL line for each check (171) to
+Enter. It writes a PASS/FAIL line for each check (186) to
 `<folder>/autopilot.log`, saves screenshots next to it, and exits with the
 number of failures:
 

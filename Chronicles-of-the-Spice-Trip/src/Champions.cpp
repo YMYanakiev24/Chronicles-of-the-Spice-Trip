@@ -81,4 +81,12 @@ const ChampionDef CHAMPIONS[CHAMPION_COUNT] = {
       .special = "Scare", .specialDesc = "Every enemy runs from you for 3 s and can't attack.",
       .kind = Special::Scare, .cooldown = 8, .fearFace = true, .bladeBonus = 3,
       .quote = "Boo! ...was that too much?", .winLine = "Scared you, didn't I?" },
+
+    // The Gym Rat: creatine in one hand, C++ in the other.
+    { .name = "The Gym Rat", .art = "gymrat.png", .walk = "walk-gymrat.png",
+      .crop = { 0.35f, 0.080f, 0.29f, 0.340f }, .cloak = { 30, 30, 36, 255 },
+      .perk = "Never skips leg day: +15 max health, +2 blade damage.",
+      .special = "Creatine & C++", .specialDesc = "Arms out: five C++ lasers ahead hit everything for 22, and a creatine cloud behind shoves enemies away.",
+      .kind = Special::CreatineCpp, .cooldown = 6, .hpBonus = 15, .bladeBonus = 2,
+      .quote = "Creatine in one hand, C++ in the other.", .winLine = "New PR. Personal record AND pull request." },
 };

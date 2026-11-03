@@ -18,17 +18,26 @@
 #include "Save.h"
 #include "Settings.h"
 #include "Sprites.h"
+#include "Video.h"
 #include <map>
 #include <string>
 #include <vector>
 
-enum class Screen { Menu, Setup, Champions, Settings, Controls, Intro, Play };
+enum class Screen { Video, Menu, Setup, Champions, Settings, Controls, Intro, Play };
 enum class Mode { Run, BossRush };
 enum class Overlay { None, Pause, Controls, Shop, Galin, RunComplete, RushOver, Roulette, Casino, Summary };
 
 struct Popup { const Anim* anim; Vector2 pos; float t; };        // a flask rising from a chest
 struct Coin { Vector2 pos, vel; float t; bool pack = false; };    // loot that flies to you (gold, or a cigarette pack)
 struct FloatText { Vector2 pos; float t; int value; Color color; };  // damage numbers
+struct Laser { Vector2 a, b; float t; };                         // one of the Gym Rat's C++ lasers
+
+// Vasil the Storyteller (assets/vasil/). He sits on his stool in the first room of every
+// floor, with his sign and a few listeners, and stands up to tell that floor's tale.
+struct VasilArt {
+    static constexpr int CROWD = 10;    // listeners in crowd.png, side by side
+    Texture2D seated{}, story[2]{}, sign{}, stool{}, portrait{}, crowd{};
+};
 
 // A roulette wheel: the prize wheel of a level-up, or Toshko's casino.
 struct Wheel {
@@ -68,6 +77,7 @@ struct Game {
     void  saveProfile();
 
     // ------------------------------------------------------------------ screens
+    void videoScreen();                 // Marin's video, once as the game starts
     void menuScreen();
     void championsScreen();
     void settingsScreen();
@@ -121,6 +131,9 @@ struct Game {
     Vector2 mouseWorld() const;
     Vector2 aimDir() const;
     Vector2 castHand() const;           // where a spell gathers as it winds up
+    void  creatineAndCpp(Vector2 dir);  // the Gym Rat's special
+    std::vector<std::string> vasilTale() const;   // this floor's story, line by line
+    std::string vasilGreeting() const;            // what he calls out as you arrive
     float hurtMul() const;
     int   spellCost(int spell) const;
     int   bladeDamage() const;          // the weapon, its upgrades, level, vape and perk
@@ -144,6 +157,7 @@ struct Game {
     void drawCasino();
     void drawSummary();
     void drawMenuBackground();
+    void drawVasil();
     void drawFear(float x, float above, float below, float size) const;   // over a scared enemy
     void drawName(int champion, float x, float y, int size, Color color, bool centred = false) const;
     void drawWeapon(int weapon, Rectangle box) const;
@@ -173,6 +187,9 @@ struct Game {
     std::vector<FloorCrack> cracks;
     std::vector<IceSpike> spikes;       // kept sorted by y, so nearer ones stand in front
     std::vector<Rubble> rubble;
+    std::vector<Laser> lasers;          // the Gym Rat's C++, fading
+    float gymT = 0;                     // the Gym Rat holds his arms-out pose this long...
+    Vector2 gymDir{ 1, 0 };             // ...lasers this way, creatine the other
     float finaleT = 0, slowMo = 0;      // a boss is falling: seconds left of it, and of the slow motion
     float rewardT = 0;                  // BOSS DEFEATED gets its moment before this overlay
     Overlay rewardOverlay = Overlay::None;
@@ -196,7 +213,6 @@ struct Game {
     bool  chestLooting = false;         // its loot is still in the air: the glow stays
     bool  chestMana = false;            // what the chest held, for when the lid goes up
     bool  chestPack = false;            // and whether a cigarette pack was in there too
-    Vector2 camPos = { 0, 0 };     // where the follow camera looks (eases after the player)
     int   difficulty = 1;               // DIFFICULTIES
     bool  hardcore = false;             // one life: dying ends the run
     RunStats stats;
@@ -205,11 +221,12 @@ struct Game {
     bool  testMode = false;             // the autopilot: no mimics, and level-ups skip the prize wheel
     Wheel wheel;
     bool  summaryWon = false;           // the summary: a finished run, or a hardcore death
-    void updateCamera(float dt);
     float banner = 0;
     std::string bannerText, bannerSub;
-    std::string dialogue;
+    std::string dialogue;               // Vasil's tale, the line he's on
     int   dialogueIdx = 0;
+    float vasilGreetT = 0;              // seconds left of his call as a floor begins
+    float vasilBowT = 0;                // the bow at the end of a tale
     float shopMsgT = 0, saveMsgT = 0;
     std::string shopMsg, saveMsg;
 
@@ -230,12 +247,16 @@ struct Game {
     Texture2D champTex[CHAMPION_COUNT]{};
     WalkSheet walk[CHAMPION_COUNT];     // each champion from every side (assets/walk/)
     Texture2D fearTex{};                // the fearful face (assets/walk/fear.png)
+    VasilArt vasil;
+    VideoPlayer introVideo;             // assets/intro/marin-trip.mpg
     BossArt bossArt;
 };
 
+inline constexpr const char* INTRO_VIDEO = "intro/marin-trip.mpg";   // plays once as the game starts
+
 // Fixed spots in the start and shop rooms.
 inline constexpr Vector2 MERCHANT_POS = { ROOM_PX_W / 2, ROOM_PX_H / 2 - 10 };
-inline constexpr Vector2 ORACLE_POS = { ROOM_PX_W / 2 - 90, ROOM_PX_H / 2 - 40 };
+inline constexpr Vector2 VASIL_POS = { ROOM_PX_W / 2 - 110, ROOM_PX_H / 2 - 50 };   // the foot of his stool
 inline constexpr Vector2 ROOM_CENTER = { ROOM_PX_W / 2, ROOM_PX_H / 2 };
 inline constexpr Vector2 SILVER_POS = { ROOM_PX_W / 2 + 64, ROOM_PX_H / 2 };   // the silver key, beside the gold one
 

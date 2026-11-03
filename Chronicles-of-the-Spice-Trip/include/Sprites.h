@@ -37,7 +37,7 @@ inline float attackFps(int kind) { return kind == EK_SOLDIER ? 12.0f : kind == E
 struct Sprites {
     Texture2D tileset{};                       // 16px tiles, 10x10
     Anim peaks, chest, chestOpen, torch, sideTorch, candle, candle2;
-    Anim flaskRed, flaskBlue, flag, coin, skull, oracle, flame, key, keySilver, rock, arrow;
+    Anim flaskRed, flaskBlue, flag, coin, skull, flame, key, keySilver, rock, arrow;
     Anim vapes, spellIcons;                    // 32px icons: one frame per Vape / SPELLS entry
     EnemyAnims enemy[12];                     // indexed by EnemyKind (skull slot unused)
 

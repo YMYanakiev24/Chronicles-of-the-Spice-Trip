@@ -18,6 +18,7 @@ enum class Special {
     Koi,           // the Storyteller: three homing koi
     Blink,         // the Fairy: teleport to the cursor, paid in fairy dust
     Scare,         // Momiche: every enemy runs from you and can't attack
+    CreatineCpp,   // the Gym Rat: C++ lasers ahead, a creatine cloud behind
 };
 
 struct ChampionDef {
@@ -47,7 +48,7 @@ struct ChampionDef {
     const char* winLine = ""; // what they say when a boss falls
 };
 
-inline constexpr int CHAMPION_COUNT = 11;
+inline constexpr int CHAMPION_COUNT = 12;
 extern const ChampionDef CHAMPIONS[CHAMPION_COUNT];
 
 // Coin Barrage and Blink run on a meter instead of only a cooldown.
@@ -60,3 +61,14 @@ inline constexpr float DUST_PER_BLINK = 10;
 // Momiche's scare: how long everyone runs, and how much faster than they walk.
 inline constexpr float SCARE_TIME = 3;
 inline constexpr float FLEE_SPEED = 1.3f;
+
+// The Gym Rat's special: arms out, C++ lasers one way and a cloud of creatine the other.
+inline constexpr int   CPP_BEAMS = 5;              // lasers in the fan
+inline constexpr float CPP_SPREAD = 0.13f;         // radians between neighbouring lasers
+inline constexpr float CPP_RANGE = 420;            // how far a laser reaches (walls stop it sooner)
+inline constexpr int   CPP_DAMAGE = 22;            // to everything a laser touches (once per cast)
+inline constexpr float CREATINE_RANGE = 120;       // the cloud behind you...
+inline constexpr float CREATINE_CONE = 0.8f;       // ...this many radians either side
+inline constexpr int   CREATINE_DAMAGE = 8;        // and it shoves what it catches away
+inline constexpr float CREATINE_SHOVE = 40;        // pixels
+inline constexpr float GYM_POSE_TIME = 0.45f;      // the lasers and the pose last this long

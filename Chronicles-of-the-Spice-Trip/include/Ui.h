@@ -45,6 +45,7 @@ namespace ui {
     void textRight(const char* s, float right, float y, int size, Color c);
     // Word-wrapped text; returns the height used.
     float textWrapped(const char* s, float x, float y, float width, int size, Color c);
+    float wrappedHeight(const char* s, float width, int size);                  // ...without drawing it
 
     // --- Widgets ------------------------------------------------------------
     bool hovered(Rectangle r);

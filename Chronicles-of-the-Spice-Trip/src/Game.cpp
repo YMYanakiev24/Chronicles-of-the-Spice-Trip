@@ -129,19 +129,29 @@ void Game::init(bool windowed) {
         fearTex = LoadTexture(p.c_str());
         SetTextureFilter(fearTex, TEXTURE_FILTER_POINT);
     }
+    vasil.seated = loadCutout("vasil/seated.png");
+    vasil.story[0] = loadCutout("vasil/story1.png");
+    vasil.story[1] = loadCutout("vasil/story2.png");
+    vasil.sign = loadCutout("vasil/sign.png");
+    vasil.stool = loadCutout("vasil/stool.png");
+    vasil.portrait = loadCutout("vasil/portrait.png");
+    vasil.crowd = loadCutout("vasil/crowd.png");
     SPR.load();
     bossArt.load();
     fight.sfx = [this](const char* s) { play(s); };
+    if (introVideo.open(INTRO_VIDEO)) screen = Screen::Video;   // Marin's video first, then the menu
 }
 
 void Game::shutdown() {
     SPR.unload();
     bossArt.unload();
-    for (Texture2D* tx : { &menuBg, &castleTex, &marinTex, &shopTex, &galinTex, &galinShopTex, &packTex })
+    for (Texture2D* tx : { &menuBg, &castleTex, &marinTex, &shopTex, &galinTex, &galinShopTex, &packTex,
+                           &vasil.seated, &vasil.story[0], &vasil.story[1], &vasil.sign, &vasil.stool, &vasil.portrait, &vasil.crowd })
         if (tx->id) UnloadTexture(*tx);
     for (auto& tx : weaponTex) if (tx.id) UnloadTexture(tx);
     for (auto& tx : champTex) if (tx.id) UnloadTexture(tx);
     for (auto& w : walk) w.unload();
+    introVideo.close();
     if (fearTex.id) UnloadTexture(fearTex);
     for (auto& [name, s] : sounds) UnloadSound(s);
     music.unload();
@@ -179,7 +189,7 @@ void Game::frame() {
         settings.fullscreen = isFullscreen();
         save::writeSettings(settings);
     }
-    music.vol = 0.5f * settings.musicVol;
+    music.vol = screen == Screen::Video ? 0.0f : 0.5f * settings.musicVol;   // the video has its own sound
     music.update();
 
     touch::update(screen == Screen::Play && overlay == Overlay::None, settings.keys);
@@ -187,6 +197,7 @@ void Game::frame() {
     BeginDrawing();
     ClearBackground(ui::INK);
     switch (screen) {
+    case Screen::Video:     videoScreen(); break;
     case Screen::Menu:      menuScreen(); break;
     case Screen::Setup:     setupScreen(); break;
     case Screen::Champions: championsScreen(); break;
@@ -196,7 +207,7 @@ void Game::frame() {
     case Screen::Play:      playScreen(); break;
     }
     if (touch::enabled()) touch::draw(settings.keys);
-    else drawCursor();
+    else if (screen != Screen::Video) drawCursor();
     if (!pendingShot.empty()) {            // the autopilot's screenshot, taken before the buffers swap
         rlDrawRenderBatchActive();
         Image shot = LoadImageFromScreen();
@@ -232,6 +243,7 @@ void Game::startRun() {
     floor = 1; kills = 0; runTime = 0;
     stats = RunStats{}; wheel = Wheel{}; challengeT = 0; autosaveT = 0;
     dialogue.clear(); overlay = Overlay::None; scareT = 0;
+    vasilGreetT = 9; vasilBowT = 0;     // Vasil calls you over to hear the floor's tale
     screen = Screen::Play; t = 0;
     enterRoom();
     showBanner("The Mistwood Depths", std::string(currentBoss().name) + " waits at the bottom of floor 1", 3.0f);
@@ -319,6 +331,7 @@ void Game::enterRoom() {
     parts.clear(); popups.clear(); coins.clear(); floaters.clear();
     fight.end();
     flashes.clear(); arcs.clear(); cracks.clear(); spikes.clear(); rubble.clear();
+    lasers.clear(); gymT = 0;
     skyFlash = 0; finaleT = 0; slowMo = 0; rewardT = 0;
     chestOpenT = 99; chestLight = 0; chestLooting = false;
     castT = 0; hitStop = 0; challengeT = 0;
@@ -428,6 +441,7 @@ void Game::descend() {
     player.hp = fminf(player.maxHp, player.hp + 30);    // a breather between floors
     player.pos = ROOM_CENTER;
     overlay = Overlay::None;
+    dialogue.clear(); vasilGreetT = 9; vasilBowT = 0;
     enterRoom();
     showBanner(THEMES[theme()].name, TextFormat("Floor %d  -  %s waits at the bottom", floor, currentBoss().name), 2.8f);
     play("ultimate");

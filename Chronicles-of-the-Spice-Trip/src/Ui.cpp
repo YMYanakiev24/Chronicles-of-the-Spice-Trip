@@ -43,10 +43,12 @@ namespace ui {
         text(s, right - measure(s, size), y, size, c);
     }
 
-    float textWrapped(const char* s, float x, float y, float width, int size, Color c) {
+    // Lays the words out in lines no wider than `width`; `draw` gets each line and its y.
+    template <class F>
+    static float wrap(const char* s, float y, float width, int size, F draw) {
         std::string line, word, all = s;
         float yy = y, lineH = size * 1.3f;
-        auto flush = [&]() { if (!line.empty()) { text(line.c_str(), x, yy, size, c); yy += lineH; line.clear(); } };
+        auto flush = [&]() { if (!line.empty()) { draw(line, yy); yy += lineH; line.clear(); } };
         for (size_t i = 0; i <= all.size(); ++i) {
             char ch = i < all.size() ? all[i] : ' ';
             if (ch != ' ' && ch != '\n') { word += ch; continue; }
@@ -58,6 +60,14 @@ namespace ui {
         }
         flush();
         return yy - y;
+    }
+
+    float textWrapped(const char* s, float x, float y, float width, int size, Color c) {
+        return wrap(s, y, width, size, [&](const std::string& line, float yy) { text(line.c_str(), x, yy, size, c); });
+    }
+
+    float wrappedHeight(const char* s, float width, int size) {
+        return wrap(s, 0, width, size, [](const std::string&, float) {});
     }
 
     // --------------------------------------------------------------- widgets

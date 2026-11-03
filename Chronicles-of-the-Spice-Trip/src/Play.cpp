@@ -9,23 +9,54 @@
 #include <cmath>
 #include <cstdio>
 
-static const char* ORACLE_LINES[] = {
-    "So. The Veil spat you out at last.",
-    "Press 1 and right-click (or Enter) to loose an Emberhex. Q calls your champion's gift.",
-    "Clear a room to open its doors. Something old waits at the bottom of every floor.",
+// Vasil's tale for each floor of a cycle (THEMES order; the boss at the bottom matches).
+static const char* const TALES[6][4] = {
+    { "Ah, a listener! Sit, sit. I'm Vasil, and every floor down here has a story. This one starts with you.",
+      "The Mistwood Depths. Clear a room and its doors open. Press 1 and right-click (or Enter) to loose an Emberhex; Q calls your champion's gift.",
+      "At the bottom waits the Good Plazmodium. Kill it once and it comes back as three. Fire does it no favours.",
+      "Off you go. I'll be waiting at the top of the next floor, with the next story." },
+    { "You made it down! This is the Drowned Crypt. The water here remembers everyone it ever swallowed.",
+      "The Bad Plasmodium sits at the bottom: a head as big as a cart. It never moves. It doesn't need to; its old body walks for it.",
+      "Lightning is what it fears. Don't stand close when it slams, and watch for the rocks it throws.",
+      nullptr },
+    { "The Ember Halls. Warm, isn't it? Take your coat off and listen.",
+      "Mordekai lives at the bottom. He fans his feathers out like knives, and every third volley he dives at you.",
+      "Feathers burn. Fire, friend. You didn't hear that from me.",
+      nullptr },
+    { "The Bone Gardens. Nothing grows here but stories, and I grow those.",
+      "Vlado runs the line at the bottom: tickets in spirals, and when he whistles, bus No.9 comes down your lane.",
+      "Lightning stops his engine. And never, ever stand in the bus lane.",
+      nullptr },
+    { "The Toxic Sewers. Hold your nose, not your tongue.",
+      "Triceps waits in her cave, and every attack she throws is real physics: grenades on a parabola, magnetic boots, a staff on a fulcrum, a live circuit.",
+      "Water shorts her circuits. Stay off the wires when they light up.",
+      nullptr },
+    { "The Gilded Vault, the last floor. The gold down here is real. The courage has to be yours.",
+      "Pyraketh, the Cinder-Maw, lord of the lowest floor. He chases, he breathes rings of embers, and once he's wounded he throws fire.",
+      "Water puts out even him. Finish this, and the Spice Trip is a story I'll be telling for years.",
+      nullptr },
 };
-static constexpr int ORACLE_COUNT = (int)(sizeof ORACLE_LINES / sizeof ORACLE_LINES[0]);
+
+std::vector<std::string> Game::vasilTale() const {
+    std::vector<std::string> lines;
+    if (floor > BOSS_COUNT)
+        lines.push_back(TextFormat("Round %d, and you're still here? Every time round the bosses get half again as strong. Listen closely.",
+            (floor - 1) / BOSS_COUNT + 1));
+    for (const char* line : TALES[theme()]) if (line) lines.push_back(line);
+    return lines;
+}
+
+std::string Game::vasilGreeting() const {
+    if (floor == 1) return "Come here, come! Every floor has a story, and I know them all.";
+    return TextFormat("Floor %d! Sit down and hear the tale of %s.", floor, THEMES[theme()].name);
+}
 
 Camera2D Game::camera() const {
     int sw = GetScreenWidth(), sh = GetScreenHeight();
     Camera2D cam{};
     cam.offset = { sw / 2.0f, sh / 2.0f };
-    // Closer than the whole room, so the view travels with the player.
-    cam.zoom = fminf(sw / (ROOM_PX_W * 0.72f), sh / (ROOM_PX_H * 0.78f));
-    // Keep the view inside the room (with a little margin); centre an axis that already fits.
-    float halfW = sw / 2.0f / cam.zoom, halfH = sh / 2.0f / cam.zoom, pad = TILE * 0.5f;
-    cam.target.x = halfW * 2 >= ROOM_PX_W + 2 * pad ? ROOM_CENTER.x : Clamp(camPos.x, halfW - pad, ROOM_PX_W - halfW + pad);
-    cam.target.y = halfH * 2 >= ROOM_PX_H + 2 * pad ? ROOM_CENTER.y : Clamp(camPos.y, halfH - pad, ROOM_PX_H - halfH + pad);
+    cam.zoom = fminf(sw / (ROOM_PX_W * 1.12f), sh / (ROOM_PX_H * 1.18f));   // the whole room, centred
+    cam.target = ROOM_CENTER;
     return cam;
 }
 
@@ -38,11 +69,6 @@ Vector2 Game::mouseWorld() const {
     if (best) return best->pos;
     Vector2 dir = touch::stickDir();
     return Vector2Add(player.pos, Vector2Scale(dir.x || dir.y ? dir : player.facing, 100));
-}
-void Game::updateCamera(float dt) {
-    // Snap on room changes and respawns; otherwise glide after the player.
-    if (Vector2Distance(camPos, player.pos) > ROOM_PX_H * 0.6f) camPos = player.pos;
-    else camPos = Vector2Lerp(camPos, player.pos, fminf(1.0f, dt * 6.0f));
 }
 
 
@@ -90,6 +116,11 @@ void Game::updatePlay(float dt) {
         *timer = fmaxf(0, *timer - dt);
     player.meleeAnim = fmaxf(0, player.meleeAnim - dt * 4);
     scareT = fmaxf(0, scareT - dt);
+    vasilGreetT = fmaxf(0, vasilGreetT - dt);
+    vasilBowT = fmaxf(0, vasilBowT - dt);
+    gymT = fmaxf(0, gymT - dt);
+    for (auto& l : lasers) l.t += dt;
+    std::erase_if(lasers, [](const Laser& l) { return l.t >= GYM_POSE_TIME; });
     player.mana = fminf(player.maxMana, player.mana + 9.0f * (player.has(VP_GRAPE) ? 1.5f : 1.0f) * dt);
     if (mode == Mode::Run && !inFight && (autosaveT += dt) > 20) autosave();     // every so often in a safe room
     if (c.kind == Special::Blink) player.charge = fminf(DUST_MAX, player.charge + DUST_REGEN * dt);
@@ -194,15 +225,22 @@ void Game::updatePlay(float dt) {
         else player.hp = fminf(player.maxHp, player.hp + 10);
     }
 
-    // --- the oracle (start room) and the merchant (shop room) ---
-    bool nearOracle = room.isStart && mode == Mode::Run && Vector2Distance(player.pos, ORACLE_POS) < 48;
-    if (nearOracle && in::pressed(K.interact)) {
+    // --- Vasil's tale (start room) and the merchant (shop room) ---
+    bool nearVasil = room.isStart && mode == Mode::Run && Vector2Distance(player.pos, VASIL_POS) < 56;
+    if (nearVasil && in::pressed(K.interact)) {
         play("ui");
-        if (!talking) { dialogueIdx = 0; dialogue = ORACLE_LINES[0]; }
-        else if (++dialogueIdx >= ORACLE_COUNT) dialogue.clear();
-        else dialogue = ORACLE_LINES[dialogueIdx];
+        std::vector<std::string> tale = vasilTale();
+        if (!talking) { dialogueIdx = 0; dialogue = tale[0]; vasilGreetT = 0; vasilBowT = 0; }
+        else if (++dialogueIdx >= (int)tale.size()) { dialogue.clear(); vasilBowT = 1.2f; }   // the end: he takes a bow
+        else dialogue = tale[dialogueIdx];
     }
-    if (!nearOracle) dialogue.clear();
+    if (!nearVasil) dialogue.clear();
+    if (!dialogue.empty() && frand(0, 1) < dt * 5) {   // the story glows off his hands
+        float life = frand(0.7f, 1.1f);
+        float side = GetRandomValue(0, 1) ? 1.0f : -1.0f;
+        parts.push_back({ { VASIL_POS.x + side * frand(10, 20), VASIL_POS.y - frand(14, 24) }, { side * frand(4, 16), frand(-36, -16) },
+            life, life, frand(1.5f, 2.5f), { 255, 226, 150, 255 }, 0, true, true });
+    }
     bool nearMerchant = room.isShop && Vector2Distance(player.pos, MERCHANT_POS) < 56;
     if (nearMerchant && !talking && in::pressed(K.interact)) { overlay = room.isGalin ? Overlay::Galin : Overlay::Shop; play("ui"); }
 
@@ -540,8 +578,60 @@ void Game::useSpecial(Vector2 mv) {
         shake = fmaxf(shake, 0.15f);
         play("scare");
         break;
+    case Special::CreatineCpp:
+        creatineAndCpp(player.facing);
+        break;
     }
     player.specialCd = c.cooldown;
+}
+
+// The Gym Rat throws his arms out: a fan of C++ lasers toward the aim, each running on until
+// a wall stops it and hitting everything it touches, and a cloud of creatine out the other
+// hand that shoves whatever is behind him away.
+void Game::creatineAndCpp(Vector2 dir) {
+    Room& room = dungeon.cur();
+    gymDir = dir; gymT = GYM_POSE_TIME;
+    float base = atan2f(dir.y, dir.x);
+    Vector2 from = { player.pos.x + dir.x * 14, player.pos.y - 8 + dir.y * 10 };
+    std::vector<Enemy*> struck;
+    for (int i = 0; i < CPP_BEAMS; ++i) {
+        Vector2 d = fromAngle(base + (i - (CPP_BEAMS - 1) / 2.0f) * CPP_SPREAD);
+        float len = 0;
+        while (len < CPP_RANGE) {                 // march along it until a wall gets in the way
+            Vector2 p = Vector2Add(from, Vector2Scale(d, len + 6));
+            if (roomWallSolid(room, (int)floorf(p.x / TILE), (int)floorf(p.y / TILE), false)) break;
+            len += 6;
+        }
+        Vector2 to = Vector2Add(from, Vector2Scale(d, len));
+        lasers.push_back({ from, to, 0 });
+        for (auto& e : enemies) {
+            if (!e.alive || std::find(struck.begin(), struck.end(), &e) != struck.end()) continue;
+            float along = Clamp(Vector2DotProduct(Vector2Subtract(e.pos, from), d), 0, len);
+            if (Vector2Distance(e.pos, Vector2Add(from, Vector2Scale(d, along))) < e.r + 4) struck.push_back(&e);
+        }
+    }
+    for (Enemy* e : struck) {
+        hitEnemy(*e, CPP_DAMAGE, { 90, 255, 120, 255 });
+        burst(parts, e->pos, 6, 90, 0.35f, { 120, 255, 140, 255 });
+    }
+
+    Vector2 back = Vector2Negate(dir);                // the creatine, out the other hand
+    for (auto& e : enemies) {
+        if (!e.alive) continue;
+        Vector2 to = Vector2Subtract(e.pos, player.pos);
+        float d = Vector2Length(to);
+        if (d > CREATINE_RANGE + e.r || (d > 1 && Vector2DotProduct(Vector2Scale(to, 1 / d), back) < cosf(CREATINE_CONE))) continue;
+        hitEnemy(e, CREATINE_DAMAGE, { 245, 245, 255, 255 });
+        if (e.bossForm < 0) e.knock = Vector2Scale(d > 1 ? Vector2Scale(to, 1 / d) : back, CREATINE_SHOVE * KNOCK_DECAY);
+    }
+    Vector2 hand = { player.pos.x - dir.x * 14, player.pos.y - 8 - dir.y * 10 };
+    for (int k = 0; k < 46; ++k) {                    // a spray of white powder
+        float life = frand(0.35f, 0.75f);
+        Vector2 v = Vector2Scale(fromAngle(atan2f(back.y, back.x) + frand(-CREATINE_CONE, CREATINE_CONE)), frand(90, 260));
+        parts.push_back({ hand, v, life, life, frand(1.5f, 3.5f), k % 4 ? Color{ 244, 246, 255, 255 } : Color{ 200, 214, 235, 255 }, -20 });
+    }
+    shake = fmaxf(shake, 0.12f);
+    play("beam"); play("swing");
 }
 
 // ------------------------------------------------------------------- attacks
