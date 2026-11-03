@@ -142,7 +142,7 @@ inline constexpr int UPGRADE_MAX = 3;
 
 // What a run has been like, for the summary at its end.
 struct RunStats {
-    int  goldEarned = 0, goldLost = 0, damageDealt = 0, damageTaken = 0, deaths = 0, spins = 0;
+    int  goldEarned = 0, goldLost = 0, damageDealt = 0, damageTaken = 0, deaths = 0, spins = 0;   // spins: no longer counted (the level-up wheel is gone); kept so saves load
     char killer[40] = {};
 };
 
@@ -161,9 +161,9 @@ struct Player {
     bool  owns(int w) const { return (weaponsOwned >> w) & 1u; }
     int   upgrades[WEAPON_COUNT][UPGRADE_COUNT] = {};   // levels, per weapon
     int   potions[2] = {};            // the belt: health and mana potions (POTION_MAX of each)
-    int   bonusDamage = 0;            // won on the prize wheel
-    float speedBonus = 0;             // won on the prize wheel (fraction)
-    int   spins = 0;                  // level-ups whose prize wheel hasn't been spun yet
+    int   bonusDamage = 0;            // won on the old level-up wheel (still counts in older saves)
+    float speedBonus = 0;             // likewise (fraction)
+    int   spins = 0;                  // (no longer used: the level-up wheel is gone; kept so saves load)
     float castCd = 0, meleeCd = 0, meleeAnim = 0, roll = 0, rollCd = 0, invuln = 0, hitFlash = 0;
     Vector2 rollDir{ 0, 1 };
 

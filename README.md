@@ -76,8 +76,6 @@ Movement, run, roll, interact and the special can be rebound in **Settings**.
   damage) and whether to play **hardcore**: one life, and dying ends the run and
   deletes the save. Otherwise dying sends you back to the entrance, and Toshko
   picks 30% of your gold from your pockets.
-- **Level-ups** spin a prize wheel: max health, max mana, blade damage, speed,
-  gold, a cigarette pack, the jackpot, or Toshko stealing the prize.
 - **Special rooms** on every floor (shown on the minimap): a **treasure room**
   behind a silver door (its silver key lies in a combat room) with a hoard of
   gold, two packs, a full heal and a free vape; a **challenge room** where waves
