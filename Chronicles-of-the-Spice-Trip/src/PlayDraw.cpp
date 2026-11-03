@@ -631,9 +631,12 @@ void Game::drawHud() {
         float bw = 250, th = ui::wrappedHeight(say.c_str(), bw - 24, 10);
         Vector2 tip = GetWorldToScreen2D({ VASIL_POS.x + 4, VASIL_POS.y - 52 }, cam);
         Rectangle b = { tip.x - 30, tip.y - th - 30, bw, th + 20 };
-        DrawRectangleRounded(b, 0.25f, 6, Fade({ 250, 242, 222, 255 }, 0.95f * a));
-        DrawTriangle({ tip.x - 14, b.y + b.height - 1 }, { tip.x, tip.y - 2 }, { tip.x + 2, b.y + b.height - 1 }, Fade({ 250, 242, 222, 255 }, 0.95f * a));
-        DrawRectangleRoundedLinesEx(b, 0.25f, 6, 2, Fade({ 120, 84, 50, 255 }, a));
+        // the outline is the bubble drawn 2px bigger underneath (the Windows raylib.lib has no DrawRectangleRoundedLinesEx)
+        Color paper = { 250, 242, 222, (unsigned char)(242 * a) }, ink = { 120, 84, 50, (unsigned char)(255 * a) };
+        DrawRectangleRounded({ b.x - 2, b.y - 2, b.width + 4, b.height + 4 }, 0.28f, 6, ink);
+        DrawTriangle({ tip.x - 16, b.y + b.height }, { tip.x, tip.y }, { tip.x + 4, b.y + b.height }, ink);
+        DrawRectangleRounded(b, 0.25f, 6, paper);
+        DrawTriangle({ tip.x - 14, b.y + b.height - 1 }, { tip.x, tip.y - 2.5f }, { tip.x + 2, b.y + b.height - 1 }, paper);
         ui::textWrapped(say.c_str(), b.x + 12, b.y + 10, bw - 24, 10, Fade({ 60, 40, 30, 255 }, a));
     }
     if (!dialogue.empty()) {
