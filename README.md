@@ -56,8 +56,8 @@ Movement, run, roll, interact and the special can be rebound in **Settings**.
 
 - **The dungeon.** Each floor is a grid of single-screen rooms, and the whole
   room is always on screen. Doors stay barred until a room is cleared. There are
-  spike traps, chests, a start room with Vasil the Storyteller (see below), and
-  one shop a floor: Marin's Market or Galin's stall (see below).
+  spike traps, chests, and a start room with Vasil the Storyteller and the door to
+  the castle, where the shops are (see below).
 - **Boss fights.** The last room of every floor holds a boss (see below).
 - **Champions.** Twelve champions, each with a passive perk and a special on **Q**:
   Arcane Surge, Aura of Calmness, Coin Dash, Mug-Shield, Melon Roll, Drink,
@@ -81,8 +81,7 @@ Movement, run, roll, interact and the special can be rebound in **Settings**.
 - **Special rooms** on every floor (shown on the minimap): a **treasure room**
   behind a silver door (its silver key lies in a combat room) with a hoard of
   gold, two packs, a full heal and a free vape; a **challenge room** where waves
-  keep coming for 30 seconds; and **Toshko's Roulette**, where you bet gold on red,
-  black (x2) or Toshko's zero (x14). One combat room a floor holds a **mini-boss**,
+  keep coming for 30 seconds. One combat room a floor holds a **mini-boss**,
   and some chests are **Mimics**.
 - **Floors** each have their own look: the Mistwood Depths, the Drowned Crypt,
   the Ember Halls, the Bone Gardens, the Toxic Sewers and the Gilded Vault.
@@ -93,17 +92,24 @@ Movement, run, roll, interact and the special can be rebound in **Settings**.
 - The game **saves itself** whenever you change rooms and every 20 seconds in a
   safe room.
 
-### The shops
+### The castle and its shops
 
-Every floor has one shop, and the minimap shows it from the start (gold for
-Marin, blue for Galin). The two take turns, starting with a random one, so
-Galin is there by floor 2 at the latest.
+The first room of every floor has a wooden door in its top wall (the minimap
+marks the room with it). Walk up into it, or press **E** in front of it, and you
+are in the **Castle Corridor** (`assets/castle/corridor.png`). Its four doors lead
+to four rooms, each with whoever keeps the shop behind their counter: walk up to
+the counter and press **E**. A room's Hallway door on the left, or the carpet at
+the bottom, takes you back to the corridor, and the corridor's side door takes
+you back down to the dungeon.
 
-- **Marin's Market** sells potions (buy as many as you like) and vapes. A vape
+- **Marin's Vape Shop** sells potions (buy as many as you like) and vapes. A vape
   is permanent and comes once: Mango Haze (move 10% faster), Blue Razz Ice
   (powers cost 20% less), Watermelon Rage (+4 blade damage), Cool Mint Fog (take
   15% less damage).
-- **Galin's stall** has two sections. **Weapons**: every run starts with the
+- **Todor's Casino**: Toshko's roulette. Bet gold on red, black (x2) or Toshko's
+  zero (x14).
+- **Beray's Drip Locker** sells outfits (see below).
+- **Galin's Weapon Shop** has two sections. **Weapons**: every run starts with the
   Rusty Sword; better ones are bought here, and those you own swap for free.
   **Upgrades** of the weapon in hand: Sharpen, Balance and Extend, three levels
   each. Every level costs gold and one cigarette pack, and each weapon keeps its
@@ -202,6 +208,21 @@ you, and you have to stay hidden for one minute.
 The floors, stalls and her rounds are at the top of `src/Toilet.cpp`, and the
 numbers (time, speeds, how far she smells and sees) in `include/Toilet.h`.
 
+### Beray and his outfits
+
+Beray (`assets/castle/beray.png`) sells clothes for every champion: the Drip
+Puffer, the Midnight Tracksuit, Gold Rush, Camo Fatigues, Pink Velour and Ice
+Cold. Pick the champion along the top (the one you play is picked to start
+with), point at an outfit to see them in it from every side, and buy it with the
+run's gold. They put it on at once and walk the dungeon in it; an outfit bought
+is theirs for good (it's kept in `profile.dat`, not the run), so you can change
+back and forth for free, and their own clothes are always there.
+
+Each champion's figure in each outfit is a walk sheet in
+`assets/outfits/<outfit>/`, made from their own walk sheet by
+`tools/outfits.py` (run it after changing a figure). The outfits are the
+`OUTFITS` table in `include/Champions.h`.
+
 ### Vasil the Storyteller
 
 Vasil sits on his stool in the first room of every floor, beside his
@@ -260,9 +281,12 @@ Chronicles-of-the-Spice-Trip/
   src/Autopilot.cpp   the automated play-through (see below)
   src/Video.cpp       plays the intro video (MPEG-1) with its sound
   src/Toilet.cpp      the toilets after Triceps: hiding from The Sergeant
+  src/Castle.cpp      the castle corridor, the shopkeepers' rooms and Beray's outfits
   assets/             art; assets/arenas/ holds the bosses' painted arenas,
                       assets/walk/ the champions' and Triceps' walk sheets,
-                      assets/vasil/ Vasil the Storyteller and his listeners
+                      assets/vasil/ Vasil the Storyteller and his listeners,
+                      assets/castle/ the castle's rooms, assets/outfits/ the outfits
+  tools/outfits.py    makes the champions' figures in Beray's outfits
   vendor/raylib/      raylib headers and library
   vendor/pl_mpeg/     pl_mpeg, the MPEG-1 decoder (MIT, one header)
 ```
@@ -270,13 +294,14 @@ Chronicles-of-the-Spice-Trip/
 ## Automated play-through
 
 `--autopilot <folder>` plays the whole game with scripted input. It watches
-the start of Marin's video and skips it, clicks through the menus, fights a room, opens a chest, shops, beats all six bosses
+the start of Marin's video and skips it, clicks through the menus, fights a room, opens a chest,
+goes through the castle (Marin's, Galin's, Todor's and Beray's), beats all six bosses
 (and checks each of Triceps' attacks),
 hides from The Sergeant in the toilets (smoke, the pee and its puddle, a stall,
 being found, a minute survived), completes a run, saves and continues, wins a
 Boss Rush, checks Vasil has each floor's tale, and tries every
 champion's special, Momiche's scare on a boss, Gakev's coins and casting with
-Enter. It writes a PASS/FAIL line for each check (186) to
+Enter. It writes a PASS/FAIL line for each check (213) to
 `<folder>/autopilot.log`, saves screenshots next to it, and exits with the
 number of failures:
 

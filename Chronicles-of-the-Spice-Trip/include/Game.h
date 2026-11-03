@@ -20,13 +20,14 @@
 #include "Sprites.h"
 #include "Video.h"
 #include "Toilet.h"
+#include "Castle.h"
 #include <map>
 #include <string>
 #include <vector>
 
 enum class Screen { Video, Menu, Setup, Champions, Settings, Controls, Intro, Play };
 enum class Mode { Run, BossRush };
-enum class Overlay { None, Pause, Controls, Shop, Galin, RunComplete, RushOver, Roulette, Casino, Summary };
+enum class Overlay { None, Pause, Controls, Shop, Galin, RunComplete, RushOver, Roulette, Casino, Summary, Drip };
 
 struct Popup { const Anim* anim; Vector2 pos; float t; };        // a flask rising from a chest
 struct Coin { Vector2 pos, vel; float t; bool pack = false; };    // loot that flies to you (gold, or a cigarette pack)
@@ -135,6 +136,22 @@ struct Game {
     void drawToilet();
     void drawToiletHud();
     Camera2D toiletCamera() const;
+    // the castle behind the door in every first room (Castle.cpp)
+    void enterCastle();
+    void leaveCastle();
+    void updateCastle(float dt);
+    void openKeeper(int place);
+    void drawCastle();
+    void drawKeeper(int place);
+    void drawCastleHud();
+    Camera2D castleCamera() const;
+    // Beray's outfits
+    void drawDrip();
+    const WalkSheet& figure(int champion) const;          // their walking figure, in the outfit they wear
+    const WalkSheet& outfitLook(int champion, int outfit); // ...or in any outfit (loaded when first asked for)
+    void wearOutfit(int champion, int outfit);
+    bool ownsOutfit(int champion, int outfit) const;
+    void buyOutfit(int champion, int outfit);              // or put it on, if it's already theirs
     Vector2 mouseWorld() const;
     Vector2 aimDir() const;
     Vector2 castHand() const;           // where a spell gathers as it winds up
@@ -196,6 +213,9 @@ struct Game {
     std::vector<Rubble> rubble;
     std::vector<Laser> lasers;          // the Gym Rat's C++, fading
     toilet::Level hunt;                 // the toilets after Triceps: hiding from The Sergeant
+    castle::Hall hall;                  // the castle corridor and its shops
+    float castleDoorCd = 0;             // just came out: the door waits a moment before it opens again
+    int   dripChampion = 0, dripHover = -1;   // Beray's: who you're dressing, the outfit pointed at
     float gymT = 0;                     // the Gym Rat holds his arms-out pose this long...
     Vector2 gymDir{ 1, 0 };             // ...lasers this way, creatine the other
     float finaleT = 0, slowMo = 0;      // a boss is falling: seconds left of it, and of the slow motion
@@ -250,7 +270,7 @@ struct Game {
     std::map<std::string, Sound> sounds;
     au::Music music;
     Texture2D menuBg{}, castleTex{}, marinTex{}, shopTex{};
-    Texture2D galinTex{}, galinShopTex{}, packTex{};
+    Texture2D galinTex{}, packTex{};
     Texture2D weaponTex[WEAPON_COUNT]{};
     Texture2D champTex[CHAMPION_COUNT]{};
     WalkSheet walk[CHAMPION_COUNT];     // each champion from every side (assets/walk/)
@@ -259,13 +279,18 @@ struct Game {
     VideoPlayer introVideo;             // assets/intro/marin-trip.mpg
     Texture2D toiletMap{}, sergeantTex{};   // assets/arenas/toilets.png, assets/sergeant.png
     WalkSheet sergeantWalk;             // assets/walk/walk-sergeant.png
+    Texture2D castleArt[castle::PLACE_COUNT]{}, berayTex{};   // assets/castle/
+    WalkSheet dressed[CHAMPION_COUNT];  // each champion in the outfit they wear
+    std::map<int, WalkSheet> outfitLooks;   // any champion in any outfit, for Beray's mirror
     BossArt bossArt;
 };
 
 inline constexpr const char* INTRO_VIDEO = "intro/marin-trip.mpg";   // plays once as the game starts
 
 // Fixed spots in the start and shop rooms.
-inline constexpr Vector2 MERCHANT_POS = { ROOM_PX_W / 2, ROOM_PX_H / 2 - 10 };
+// The door to the castle, in the top wall of every floor's first room, and where you come back out.
+inline constexpr float   CASTLE_DOOR_X = 13 * TILE;
+inline constexpr Vector2 CASTLE_DOOR_FRONT = { CASTLE_DOOR_X, TILE * 1.0f + 26 };
 inline constexpr Vector2 VASIL_POS = { ROOM_PX_W / 2 - 110, ROOM_PX_H / 2 - 50 };   // the foot of his stool
 inline constexpr Vector2 ROOM_CENTER = { ROOM_PX_W / 2, ROOM_PX_H / 2 };
 inline constexpr Vector2 SILVER_POS = { ROOM_PX_W / 2 + 64, ROOM_PX_H / 2 };   // the silver key, beside the gold one

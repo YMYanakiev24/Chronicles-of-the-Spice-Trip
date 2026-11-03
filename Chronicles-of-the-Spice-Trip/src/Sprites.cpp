@@ -112,8 +112,8 @@ Facing facingOf(Vector2 dir) {
     return dir.y < 0 ? FACE_UP : FACE_DOWN;
 }
 
-void WalkSheet::load(const char* file) {
-    std::string p = findAsset((std::string("walk/") + file).c_str());
+void WalkSheet::load(const char* file, const char* dir) {
+    std::string p = findAsset((std::string(dir) + file).c_str());
     if (p.empty()) return;
     tex = LoadTexture(p.c_str());
     fh = tex.height / 3;

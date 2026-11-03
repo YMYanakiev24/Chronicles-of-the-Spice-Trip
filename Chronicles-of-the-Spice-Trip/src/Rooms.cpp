@@ -70,26 +70,10 @@ void Dungeon::generate() {
     }
     grid[by][bx].isBoss = true;
 
-    // One shop a floor, Marin's and Galin's in turn, in a dead-end room if there is one (any room otherwise).
-    {
-        int sx = -1, sy = -1, fallbackX = -1, fallbackY = -1;
-        for (int y = 0; y < DUNGEON_G; ++y)
-            for (int x = 0; x < DUNGEON_G; ++x) {
-                Room& rm = grid[y][x];
-                if (!rm.exists || rm.isStart || rm.isBoss) continue;
-                int n = 0;
-                for (int b : { DIR_N, DIR_E, DIR_S, DIR_W }) if (rm.doors & b) n++;
-                if (n == 1 && (sx < 0 || GetRandomValue(0, 1))) { sx = x; sy = y; }
-                if (fallbackX < 0 || GetRandomValue(0, 2) == 0) { fallbackX = x; fallbackY = y; }
-            }
-        if (sx < 0) { sx = fallbackX; sy = fallbackY; }
-        if (sx >= 0) { grid[sy][sx].isShop = true; grid[sy][sx].isGalin = galinNext; grid[sy][sx].cleared = true; }
-        galinNext = !galinNext;
-    }
-
     // The special rooms, each in a room nothing else has claimed, as long as two plain
-    // combat rooms are left for the keys: a treasure room (a dead end if there is one),
-    // a challenge room and Toshko's casino. One combat room also gets a mini-boss.
+    // combat rooms are left for the keys: a treasure room (a dead end if there is one) and
+    // a challenge room. One combat room also gets a mini-boss. (The shops and Todor's casino
+    // are in the castle, behind the door in the first room.)
     auto pick = [&](bool deadEnd, bool combatOk) -> Room* {
         Room* chosen = nullptr;
         int n = 0;
@@ -117,11 +101,6 @@ void Dungeon::generate() {
     }
     if (plainRooms() > 2)
         if (Room* c = pick(false, false)) c->isChallenge = true;
-    if (plainRooms() > 2) {
-        Room* casino = pick(true, false);
-        if (!casino) casino = pick(false, false);
-        if (casino) { casino->isCasino = true; casino->cleared = true; }
-    }
     if (Room* e = pick(false, false)) e->isElite = true;
 
     // The boss key waits in one combat room, the silver key (if there's a treasure room) in another.

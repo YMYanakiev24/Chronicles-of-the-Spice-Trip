@@ -31,6 +31,9 @@ struct Profile {
     unsigned bossesBeaten = 0;      // bit per BOSSES entry
     float    bestRush = 0;          // best Boss Rush time, 0 = none yet
     int      bestHardcore = 0;      // deepest floor reached in a hardcore run
+    // Beray's outfits, per champion (room for more champions than there are)
+    unsigned outfitsOwned[32] = {};   // a bit per OUTFITS entry
+    signed char outfit[32] = {};      // the one each champion wears
 };
 
 namespace save {

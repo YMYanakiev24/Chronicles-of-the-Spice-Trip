@@ -53,6 +53,7 @@ std::string Game::vasilGreeting() const {
 
 Camera2D Game::camera() const {
     if (hunt.active) return toiletCamera();
+    if (hall.active) return castleCamera();
     int sw = GetScreenWidth(), sh = GetScreenHeight();
     Camera2D cam{};
     cam.offset = { sw / 2.0f, sh / 2.0f };
@@ -118,6 +119,7 @@ void Game::updatePlay(float dt) {
     player.meleeAnim = fmaxf(0, player.meleeAnim - dt * 4);
     scareT = fmaxf(0, scareT - dt);
     vasilGreetT = fmaxf(0, vasilGreetT - dt);
+    castleDoorCd = fmaxf(0, castleDoorCd - dt);
     vasilBowT = fmaxf(0, vasilBowT - dt);
     gymT = fmaxf(0, gymT - dt);
     for (auto& l : lasers) l.t += dt;
@@ -206,13 +208,6 @@ void Game::updatePlay(float dt) {
         }
     }
 
-    // --- Toshko's roulette table ---
-    if (room.isCasino && !talking && Vector2Distance(player.pos, MERCHANT_POS) < 60 && in::pressed(K.interact)) {
-        int bet = wheel.bet, pick = wheel.pick;    // remember the last stake and colour
-        wheel = Wheel{}; wheel.casino = true; wheel.bet = bet; wheel.pick = pick;
-        overlay = Overlay::Casino; play("ui");
-    }
-
     // --- chest (only once the room is safe) ---
     Vector2 chestPos = { room.chestTx * (float)TILE + 16, room.chestTy * (float)TILE + 16 };
     bool nearChest = room.hasChest && !room.chestOpened && room.cleared && Vector2Distance(player.pos, chestPos) < 40;
@@ -226,7 +221,14 @@ void Game::updatePlay(float dt) {
         else player.hp = fminf(player.maxHp, player.hp + 10);
     }
 
-    // --- Vasil's tale (start room) and the merchant (shop room) ---
+    // --- the castle door in the first room: E, or walk up into it ---
+    if (room.isStart && mode == Mode::Run && !talking && castleDoorCd <= 0 && fabsf(player.pos.x - CASTLE_DOOR_X) < 30 && player.pos.y < CASTLE_DOOR_FRONT.y + 10
+        && (in::pressed(K.interact) || (mv.y < -0.5f && player.pos.y < TILE + PLAYER_R + 6))) {
+        enterCastle();
+        return;
+    }
+
+    // --- Vasil's tale (start room) ---
     bool nearVasil = room.isStart && mode == Mode::Run && Vector2Distance(player.pos, VASIL_POS) < 56;
     if (nearVasil && in::pressed(K.interact)) {
         play("ui");
@@ -242,8 +244,6 @@ void Game::updatePlay(float dt) {
         parts.push_back({ { VASIL_POS.x + side * frand(10, 20), VASIL_POS.y - frand(14, 24) }, { side * frand(4, 16), frand(-36, -16) },
             life, life, frand(1.5f, 2.5f), { 255, 226, 150, 255 }, 0, true, true });
     }
-    bool nearMerchant = room.isShop && Vector2Distance(player.pos, MERCHANT_POS) < 56;
-    if (nearMerchant && !talking && in::pressed(K.interact)) { overlay = room.isGalin ? Overlay::Galin : Overlay::Shop; play("ui"); }
 
     // --- attacks ---
     bool castKey = in::mousePressed(MOUSE_BUTTON_RIGHT) || in::down(KEY_ENTER) || in::down(KEY_KP_ENTER);   // hold Enter to keep casting
