@@ -900,19 +900,27 @@ void Autopilot::build() {
         shot(g, "triceps-well");
         return true;
     });
-    add("blast", 4, [this](Game& g, float) {
+    // The boots can fly while the blast is still being waited for, so both steps watch for them.
+    auto watchBoots = [this](Game& g) {
+        int boots = 0, curving = 0;
+        for (auto& p : g.enemyShots) if (p.kind == ShotKind::Boot) { boots++; curving += p.curve != 0; }
+        if (boots > markX) { markX = (float)boots; markY = (float)curving; }
+        return boots >= 3;
+    };
+    add("blast", 4, [this, watchBoots](Game& g, float t) {
+        if (t == 0) markX = markY = 0;
         Grenade& gr = g.fight.grenades[0];
         g.player.pos = gr.to; g.player.invuln = 0;      // stay in the middle for the blast
+        watchBoots(g);
         if (!gr.hit) return false;
         check("the well goes off under you", true);
         return true;
     });
-    add("magnetic boots", 8, [this](Game& g, float) {
-        int boots = 0, curving = 0;
-        for (auto& p : g.enemyShots) if (p.kind == ShotKind::Boot) { boots++; curving += p.curve != 0; }
-        if (boots < 3) return false;
-        check("she kicks three magnetic boots, two curving in from the sides", boots == 3 && curving == 2);
-        shot(g, "triceps-boots");
+    add("magnetic boots", 8, [this, watchBoots](Game& g, float) {
+        bool now = watchBoots(g);
+        if (markX < 3) return false;
+        check("she kicks three magnetic boots, two curving in from the sides", markX == 3 && markY == 2);
+        if (now) shot(g, "triceps-boots");
         return true;
     });
     add("fulcrum staff", 9, [this](Game& g, float) {

@@ -75,6 +75,7 @@ struct Enemy {
     float   atkAnim = 0;               // >0 while the attack animation plays
     float   deathT = 0;                // time since death (death animation)
     bool    dying = false, flip = false, moving = false;
+    float   bestDist = 1e9f, stuckT = 0, ghostT = 0;   // jammed in a crowd: slip past allies a moment
     int     lastRollHit = -1;          // Pupesh's roll hits each enemy once per roll
     int     stolen = 0;                // Toshko: gold he snatched and is running off with
     float   fleeT = 0;                 // Toshko: seconds spent running away

@@ -18,9 +18,13 @@ static constexpr int ORACLE_COUNT = (int)(sizeof ORACLE_LINES / sizeof ORACLE_LI
 Camera2D Game::camera() const {
     int sw = GetScreenWidth(), sh = GetScreenHeight();
     Camera2D cam{};
-    cam.target = ROOM_CENTER;
     cam.offset = { sw / 2.0f, sh / 2.0f };
-    cam.zoom = fminf(sw / (ROOM_PX_W * 1.12f), sh / (ROOM_PX_H * 1.18f));   // the whole room, centred
+    // Closer than the whole room, so the view travels with the player.
+    cam.zoom = fminf(sw / (ROOM_PX_W * 0.72f), sh / (ROOM_PX_H * 0.78f));
+    // Keep the view inside the room (with a little margin); centre an axis that already fits.
+    float halfW = sw / 2.0f / cam.zoom, halfH = sh / 2.0f / cam.zoom, pad = TILE * 0.5f;
+    cam.target.x = halfW * 2 >= ROOM_PX_W + 2 * pad ? ROOM_CENTER.x : Clamp(camPos.x, halfW - pad, ROOM_PX_W - halfW + pad);
+    cam.target.y = halfH * 2 >= ROOM_PX_H + 2 * pad ? ROOM_CENTER.y : Clamp(camPos.y, halfH - pad, ROOM_PX_H - halfH + pad);
     return cam;
 }
 
@@ -34,6 +38,12 @@ Vector2 Game::mouseWorld() const {
     Vector2 dir = touch::stickDir();
     return Vector2Add(player.pos, Vector2Scale(dir.x || dir.y ? dir : player.facing, 100));
 }
+void Game::updateCamera(float dt) {
+    // Snap on room changes and respawns; otherwise glide after the player.
+    if (Vector2Distance(camPos, player.pos) > ROOM_PX_H * 0.6f) camPos = player.pos;
+    else camPos = Vector2Lerp(camPos, player.pos, fminf(1.0f, dt * 6.0f));
+}
+
 
 float Game::hurtMul() const { return player.has(VP_MINT) ? 0.85f : 1.0f; }
 
@@ -118,6 +128,10 @@ void Game::updatePlay(float dt) {
     bool spikesUp = fmodf(trapClock, 2.4f) < 1.2f;
     if (spikesUp && !airborne && player.roll <= 0 && player.invuln <= 0 && onSpikes(room, player.pos))
         hurtPlayer(8, 0.6f);
+    if (!airborne && player.roll <= 0 && player.invuln <= 0 && inFlames(room, player.pos, trapClock)) {
+        hurtPlayer(12, 0.7f);
+        burst(parts, player.pos, 8, 70, 0.4f, { 255, 140, 40, 255 });
+    }
 
     // --- the boss key (lies in the middle once its room is safe) ---
     if (room.hasKey && room.cleared && !dungeon.keyFound && Vector2Distance(player.pos, ROOM_CENTER) < 26) {
@@ -707,6 +721,12 @@ void Game::updateEnemies(float dt, float slow) {
             }
         }
 
+        // An enemy that stops getting closer is jammed behind its friends in a narrow gap:
+        // let it slip through them for a moment.
+        if (d < e.bestDist - 8) { e.bestDist = d; e.stuckT = 0; }
+        else if ((e.stuckT += edt) > 1.5f) { e.ghostT = 1.2f; e.stuckT = 0; e.bestDist = d; }
+        e.ghostT = fmaxf(0, e.ghostT - edt);
+
         // solid bodies: push out of the player and out of each other (nothing shifts the Bad Plasmodium)
         bool rooted = e.bossForm == 0 && fight.active() && fight.def->kind == BossKind::Rooted;
         Vector2 off = Vector2Subtract(e.pos, player.pos);
@@ -718,7 +738,7 @@ void Game::updateEnemies(float dt, float slow) {
         }
         for (auto& o : enemies) {
             if (rooted) break;
-            if (&o == &e || !o.alive) continue;
+            if (&o == &e || !o.alive || e.ghostT > 0 || o.ghostT > 0) continue;
             Vector2 sep = Vector2Subtract(e.pos, o.pos);
             float sd = Vector2Length(sep), need = e.r + o.r;
             if (sd >= need) continue;

@@ -165,6 +165,8 @@ struct Game {
     bool  chestLooting = false;         // its loot is still in the air: the glow stays
     bool  chestMana = false;            // what the chest held, for when the lid goes up
     bool  chestPack = false;            // and whether a cigarette pack was in there too
+    Vector2 camPos = { 0, 0 };     // where the follow camera looks (eases after the player)
+    void updateCamera(float dt);
     float banner = 0;
     std::string bannerText, bannerSub;
     std::string dialogue;
