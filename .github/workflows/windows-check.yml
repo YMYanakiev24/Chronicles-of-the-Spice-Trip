@@ -1,0 +1,23 @@
+# Temporary: builds the Visual Studio project to check it compiles and links.
+name: Windows check
+on:
+  push:
+    branches: [ci-windows-check]
+jobs:
+  build:
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        config: [Debug, Release]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: microsoft/setup-msbuild@v2
+      - name: Build
+        shell: pwsh
+        run: |
+          cd Chronicles-of-the-Spice-Trip
+          msbuild Chronicles-of-the-Spice-Trip.vcxproj -p:Configuration=${{ matrix.config }} -p:Platform=x64 -p:PlatformToolset=v143 -m -nologo -v:minimal 2>&1 | Tee-Object -FilePath build.log
+          $errs = Select-String -Path build.log -Pattern ": (fatal )?error " | ForEach-Object { ($_.Line -replace ' \[[^\]]*\]$','') -replace '^.*\\Chronicles-of-the-Spice-Trip\\','' } | Select-Object -Unique -First 60
+          if ($errs) { Write-Output ("::error::" + ($errs -join "%0A")) }
+          if (!(Test-Path build\x64\${{ matrix.config }}\ChroniclesOfTheSpiceTrip.exe)) { Write-Output "::error::no exe"; exit 1 }
