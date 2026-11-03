@@ -6,6 +6,7 @@
 #include <vector>
 #include <cmath>
 #include <cstdint>
+#include <cstdlib>
 
 namespace au {
 
@@ -138,12 +139,32 @@ namespace au {
     }
 
     // --- Music --------------------------------------------------------------
+    // Each boss has a theme: sixteen eighth-notes of lead and eight quarter-notes of bass,
+    // in semitones above the root (REST is silence), looping over the drone.
+    constexpr int REST = 99;
+    struct Song { float bpm, root; WaveType lead, bass; int notes[16]; int bassline[8]; };
+    static const Song SONGS[] = {
+        { 140, 220, SQUARE, TRI, { 0, 3, 7, 3, 10, 7, 3, 7, 0, 3, 7, 12, 10, 7, 5, 3 }, { 0, 0, -4, -4, -2, -2, -5, -5 } },          // the Good Plazmodium
+        { 100, 196, SAW, SQUARE, { 0, REST, 0, 1, REST, 0, 7, 6, 0, REST, 0, 1, 3, 1, 0, REST }, { 0, 0, 1, 1, 0, 0, -2, -2 } },     // the Bad Plasmodium
+        { 160, 247, TRI, TRI, { 12, 15, 19, 15, 12, 10, 7, 10, 12, 15, 19, 22, 19, 15, 12, 10 }, { 0, -2, -4, -5, 0, -2, -4, -7 } },  // Mordekai
+        { 130, 233, SQUARE, SAW, { 7, 7, REST, 7, 5, 3, 5, REST, 7, 7, REST, 10, 12, 10, 7, REST }, { 0, 0, 5, 5, 3, 3, -2, -2 } },  // Vlado
+        { 150, 262, TRI, SQUARE, { 0, 4, 7, 11, 12, 11, 7, 4, 2, 5, 9, 12, 14, 12, 9, 5 }, { 0, 0, 2, 2, 4, 4, 5, 7 } },              // Triceps
+        { 120, 185, SAW, SAW, { 0, REST, 3, 5, 7, REST, 8, 7, 5, 3, 2, 3, 0, REST, -1, 0 }, { 0, 0, -4, -4, -5, -5, -2, -2 } },       // Pyraketh
+    };
+    constexpr int SONG_COUNT = (int)(sizeof SONGS / sizeof SONGS[0]);
+
     void Music::init() { stream = LoadAudioStream(SR, 16, 1); PlayAudioStream(stream); }
 
     void Music::setMood(const std::string& mood) {
         active = true;
+        if (mood.rfind("boss", 0) != 0) song = -1;
         if (mood == "menu") { root = 130.81f; droneType = SINE; arpType = SINE; rate = 2.6f; }
-        else if (mood == "boss") { root = 110.0f; droneType = TRI; arpType = SQUARE; rate = 0.9f; }
+        else if (mood.rfind("boss", 0) == 0) {
+            root = 110.0f; droneType = TRI; arpType = SQUARE; rate = 0.9f;
+            int next = mood.size() > 4 ? atoi(mood.c_str() + 4) % SONG_COUNT : 0;
+            if (next != song) { song = next; step = 0; stepT = 0; }
+            return;
+        }
         else { root = 130.81f; droneType = SINE; arpType = TRI; rate = 2.8f; } // mist
     }
 
@@ -171,14 +192,34 @@ namespace au {
                 float s = osc(droneType, dphase[0]) * 0.07f
                     + osc(droneType, dphase[1]) * 0.07f
                     + osc(droneType, dphase[2]) * 0.12f;
-                s *= trem;
-                arpTimer -= dt;
-                if (arpTimer <= 0) { triggerPluck(); arpTimer = rate + frand(0, 1.5f); }
+                s *= trem * (song >= 0 ? 0.5f : 1.0f);
+                if (song >= 0) {                        // the boss's theme over a quieter drone
+                    const Song& sg = SONGS[song];
+                    if ((stepT -= dt) <= 0) {
+                        stepT = 30.0f / sg.bpm;
+                        int note = sg.notes[step % 16];
+                        if (note != REST) {
+                            float f = sg.root * powf(2.0f, note / 12.0f);
+                            Pluck* slot = &plucks[0];
+                            for (auto& p : plucks) if (!p.on) { slot = &p; break; }
+                            *slot = Pluck{ 0, f, 0, 0.42f, sg.lead, true };
+                        }
+                        if (step % 2 == 0) { bassFreq = sg.root * 0.25f * powf(2.0f, sg.bassline[(step / 2) % 8] / 12.0f); bassT = 0; }
+                        step++;
+                    }
+                    bassPhase += bassFreq / SR; if (bassPhase >= 1) bassPhase -= 1;
+                    bassT += dt;
+                    s += osc(sg.bass, bassPhase) * 0.09f * expf(-bassT * 2.2f);
+                }
+                else {
+                    arpTimer -= dt;
+                    if (arpTimer <= 0) { triggerPluck(); arpTimer = rate + frand(0, 1.5f); }
+                }
                 for (auto& p : plucks) {
                     if (!p.on) continue;
                     p.phase += p.freq / SR; if (p.phase >= 1) p.phase -= 1;
                     p.t += dt;
-                    s += osc(p.type, p.phase) * (0.06f * expf(-p.t * 2.5f));
+                    s += osc(p.type, p.phase) * (0.06f * expf(-p.t * (p.dur < 1 ? 6.0f : 2.5f)));
                     if (p.t > p.dur) p.on = false;
                 }
                 s *= vol;

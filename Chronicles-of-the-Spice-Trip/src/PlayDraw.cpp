@@ -15,8 +15,14 @@ void Game::playScreen() {
     if (in::pressed(KEY_ESCAPE)) {
         if (overlay == Overlay::Controls) { save::writeTouchLayout(touch::layout()); overlay = Overlay::Pause; }
         else if (overlay == Overlay::Shop || overlay == Overlay::Galin || overlay == Overlay::Pause) overlay = Overlay::None;
+        else if (overlay == Overlay::Casino && !wheel.spinning) overlay = Overlay::None;
         else if (overlay == Overlay::None) overlay = Overlay::Pause;
         play("ui");
+    }
+    // a level-up's prize wheel comes up once the moment is calm
+    if (overlay == Overlay::None && player.spins > 0 && mode == Mode::Run && finaleT <= 0 && rewardT <= 0 && hitStop <= 0) {
+        if (testMode) player.spins = 0;             // the autopilot measures exact numbers: no surprise prizes
+        else { wheel = Wheel{}; overlay = Overlay::Roulette; }
     }
     if (overlay == Overlay::None) updatePlay(dt);
     if (screen != Screen::Play) return;            // left for the menu this frame
@@ -27,6 +33,7 @@ void Game::playScreen() {
     float target = r.isBoss && !r.cleared ? (painted ? 0.16f : 0.38f) : 0.0f;
     gloom += (target - gloom) * fminf(1.0f, dt * 2.5f);
 
+    updateCamera(dt);
     Camera2D cam = camera();
     if (shake > 0 && overlay == Overlay::None) {
         shake = fmaxf(0, shake - dt);
@@ -40,7 +47,7 @@ void Game::playScreen() {
 
     int sw = GetScreenWidth(), sh = GetScreenHeight();
     if (gloom > 0.001f) DrawRectangle(0, 0, sw, sh, Fade({ 4, 2, 10, 255 }, gloom));
-    DrawRectangle(0, 0, sw, sh, Fade(FOG_TINT, 0.04f));
+    DrawRectangle(0, 0, sw, sh, Fade(THEMES[theme()].fog, theme() ? 0.07f : 0.04f));
     if (player.auraT > 0) DrawRectangle(0, 0, sw, sh, Fade({ 120, 180, 255, 255 }, 0.06f));
     if (skyFlash > 0) DrawRectangle(0, 0, sw, sh, Fade({ 205, 225, 255, 255 }, skyFlash * 0.2f));
     drawHud();
@@ -52,14 +59,18 @@ void Game::playScreen() {
     case Overlay::Controls:    drawControlsEditor(); break;
     case Overlay::RunComplete: drawRunComplete(); break;
     case Overlay::RushOver:    drawRushOver(); break;
+    case Overlay::Roulette:    drawRoulette(); break;
+    case Overlay::Casino:      drawCasino(); break;
+    case Overlay::Summary:     drawSummary(); break;
     default: break;
     }
 }
 
 // ----------------------------------------------------------------- the room
 // The boss key: the pack's spinning gold key, or a drawn one if the sprite is missing.
-static void drawKey(Vector2 c, float s) {
-    if (SPR.key.ok()) { drawAnim(SPR.key, animFrame(SPR.key, (float)GetTime(), 6, true), c, 2.0f * s); return; }
+static void drawKey(Vector2 c, float s, bool silver = false) {
+    const Anim& k = silver ? SPR.keySilver : SPR.key;
+    if (k.ok()) { drawAnim(k, animFrame(k, (float)GetTime(), 6, true), c, 2.0f * s); return; }
     Color gold = { 240, 200, 80, 255 }, dark = { 120, 80, 20, 255 };
     DrawRing(c, 4 * s, 7.5f * s, 0, 360, 16, dark);
     DrawRing(c, 3 * s, 6 * s, 0, 360, 16, gold);
@@ -88,7 +99,20 @@ void Game::drawRoom() {
             else if (tx == 0 && ty == midY) dir = DIR_W;
             else if (tx == ROOM_TW - 1 && ty == midY) dir = DIR_E;
             bool isDoor = dir && (r.doors & dir);
-            bool innerWall = !border && r.tiles[ty][tx] == RT_WALL;
+            bool innerWall = !border && (r.tiles[ty][tx] == RT_WALL || r.tiles[ty][tx] == RT_FLAMER);
+            if (!border && r.tiles[ty][tx] == RT_VOID) {    // outside the room's shape
+                bool edge = false;                         // void touching floor reads as a wall face
+                for (int k = 0; k < 4; ++k) {
+                    int nx = tx + (k == 0) - (k == 1), ny = ty + (k == 2) - (k == 3);
+                    if (nx > 0 && ny > 0 && nx < ROOM_TW - 1 && ny < ROOM_TH - 1 && !tileSolid(r.tiles[ny][nx])) edge = true;
+                }
+                DrawRectangle((int)px, (int)py, TILE, TILE, { 10, 9, 14, 255 });
+                if (edge) {
+                    if (SPR.tileset.id) drawTile(1 + ((tx * 7 + ty * 3) % 4), 0, px, py);
+                    else { DrawRectangle((int)px, (int)py, TILE, TILE, { 24, 22, 32, 255 }); DrawRectangle((int)px, (int)py, TILE, 6, { 58, 54, 74, 255 }); }
+                }
+                continue;
+            }
             unsigned h = (unsigned)(tx * 73856093) ^ (unsigned)(ty * 19349663) ^
                 (unsigned)(dungeon.cx * 83492791 + dungeon.cy * 2654435761u);
 
@@ -107,7 +131,7 @@ void Game::drawRoom() {
             }
             if ((!border || isDoor) && !innerWall) {
                 drawTile(6 + h % 4, (h >> 4) % 3, px, py);                 // stone floor variants
-                if (isDoor && (!r.cleared || dungeon.bossDoorLocked(dir))) drawTile(8, 3, px, py);   // barred door
+                if (isDoor && (!r.cleared || dungeon.doorLock(dir))) drawTile(8, 3, px, py);   // barred door
                 else if (!border && r.tiles[ty][tx] == RT_SPIKES)
                     drawAnim(SPR.peaks, spikeFrame, { px + TILE / 2.0f, py + TILE / 2.0f }, 2.0f);
                 if (ty == 1 && tx == 1 && !r.isBoss) drawTile(4, 6, px, py);              // cobwebs
@@ -118,6 +142,49 @@ void Game::drawRoom() {
             else if (ty == ROOM_TH - 1) drawTile(tx == 0 ? 0 : tx == ROOM_TW - 1 ? 5 : 1 + tx % 4, 4, px, py);
             else drawTile(tx == 0 ? 0 : 5, 1 + ty % 3, px, py);
         }
+
+    // the floor's theme washes over the stone (painted arenas keep their own colours)
+    Color tint = THEMES[theme()].tint;
+    if (!arena.id && (tint.r < 255 || tint.g < 255 || tint.b < 255)) {
+        BeginBlendMode(BLEND_MULTIPLIED);
+        DrawRectangle(0, 0, (int)ROOM_PX_W, (int)ROOM_PX_H, tint);
+        EndBlendMode();
+    }
+
+    // fire-throwers: a metal nozzle on the brick, sputtering, then a roaring jet
+    for (int i = 0; i < r.flamerCount; ++i) {
+        const Flamer& f = r.flamers[i];
+        int state = flamerState(f, trapClock);
+        Vector2 c = { f.tx * (float)TILE + TILE / 2.0f, f.ty * (float)TILE + TILE / 2.0f };
+        Vector2 d = { (float)((f.dir == DIR_E) - (f.dir == DIR_W)), (float)((f.dir == DIR_S) - (f.dir == DIR_N)) };
+        DrawRectangle((int)c.x - 11, (int)c.y - 11, 22, 22, { 70, 66, 74, 255 });
+        DrawRectangleLines((int)c.x - 11, (int)c.y - 11, 22, 22, { 30, 26, 32, 255 });
+        Vector2 mouth = Vector2Add(c, Vector2Scale(d, 10));
+        DrawCircleV(mouth, 6, { 40, 34, 36, 255 });
+        DrawCircleV(mouth, 3.5f, state == 0 ? Color{ 90, 40, 30, 255 } : Color{ 255, 150, 50, 255 });
+        if (state == 1) {           // warning sparks
+            for (int k = 0; k < 3; ++k) {
+                float t = fmodf(clock * 3 + k * 0.33f, 1.0f);
+                Vector2 sp = Vector2Add(mouth, Vector2Scale(d, t * 18));
+                DrawCircleV({ sp.x + sinf(clock * 20 + k) * 3, sp.y + cosf(clock * 17 + k) * 3 }, 2.5f * (1 - t), Fade({ 255, 190, 80, 255 }, 1 - t));
+            }
+        }
+        else if (state == 2) {      // the jet itself, flickering blobs along its tiles
+            int fx[FLAMER_RANGE], fy[FLAMER_RANGE];
+            int n = flameTiles(r, f, fx, fy);
+            float len = n * (float)TILE;
+            for (float s2 = 0; s2 < len; s2 += 7) {
+                float u = s2 / fmaxf(len, 1);
+                float wob = sinf(clock * 25 + s2 * 0.4f) * 3;
+                Vector2 p = Vector2Add(mouth, Vector2Scale(d, s2));
+                p = Vector2Add(p, { -d.y * wob, d.x * wob });
+                float rad = 7 + 7 * u + sinf(clock * 31 + s2) * 1.5f;
+                DrawCircleV(p, rad, Fade({ 230, 70, 20, 255 }, 0.55f * (1 - u * 0.5f)));
+                DrawCircleV(p, rad * 0.6f, Fade({ 255, 170, 50, 255 }, 0.8f * (1 - u * 0.6f)));
+                DrawCircleV(p, rad * 0.25f, Fade({ 255, 240, 180, 255 }, 0.9f * (1 - u)));
+            }
+        }
+    }
 
     if (arena.id) {             // the boss's painted arena, framed by the walls
         Rectangle inner = { (float)TILE, (float)TILE, ROOM_PX_W - 2 * TILE, ROOM_PX_H - 2 * TILE };
@@ -163,13 +230,42 @@ void Game::drawActors() {
         DrawRectangleLinesEx({ sx - 30, sy - 24, 60, 48 }, 2, { 150, 140, 90, 255 });
     }
 
+    if (r.hasSilverKey && r.cleared && !dungeon.silverFound) {      // the treasure room's key
+        Vector2 k = { SILVER_POS.x, SILVER_POS.y - 6 + sinf(clock * 3 + 1) * 3 };
+        drawShadow({ SILVER_POS.x, SILVER_POS.y + 8 }, 8);
+        drawKey(k, 1.0f, true);
+    }
+    if (r.isTreasure) {             // the hoard: a big chest on a heap of gold
+        if (!r.chestOpened)
+            for (int i = 0; i < 16; ++i) {
+                float a = i * 2.4f, d = 26 + (i % 4) * 9;
+                drawAnim(SPR.coin, (i + (int)(clock * 8)) % std::max(1, SPR.coin.frames),
+                    { ROOM_CENTER.x + cosf(a) * d, ROOM_CENTER.y + 12 + sinf(a) * d * 0.45f }, 1.3f);
+            }
+        drawShadow({ ROOM_CENTER.x, ROOM_CENTER.y + 14 }, 22);
+        const Anim& a = r.chestOpened ? SPR.chestOpen : SPR.chest;
+        if (a.ok()) drawAnim(a, r.chestOpened ? a.frames - 1 : 0, { ROOM_CENTER.x, ROOM_CENTER.y - 8 }, 3.4f);
+    }
+    if (r.isCasino) {               // Toshko's roulette table, Toshko behind it
+        Vector2 tp = { MERCHANT_POS.x, MERCHANT_POS.y + 22 };
+        const Anim& ta = SPR.enemy[EK_TOSHKO].idle;
+        if (ta.ok()) drawAnim(ta, animFrame(ta, clock, 6, true), { MERCHANT_POS.x, MERCHANT_POS.y - 24 }, 0.8f);
+        DrawRectangleRounded({ tp.x - 74, tp.y - 16, 148, 48 }, 0.4f, 8, { 90, 50, 30, 255 });
+        DrawRectangleRounded({ tp.x - 68, tp.y - 12, 136, 40 }, 0.4f, 8, { 30, 110, 60, 255 });
+        float spin = clock * 120;
+        for (int i = 0; i < 8; ++i)
+            DrawCircleSector({ tp.x - 30, tp.y + 8 }, 15, spin + i * 45, spin + i * 45 + 45, 4,
+                i == 0 ? Color{ 40, 160, 70, 255 } : i % 2 ? Color{ 170, 30, 40, 255 } : Color{ 25, 22, 30, 255 });
+        for (int i = 0; i < 3; ++i) drawAnim(SPR.coin, 0, { tp.x + 18 + i * 14, tp.y + 8 - i * 3 }, 1.2f);
+    }
+
     if (r.hasKey && r.cleared && !dungeon.keyFound) {      // the boss key, bobbing and glinting
         Vector2 k = { ROOM_CENTER.x, ROOM_CENTER.y - 6 + sinf(clock * 3) * 3 };
         drawShadow({ ROOM_CENTER.x, ROOM_CENTER.y + 8 }, 8);
         drawKey(k, 1.0f);
     }
 
-    if (r.hasChest) {
+    if (r.hasChest && !r.mimic) {
         Vector2 c = { r.chestTx * (float)TILE + 16, r.chestTy * (float)TILE + 16 };
         drawShadow({ c.x, c.y + 8 }, 12);
         if (SPR.chest.ok()) {
@@ -315,9 +411,16 @@ void Game::drawHud() {
     Room& r = dungeon.cur();
 
     // --- damage numbers ---
+    // bigger on a phone and for big hits, with a dark outline, popping in as they appear
     for (auto& f : floaters) {
         Vector2 s = GetWorldToScreen2D(f.pos, cam);
-        ui::textCentered(TextFormat("%d", f.value), s.x, s.y, 20, Fade(f.color, fminf(1, 2.5f * (0.8f - f.t))));
+        float a = fminf(1, 2.5f * (0.8f - f.t)), pop = f.t < 0.1f ? 1 + (0.1f - f.t) * 3 : 1;
+        int size = (int)(((touch::enabled() ? 30 : 20) + (f.value >= 30 ? 10 : 0)) * pop);
+        const char* txt = TextFormat("%d", f.value);
+        int w = ui::measure(txt, size);
+        for (int k = 0; k < 4; ++k)
+            DrawText(txt, (int)(s.x - w / 2.0f) + (k % 2 ? 2 : -2), (int)s.y + (k / 2 ? 2 : -2), size, Fade(BLACK, 0.8f * a));
+        DrawText(txt, (int)(s.x - w / 2.0f), (int)s.y, size, Fade(f.color, a));
     }
 
     // --- interaction prompts ---
@@ -327,6 +430,10 @@ void Game::drawHud() {
         prompt(cam, { chestPos.x, chestPos.y - 34 }, E, "open");
     if (r.isShop && overlay == Overlay::None && Vector2Distance(player.pos, MERCHANT_POS) < 56)
         prompt(cam, { MERCHANT_POS.x, MERCHANT_POS.y - (r.isGalin ? 136 : 66) }, E, r.isGalin ? "trade with Galin" : "trade with Marin");
+    if (r.isTreasure && !r.chestOpened && Vector2Distance(player.pos, ROOM_CENTER) < 48)
+        prompt(cam, { ROOM_CENTER.x, ROOM_CENTER.y - 54 }, E, "open the hoard");
+    if (r.isCasino && overlay == Overlay::None && Vector2Distance(player.pos, MERCHANT_POS) < 60)
+        prompt(cam, { MERCHANT_POS.x, MERCHANT_POS.y - 70 }, E, "gamble with Toshko");
     if (r.isStart && mode == Mode::Run && dialogue.empty() && Vector2Distance(player.pos, ORACLE_POS) < 48)
         prompt(cam, { ORACLE_POS.x, ORACLE_POS.y - 40 }, E, "talk");
     if (mode == Mode::Run && r.isBoss && r.cleared && Vector2Distance(player.pos, ROOM_CENTER) < 70)
@@ -356,6 +463,9 @@ void Game::drawHud() {
     drawAnim(SPR.coin, 0, { box.x + 14, box.y + box.height + 22 }, 1.3f);
     ui::text(TextFormat("%d", player.gold), box.x + 28, box.y + box.height + 12, 20, ui::ACCENT);
     if (mode == Mode::Run && dungeon.keyFound) drawKey({ box.x + 72, box.y + box.height + 22 }, 0.8f);
+    bool hoardWaits = false;
+    for (auto& row : dungeon.grid) for (auto& rm : row) hoardWaits |= rm.isTreasure && !rm.chestOpened;
+    if (mode == Mode::Run && dungeon.silverFound && hoardWaits) drawKey({ box.x + 90, box.y + box.height + 22 }, 0.8f, true);
     const char* where = mode == Mode::Run ? TextFormat("Floor %d   %s", floor, ui::clock(runTime))
                                           : TextFormat("Boss Rush %d/%d   %s", rushStage + 1, BOSS_COUNT, ui::clock(rushTime));
     ui::text(where, box.x + 100, box.y + box.height + 16, 10, ui::MUTED);
@@ -389,17 +499,32 @@ void Game::drawHud() {
     effect(player.shieldT, "Mug-Shield", { 240, 200, 130, 255 });
     effect(player.wobbleT, "Tipsy", { 230, 150, 150, 255 });
 
-    // --- hotbar (bottom centre): three powers and the special ---
-    float slot = 60, gap = 10, total = 4 * slot + 3 * gap + 14;
-    float hx = (sw - total) / 2, hy = sh - slot - 34;
-    for (int i = 0; i < SPELL_COUNT; ++i) {
+    // --- hotbar: the potion belt, three powers and the special (on a phone, wherever it was put) ---
+    float slot = 60, barX = sw / 2.0f, barY = sh - 64.0f;
+    if (touch::enabled()) { Vector2 at = touch::controlPos(TC_BAR); slot = touch::controlSize(TC_BAR); barX = at.x; barY = at.y; }
+    float gap = slot / 6, hx = barX - hotbarWidth(slot) / 2, hy = barY - slot / 2;
+    for (int i = 0; i < 2; ++i) {
         Rectangle s = { hx + i * (slot + gap), hy, slot, slot };
+        int key = i == 0 ? settings.keys.potionHp : settings.keys.potionMana;
+        DrawRectangleRec(s, { 16, 14, 24, 230 });
+        touch::zone(s, key);
+        const Anim& a = i == 0 ? SPR.flaskRed : SPR.flaskBlue;
+        drawAnim(a, animFrame(a, clock, 6, true), { s.x + slot / 2, s.y + slot / 2 }, slot / 26, false,
+            player.potions[i] ? WHITE : Color{ 80, 80, 90, 255 });
+        DrawRectangleLinesEx(s, 1, ui::EDGE);
+        ui::keycap(keyName(key), s.x + 3, s.y + 3);
+        ui::textRight(TextFormat("x%d", player.potions[i]), s.x + slot - 5, s.y + slot - 14, 10, player.potions[i] ? ui::TEXT : ui::MUTED);
+        ui::textCentered(i == 0 ? "Health" : "Mana", s.x + slot / 2, s.y + slot + 6, 10, ui::MUTED);
+    }
+    float sx0 = hx + 2 * slot + gap + 14;
+    for (int i = 0; i < SPELL_COUNT; ++i) {
+        Rectangle s = { sx0 + i * (slot + gap), hy, slot, slot };
         bool sel = i == player.selected;
         int cost = spellCost(i);
         bool castable = player.mana >= cost;
         DrawRectangleRec(s, { 16, 14, 24, 230 });
         touch::zone(s, KEY_ONE + i);
-        if (SPR.spellIcons.ok()) drawAnim(SPR.spellIcons, i, { s.x + slot / 2, s.y + slot / 2 - 4 }, 1.1f, false, castable ? WHITE : Color{ 90, 90, 100, 255 });
+        if (SPR.spellIcons.ok()) drawAnim(SPR.spellIcons, i, { s.x + slot / 2, s.y + slot / 2 - 4 }, 1.1f * slot / 60, false, castable ? WHITE : Color{ 90, 90, 100, 255 });
         else DrawRectangle((int)s.x + 8, (int)s.y + 8, (int)slot - 16, 24, SPELLS[i].color);
         DrawRectangleLinesEx(s, sel ? 3.0f : 1.0f, sel ? ui::ACCENT : ui::EDGE);
         ui::text(TextFormat("%d", i + 1), s.x + 5, s.y + 4, 10, ui::TEXT);
@@ -407,7 +532,7 @@ void Game::drawHud() {
         ui::textCentered(SPELLS[i].name, s.x + slot / 2, s.y + slot + 6, 10, sel ? ui::ACCENT : ui::MUTED);
     }
     {
-        Rectangle s = { hx + 3 * (slot + gap) + 14, hy, slot, slot };
+        Rectangle s = { sx0 + 3 * slot + 2 * gap + 14, hy, slot, slot };
         DrawRectangleRec(s, { 30, 20, 40, 235 });
         touch::zone(s, settings.keys.special);
         if (champTex[player.champion].id) {
@@ -428,6 +553,19 @@ void Game::drawHud() {
         ui::keycap(keyName(settings.keys.special), s.x + 3, s.y + 3);
         ui::textCentered(c.special, s.x + slot / 2, s.y + slot + 6, 10, ready ? ui::ACCENT : ui::MUTED);
     }
+
+    // a challenge room's clock, or a mini-boss's health
+    if (challengeT > 0) {
+        ui::textCentered(TextFormat("SURVIVE  %d", (int)ceilf(challengeT)), sw / 2.0f, 22, 40, { 255, 170, 80, 255 });
+        ui::bar({ sw / 2.0f - 160, 70, 320, 8 }, challengeT / CHALLENGE_TIME, { 255, 170, 80, 255 });
+    }
+    else if (!fight.active())
+        for (auto& e : enemies) {
+            if (!e.alive || !e.elite) continue;
+            ui::textCentered(e.name, sw / 2.0f, 22, 20, ui::ACCENT);
+            ui::bar({ sw / 2.0f - 200, 50, 400, 12 }, e.hp / e.maxHp, { 230, 180, 70, 255 });
+            break;
+        }
 
     drawMinimap();
     if (fight.active()) drawBossBar();
@@ -479,6 +617,9 @@ void Game::drawMinimap() {
             if (cur) c = { 255, 220, 120, 255 };
             else if (rm.isBoss) c = rm.visited ? Color{ 210, 90, 80, 255 } : Color{ 120, 54, 50, 255 };
             else if (rm.isShop) c = rm.isGalin ? Color{ 90, 150, 220, 255 } : Color{ 220, 180, 70, 255 };   // shown from the start
+            else if (rm.isTreasure) c = rm.chestOpened ? Color{ 110, 80, 140, 255 } : Color{ 190, 120, 255, 255 };
+            else if (rm.isCasino) c = { 70, 170, 90, 255 };
+            else if (rm.isChallenge && rm.visited) c = rm.cleared ? Color{ 150, 110, 70, 255 } : Color{ 230, 140, 60, 255 };
             else if (rm.visited) c = { 120, 124, 150, 255 };
             else c = { 56, 58, 78, 255 };
             int rx = ox + (x - minX) * (cell + gap), ry = oy + (y - minY) * (cell + gap);
@@ -593,7 +734,8 @@ void Game::drawGalin() {
     ui::text(TextFormat("%d", player.packs), panel.x + pw - 176, panel.y + 24, 20, ui::ACCENT);
     if (ui::button({ panel.x + pw - 46, panel.y + 12, 32, 32 }, "X", ui::Style::Normal, 20)) { play("ui"); overlay = Overlay::None; }
 
-    float gy = panel.y + artH + 18, colW = (pw - 72) / 2, rowH = 52, rightX = panel.x + 24 + colW + 24;
+    float gy = panel.y + artH + 18, colW = (pw - 72) / 2, rightX = panel.x + 24 + colW + 24;
+    float rowH = fminf(52.0f, (panel.y + ph - 50 - (gy + 30)) / WEAPON_COUNT - 8);
     auto rowAt = [&](float x, int i) { return Rectangle{ x, gy + 30 + i * (rowH + 8), colW, rowH }; };
     auto rowBack = [&](Rectangle row) {
         DrawRectangleRec(row, ui::PANEL_LIGHT);
@@ -606,9 +748,9 @@ void Game::drawGalin() {
         const WeaponDef& w = WEAPONS[i];
         Rectangle row = rowAt(panel.x + 24, i);
         rowBack(row);
-        drawWeapon(i, { row.x + 8, row.y + 4, 64, 44 });
-        ui::text(w.name, row.x + 80, row.y + 8, 20, ui::TEXT);
-        ui::text(TextFormat("+%d %s  %.2fs swing  %d reach  %d knockback", w.damage, w.anal ? "Anal damage" : "damage", w.swing, (int)w.reach, (int)w.knockback), row.x + 80, row.y + 32, 10, ui::MUTED);
+        drawWeapon(i, { row.x + 8, row.y + 4, 64, rowH - 8 });
+        ui::text(w.name, row.x + 80, row.y + 6, 20, ui::TEXT);
+        ui::text(TextFormat("+%d %s  %.2fs swing  %d reach  %d knockback", w.damage, w.anal ? "Anal damage" : "damage", w.swing, (int)w.reach, (int)w.knockback), row.x + 80, row.y + rowH - 16, 10, ui::MUTED);
         Rectangle btn = { row.x + colW - 96, row.y + 11, 84, rowH - 22 };
         if (i == player.weapon) ui::textCentered("In hand", btn.x + btn.width / 2, btn.y + 10, 10, ui::GOOD);
         else if (player.owns(i)) { if (ui::button(btn, "Equip", ui::Style::Good, 20)) buyWeapon(i); }
@@ -697,6 +839,8 @@ void Game::drawRunComplete() {
     }
     ui::text(TextFormat("Floor %d   Time %s   Kills %d   Gold %d   Level %d", floor, ui::clock(runTime), kills, player.gold, player.level),
         p.x + 28, y + 120, 20, ui::MUTED);
+    ui::text(TextFormat("Damage dealt %d   taken %d   Deaths %d   Prize spins %d   %s%s", stats.damageDealt, stats.damageTaken,
+        stats.deaths, stats.spins, DIFFICULTIES[difficulty].name, hardcore ? ", hardcore" : ""), p.x + 28, y + 150, 10, ui::MUTED);
     float bw = 240, by = p.y + ph - 76;
     if (ui::button({ p.x + pw / 2 - bw - 10, by, bw, 50 }, "Descend deeper", ui::Style::Primary)) { play("ui"); descend(); }
     if (ui::button({ p.x + pw / 2 + 10, by, bw, 50 }, "Main menu", ui::Style::Normal)) { play("ui"); toMenu(); }
@@ -720,6 +864,121 @@ void Game::drawRushOver() {
     float bw = 220, by = p.y + ph - 76;
     if (ui::button({ p.x + pw / 2 - bw - 10, by, bw, 50 }, "Try again", ui::Style::Primary)) { play("ui"); startBossRush(); }
     if (ui::button({ p.x + pw / 2 + 10, by, bw, 50 }, "Main menu", ui::Style::Normal)) { play("ui"); toMenu(); }
+}
+
+// ------------------------------------------------------------- the wheels
+void Game::drawWheel(Vector2 c, float R) {
+    int n = wheel.casino ? CASINO_SLOTS : PZ_COUNT;
+    float step = 360.0f / n;
+    DrawCircleV(c, R + 10, { 60, 40, 20, 255 });
+    DrawCircleV(c, R + 4, { 200, 160, 60, 255 });
+    for (int i = 0; i < n; ++i) {
+        float a0 = wheel.angle + i * step;
+        Color col = wheel.casino ? (i == 0 ? Color{ 40, 140, 60, 255 } : i % 2 ? Color{ 170, 30, 40, 255 } : Color{ 25, 22, 30, 255 })
+                                 : PRIZES[i].color;
+        if (wheel.done && i == wheel.result && fmodf(clock * 4, 1) < 0.5f) col = ColorBrightness(col, 0.45f);
+        DrawCircleSector(c, R, a0, a0 + step, 12, col);
+        DrawLineEx(c, { c.x + cosf(a0 * DEG2RAD) * R, c.y + sinf(a0 * DEG2RAD) * R }, 2, { 230, 200, 120, 255 });
+        float mid = (a0 + step / 2) * DEG2RAD;
+        const char* label = wheel.casino ? (i == 0 ? "T" : TextFormat("%d", i)) : PRIZES[i].label;
+        ui::textCentered(label, c.x + cosf(mid) * R * 0.66f, c.y + sinf(mid) * R * 0.66f - 5, 10, RAYWHITE);
+    }
+    DrawCircleV(c, R * 0.14f, { 200, 160, 60, 255 });
+    DrawCircleV(c, R * 0.08f, { 90, 60, 20, 255 });
+    DrawTriangle({ c.x, c.y - R + 16 }, { c.x + 13, c.y - R - 16 }, { c.x - 13, c.y - R - 16 }, RAYWHITE);   // the pointer
+}
+
+void Game::drawRoulette() {
+    int sw = GetScreenWidth(), sh = GetScreenHeight();
+    updateWheel(GetFrameTime());
+    ui::veil(0.72f);
+    ui::textCentered("LEVEL UP!", sw / 2.0f, 34, 40, ui::ACCENT);
+    ui::textCentered(TextFormat("Level %d  -  spin the wheel for a prize", player.level), sw / 2.0f, 82, 20, ui::TEXT);
+    float R = fminf(190.0f, sh * 0.3f);
+    Vector2 c = { sw / 2.0f - R * 0.9f, sh / 2.0f + 40 };
+    drawWheel(c, R);
+    float x = c.x + R + 60, y = c.y - R * 0.6f;
+    for (int i = 0; i < PZ_COUNT; ++i) {
+        DrawRectangle((int)x, (int)(y + i * 24), 14, 14, PRIZES[i].color);
+        ui::text(PRIZES[i].won, x + 22, y + i * 24, 10, ui::TEXT);
+    }
+    float by = y + PZ_COUNT * 24 + 16;
+    if (!wheel.spinning && !wheel.done) {
+        if (ui::button({ x, by, 200, 52 }, "SPIN", ui::Style::Primary) || in::pressed(KEY_SPACE)) spinWheel();
+    }
+    else if (wheel.done) {
+        ui::text(wheel.message.c_str(), x, by, 20, wheel.result == PZ_TOSHKO ? ui::BAD : ui::GOOD);
+        if (ui::button({ x, by + 34, 200, 52 }, "Collect", ui::Style::Good) || in::pressed(KEY_SPACE)) {
+            play("ui");
+            if (--player.spins > 0) wheel = Wheel{};
+            else overlay = Overlay::None;
+        }
+    }
+}
+
+void Game::drawCasino() {
+    int sw = GetScreenWidth(), sh = GetScreenHeight();
+    updateWheel(GetFrameTime());
+    ui::veil(0.72f);
+    float pw = fminf(980.0f, sw - 40.0f), ph = fminf(600.0f, sh - 40.0f);
+    Rectangle p = { (sw - pw) / 2, (sh - ph) / 2, pw, ph };
+    ui::titledPanel(p, "Toshko's Roulette");
+    drawAnim(SPR.coin, animFrame(SPR.coin, clock, 8, true), { p.x + pw - 170, p.y + 34 }, 2.0f);
+    ui::text(TextFormat("%d", player.gold), p.x + pw - 150, p.y + 24, 20, ui::ACCENT);
+    if (!wheel.spinning && ui::button({ p.x + pw - 50, p.y + 16, 32, 32 }, "X")) { play("ui"); overlay = Overlay::None; return; }
+
+    float R = fminf(200.0f, ph * 0.36f);
+    Vector2 c = { p.x + 40 + R, p.y + 90 + R };
+    drawWheel(c, R);
+    const Anim& ta = SPR.enemy[EK_TOSHKO].idle;
+    if (ta.ok()) drawAnim(ta, animFrame(ta, clock, 6, true), { c.x + R + 30, c.y + R - 20 }, 1.6f);
+
+    float x = c.x + R + 80, y = p.y + 84, colW = p.x + pw - 30 - x;
+    ui::text("Your bet", x, y, 20, ui::ACCENT);
+    float bw = (colW - 3 * 10) / 4;
+    for (int i = 0; i < 4; ++i)
+        if (ui::button({ x + i * (bw + 10), y + 30, bw, 44 }, TextFormat("%d g", CASINO_BETS[i]),
+            wheel.bet == CASINO_BETS[i] ? ui::Style::Good : ui::Style::Normal, 20, !wheel.spinning)) { wheel.bet = CASINO_BETS[i]; play("ui"); }
+    y += 100;
+    ui::text("On", x, y, 20, ui::ACCENT);
+    const char* picks[3] = { "Red  x2", "Black  x2", "Toshko  x14" };
+    float pbw = (colW - 2 * 10) / 3;
+    for (int i = 0; i < 3; ++i)
+        if (ui::button({ x + i * (pbw + 10), y + 30, pbw, 44 }, picks[i], wheel.pick == i ? ui::Style::Good : ui::Style::Normal, 20, !wheel.spinning)) {
+            wheel.pick = i; play("ui");
+        }
+    y += 100;
+    if (ui::button({ x, y, colW, 56 }, wheel.spinning ? "..." : TextFormat("Spin for %d gold", wheel.bet), ui::Style::Primary, 20,
+        !wheel.spinning && player.gold >= wheel.bet)) spinWheel();
+    if (!wheel.message.empty()) ui::textWrapped(wheel.message.c_str(), x, y + 74, colW, 20, wheel.done && wheel.message.find("win") != std::string::npos ? ui::GOOD : ui::MUTED);
+    ui::textWrapped("\"The wheel is fair. The croupier is not.\"  - Toshko", x, p.y + ph - 50, colW, 10, ui::MUTED);
+}
+
+void Game::drawSummary() {
+    int sw = GetScreenWidth(), sh = GetScreenHeight();
+    ui::veil(0.78f);
+    float pw = fminf(720.0f, sw - 60.0f), ph = fminf(500.0f, sh - 40.0f);
+    Rectangle p = { (sw - pw) / 2, (sh - ph) / 2, pw, ph };
+    ui::titledPanel(p, summaryWon ? "Run complete" : "Run over");
+    float x = p.x + 30, y = p.y + 80;
+    drawName(player.champion, x, y, 30, ui::ACCENT);
+    ui::text(TextFormat("%s%s", DIFFICULTIES[difficulty].name, hardcore ? "  -  hardcore" : ""), x, y + 40, 10, ui::MUTED);
+    if (!summaryWon && stats.killer[0]) ui::text(TextFormat("Killed by %s on floor %d", stats.killer, floor), x, y + 58, 20, ui::BAD);
+    const char* rows[][2] = {
+        { "Floor reached", TextFormat("%d", floor) }, { "Time", ui::clock(runTime) }, { "Level", TextFormat("%d", player.level) },
+        { "Kills", TextFormat("%d", kills) }, { "Gold earned", TextFormat("%d", stats.goldEarned) }, { "Gold lost", TextFormat("%d", stats.goldLost) },
+        { "Damage dealt", TextFormat("%d", stats.damageDealt) }, { "Damage taken", TextFormat("%d", stats.damageTaken) },
+        { "Deaths", TextFormat("%d", stats.deaths) }, { "Prize spins", TextFormat("%d", stats.spins) },
+    };
+    float ry = y + 100;
+    for (int i = 0; i < 10; ++i) {
+        float cx = x + (i % 2) * (pw / 2 - 10), cy = ry + (i / 2) * 30;
+        ui::text(rows[i][0], cx, cy, 20, ui::MUTED);
+        ui::textRight(rows[i][1], cx + pw / 2 - 60, cy, 20, ui::TEXT);
+    }
+    float bw = 220, by = p.y + ph - 74;
+    if (ui::button({ p.x + pw / 2 - bw - 10, by, bw, 50 }, "New Run", ui::Style::Primary)) { play("ui"); toMenu(); screen = Screen::Setup; return; }
+    if (ui::button({ p.x + pw / 2 + 10, by, bw, 50 }, "Main menu")) { play("ui"); toMenu(); }
 }
 
 // ------------------------------------------------------------ Momiche's scare

@@ -7,6 +7,7 @@
 #include "Render.h"
 #include <algorithm>
 #include <cmath>
+#include <cstdio>
 
 static const char* ORACLE_LINES[] = {
     "So. The Veil spat you out at last.",
@@ -18,9 +19,13 @@ static constexpr int ORACLE_COUNT = (int)(sizeof ORACLE_LINES / sizeof ORACLE_LI
 Camera2D Game::camera() const {
     int sw = GetScreenWidth(), sh = GetScreenHeight();
     Camera2D cam{};
-    cam.target = ROOM_CENTER;
     cam.offset = { sw / 2.0f, sh / 2.0f };
-    cam.zoom = fminf(sw / (ROOM_PX_W * 1.12f), sh / (ROOM_PX_H * 1.18f));   // the whole room, centred
+    // Closer than the whole room, so the view travels with the player.
+    cam.zoom = fminf(sw / (ROOM_PX_W * 0.72f), sh / (ROOM_PX_H * 0.78f));
+    // Keep the view inside the room (with a little margin); centre an axis that already fits.
+    float halfW = sw / 2.0f / cam.zoom, halfH = sh / 2.0f / cam.zoom, pad = TILE * 0.5f;
+    cam.target.x = halfW * 2 >= ROOM_PX_W + 2 * pad ? ROOM_CENTER.x : Clamp(camPos.x, halfW - pad, ROOM_PX_W - halfW + pad);
+    cam.target.y = halfH * 2 >= ROOM_PX_H + 2 * pad ? ROOM_CENTER.y : Clamp(camPos.y, halfH - pad, ROOM_PX_H - halfH + pad);
     return cam;
 }
 
@@ -34,6 +39,12 @@ Vector2 Game::mouseWorld() const {
     Vector2 dir = touch::stickDir();
     return Vector2Add(player.pos, Vector2Scale(dir.x || dir.y ? dir : player.facing, 100));
 }
+void Game::updateCamera(float dt) {
+    // Snap on room changes and respawns; otherwise glide after the player.
+    if (Vector2Distance(camPos, player.pos) > ROOM_PX_H * 0.6f) camPos = player.pos;
+    else camPos = Vector2Lerp(camPos, player.pos, fminf(1.0f, dt * 6.0f));
+}
+
 
 float Game::hurtMul() const { return player.has(VP_MINT) ? 0.85f : 1.0f; }
 
@@ -42,7 +53,7 @@ int Game::spellCost(int spell) const {
 }
 
 int Game::bladeDamage() const {
-    return 10 + player.level * 2 + WEAPONS[player.weapon].damage + player.upgrades[player.weapon][UP_SHARPEN] * 3
+    return 10 + player.level * 2 + player.bonusDamage + WEAPONS[player.weapon].damage + player.upgrades[player.weapon][UP_SHARPEN] * 3
         + (player.has(VP_MELON) ? 4 : 0) + champ().bladeBonus;
 }
 
@@ -79,7 +90,8 @@ void Game::updatePlay(float dt) {
         *timer = fmaxf(0, *timer - dt);
     player.meleeAnim = fmaxf(0, player.meleeAnim - dt * 4);
     scareT = fmaxf(0, scareT - dt);
-    player.mana = fminf(player.maxMana, player.mana + 9.0f * dt);
+    player.mana = fminf(player.maxMana, player.mana + 9.0f * (player.has(VP_GRAPE) ? 1.5f : 1.0f) * dt);
+    if (mode == Mode::Run && !inFight && (autosaveT += dt) > 20) autosave();     // every so often in a safe room
     if (c.kind == Special::Blink) player.charge = fminf(DUST_MAX, player.charge + DUST_REGEN * dt);
     for (int v = 0; v < VP_COUNT; ++v)
         if (player.has((Vape)v) && frand(0, 1) < dt * 0.5f)   // the odd lazy puff drifting up off the player
@@ -90,6 +102,8 @@ void Game::updatePlay(float dt) {
     // --- hotbar ---
     for (int i = 0; i < SPELL_COUNT; ++i)
         if (in::pressed(KEY_ONE + i)) { player.selected = i; play("ui"); }
+    if (!talking && in::pressed(K.potionHp)) usePotion(0);
+    if (!talking && in::pressed(K.potionMana)) usePotion(1);
 
     // --- movement ---
     Vector2 mv{ 0, 0 };
@@ -118,6 +132,10 @@ void Game::updatePlay(float dt) {
     bool spikesUp = fmodf(trapClock, 2.4f) < 1.2f;
     if (spikesUp && !airborne && player.roll <= 0 && player.invuln <= 0 && onSpikes(room, player.pos))
         hurtPlayer(8, 0.6f);
+    if (!airborne && player.roll <= 0 && player.invuln <= 0 && inFlames(room, player.pos, trapClock)) {
+        hurtPlayer(12, 0.7f);
+        burst(parts, player.pos, 8, 70, 0.4f, { 255, 140, 40, 255 });
+    }
 
     // --- the boss key (lies in the middle once its room is safe) ---
     if (room.hasKey && room.cleared && !dungeon.keyFound && Vector2Distance(player.pos, ROOM_CENTER) < 26) {
@@ -126,10 +144,49 @@ void Game::updatePlay(float dt) {
         burst(parts, ROOM_CENTER, 16, 100, 0.7f, { 245, 215, 120, 255 });
     }
 
+    // --- the silver key (beside the middle, once its room is safe) ---
+    if (room.hasSilverKey && room.cleared && !dungeon.silverFound && Vector2Distance(player.pos, SILVER_POS) < 26) {
+        dungeon.silverFound = true; play("levelup");
+        showBanner("Silver key found", "The treasure room is open", 2.2f);
+        burst(parts, SILVER_POS, 16, 100, 0.7f, { 210, 220, 240, 255 });
+    }
+
+    // --- the treasure room's hoard ---
+    if (room.isTreasure && !room.chestOpened && !talking && Vector2Distance(player.pos, ROOM_CENTER) < 48 && in::pressed(K.interact)) {
+        room.chestOpened = true; play("lid"); play("victory"); shake = fmaxf(shake, 0.15f);
+        int gold = 60 + 10 * floor;
+        for (int k = 0; k < gold; ++k) coins.push_back({ ROOM_CENTER, { frand(-140, 140), frand(-200, -40) }, 0 });
+        for (int k = 0; k < 2; ++k) coins.push_back({ ROOM_CENTER, { frand(-50, 50), -170 }, 0, true });
+        player.hp = player.maxHp; player.mana = player.maxMana;
+        std::string got = TextFormat("+%d gold, 2 packs, full health", gold);
+        int missing[VP_COUNT], n = 0;                 // and a vape Marin sells, if you're missing one
+        for (int v = 0; v < VP_COUNT; ++v) if (!player.has((Vape)v)) missing[n++] = v;
+        if (n > 0) {
+            int v = missing[GetRandomValue(0, n - 1)];
+            player.vapes |= 1u << v;
+            for (const ShopItem& it : SHOP_ITEMS) if (it.vape == v) got += std::string(", and ") + it.name;
+        }
+        showBanner("Treasure!", got, 3.2f);
+        for (int k = 0; k < 30; ++k) {
+            float life = frand(0.8f, 1.3f);
+            parts.push_back({ { ROOM_CENTER.x, ROOM_CENTER.y - 10 }, Vector2Scale(fromAngle(-PI / 2 + frand(-1.0f, 1.0f)), frand(120, 300)), life, life,
+                frand(3, 6), k % 3 ? Color{ 255, 222, 110, 255 } : Color{ 255, 255, 235, 255 }, 320, false, true });
+        }
+    }
+
+    // --- Toshko's roulette table ---
+    if (room.isCasino && !talking && Vector2Distance(player.pos, MERCHANT_POS) < 60 && in::pressed(K.interact)) {
+        int bet = wheel.bet, pick = wheel.pick;    // remember the last stake and colour
+        wheel = Wheel{}; wheel.casino = true; wheel.bet = bet; wheel.pick = pick;
+        overlay = Overlay::Casino; play("ui");
+    }
+
     // --- chest (only once the room is safe) ---
     Vector2 chestPos = { room.chestTx * (float)TILE + 16, room.chestTy * (float)TILE + 16 };
     bool nearChest = room.hasChest && !room.chestOpened && room.cleared && Vector2Distance(player.pos, chestPos) < 40;
-    if (nearChest && !talking && in::pressed(K.interact)) {
+    if (nearChest && !talking && in::pressed(K.interact) && !testMode && mode == Mode::Run && GetRandomValue(1, 100) <= MIMIC_PERCENT)
+        openMimic();
+    else if (nearChest && !talking && in::pressed(K.interact)) {
         room.chestOpened = true; play("rattle"); chestOpenT = 0;     // it shakes, then slamChest throws it open
         chestMana = GetRandomValue(0, 1) == 0;
         chestPack = GetRandomValue(1, 100) <= CHEST_PACK_PERCENT;
@@ -196,9 +253,10 @@ void Game::updatePlay(float dt) {
     spawned.clear();
 
     updateLoot(dt);
+    updateChallenge(dt);
 
     // --- room cleared? open the doors ---
-    if (inFight && enemies.empty() && finaleT <= 0) {
+    if (inFight && enemies.empty() && finaleT <= 0 && challengeT <= 0) {
         room.cleared = true; inFight = false;
         if (room.isBoss) bossDefeated();
         else { showBanner("Room cleared", "", 1.4f); play("quest"); }
@@ -227,15 +285,134 @@ void Game::updatePlay(float dt) {
     }
 
     // --- falling ---
-    if (player.hp <= 0) {
-        play("death");
-        if (mode == Mode::BossRush) { rushWon = false; overlay = Overlay::RushOver; return; }
-        player.hp = player.maxHp; player.mana = player.maxMana;
-        dungeon.cx = DUNGEON_G / 2; dungeon.cy = DUNGEON_G / 2;
-        player.pos = ROOM_CENTER;
-        player.invuln = 1.5f;
-        enterRoom();
-        showBanner("You fall...", "back to the entrance", 2.2f);
+    if (player.hp <= 0) playerDied();
+}
+
+void Game::playerDied() {
+    play("death");
+    hapticBuzz(300);
+    if (mode == Mode::BossRush) { rushWon = false; overlay = Overlay::RushOver; return; }
+    stats.deaths++;
+    if (hardcore) {                 // one life: the run is over, and the save goes with it
+        profile.bestHardcore = std::max(profile.bestHardcore, floor);
+        saveProfile();
+        save::deleteRun(); hasSave = false;
+        summaryWon = false; overlay = Overlay::Summary;
+        return;
+    }
+    // Toshko is never far: he goes through your pockets while you're down
+    int lost = player.gold < 10 ? player.gold : std::max(10, player.gold * 3 / 10);
+    player.gold -= lost; stats.goldLost += lost;
+    player.hp = player.maxHp; player.mana = player.maxMana;
+    dungeon.cx = DUNGEON_G / 2; dungeon.cy = DUNGEON_G / 2;
+    player.pos = ROOM_CENTER;
+    player.invuln = 1.5f;
+    enterRoom();
+    showBanner("You fall...", lost > 0 ? TextFormat("Toshko picked your pockets: -%d gold", lost) : "back to the entrance", 2.6f);
+    autosave();
+}
+
+// A challenge room: waves keep coming until the clock runs out, then the room is yours.
+void Game::updateChallenge(float dt) {
+    if (challengeT <= 0) return;
+    Room& room = dungeon.cur();
+    challengeT -= dt;
+    if (enemies.empty()) challengeWaveT = fminf(challengeWaveT, 1.0f);   // wave beaten early: the next comes sooner
+    if ((challengeWaveT -= dt) <= 0 && challengeT > 3) {
+        static const int pool[] = { MT_MISTLING, MT_HOUND, MT_WISP, MT_SOLDIER, MT_BLOOD, MT_ORC, MT_DEMON };
+        int kinds = floor >= 2 ? 7 : 6;
+        float tough = 1.0f + 0.15f * (floor - 1);
+        for (int i = 0, n = 3 + floor / 2; i < n; ++i) spawnMonster(pool[GetRandomValue(0, kinds - 1)], tough, 140);
+        challengeWaveT = CHALLENGE_WAVE;
+        play("roar");
+    }
+    if (challengeT > 0) return;
+    challengeT = 0;
+    for (auto& e : enemies) if (e.alive) burst(parts, e.pos, 10, 100, 0.5f, e.color);
+    enemies.clear();
+    room.cleared = true; inFight = false;
+    int gold = 30 + 6 * floor;
+    for (int k = 0; k < gold; ++k) coins.push_back({ player.pos, { frand(-120, 120), frand(-180, -40) }, 0 });
+    coins.push_back({ player.pos, { 0, -170 }, 0, true });
+    showBanner("Challenge complete", TextFormat("+%d gold and a cigarette pack", gold), 2.4f);
+    play("victory");
+}
+
+void Game::usePotion(int which) {
+    if (player.potions[which] <= 0) { showBanner(which ? "No mana potions" : "No health potions", "Marin sells them", 1.2f); play("hurt"); return; }
+    if (which == 0 ? player.hp >= player.maxHp : player.mana >= player.maxMana) return;
+    player.potions[which]--;
+    if (which == 0) player.hp = fminf(player.maxHp, player.hp + 35);
+    else player.mana = fminf(player.maxMana, player.mana + 50);
+    popups.push_back({ which ? &SPR.flaskBlue : &SPR.flaskRed, { player.pos.x, player.pos.y - 30 }, 0 });
+    play("heal");
+}
+
+// The chest bites back: the room locks again until the Mimic is dead.
+void Game::openMimic() {
+    Room& room = dungeon.cur();
+    Vector2 at = { room.chestTx * (float)TILE + 16, room.chestTy * (float)TILE + 16 };
+    room.chestOpened = true; room.mimic = true; room.cleared = false; inFight = true;
+    Enemy& e = spawnEnemy("Mimic", 90 * (1.0f + 0.15f * (floor - 1)), 95, 14, 40, 13, { 150, 100, 50, 255 }, "Fire", EK_MIMIC);
+    e.pos = at;
+    showBanner("It's a Mimic!", "The chest bites back", 2.0f);
+    play("roar"); shake = fmaxf(shake, 0.3f);
+    hapticBuzz(120);
+}
+
+// ---------------------------------------------------------------- the wheel
+void Game::spinWheel() {
+    if (wheel.spinning) return;
+    if (wheel.casino) {
+        if (player.gold < wheel.bet) { wheel.message = "Not enough gold"; play("hurt"); return; }
+        player.gold -= wheel.bet;
+    }
+    wheel.spinning = true; wheel.done = false; wheel.result = -1; wheel.message.clear();
+    wheel.speed = frand(560, 900);
+    play("rattle");
+}
+
+void Game::updateWheel(float dt) {
+    if (!wheel.spinning) return;
+    wheel.angle = fmodf(wheel.angle + wheel.speed * dt, 360);
+    wheel.speed = fmaxf(0, wheel.speed - (90 + wheel.speed * 0.55f) * dt);
+    if (wheel.speed > 0) return;
+    wheel.spinning = false;
+    int n = wheel.casino ? CASINO_SLOTS : PZ_COUNT;
+    float under = fmodf(270.0f - wheel.angle + 720.0f, 360.0f);     // the pointer sits at the top
+    wheel.result = std::min(n - 1, (int)(under / (360.0f / n)));
+    wheelLanded();
+}
+
+void Game::wheelLanded() {
+    wheel.done = true;
+    if (!wheel.casino) {            // the level-up prize
+        stats.spins++;
+        switch (wheel.result) {
+        case PZ_HEALTH:  player.maxHp += 25; player.hp = fminf(player.maxHp, player.hp + 25); break;
+        case PZ_MANA:    player.maxMana += 20; player.mana = fminf(player.maxMana, player.mana + 20); break;
+        case PZ_DAMAGE:  player.bonusDamage += 5; break;
+        case PZ_SPEED:   player.speedBonus += 0.08f; break;
+        case PZ_GOLD:    player.gold += 40; stats.goldEarned += 40; break;
+        case PZ_PACK:    player.packs++; break;
+        case PZ_JACKPOT: player.gold += 120; stats.goldEarned += 120; break;
+        default: break;             // Toshko took it
+        }
+        wheel.message = PRIZES[wheel.result].won;
+        play(wheel.result == PZ_TOSHKO ? "hurt" : wheel.result == PZ_JACKPOT ? "victory" : "levelup");
+        return;
+    }
+    int colour = wheel.result == 0 ? 2 : wheel.result % 2 ? 0 : 1;      // 0 red, 1 black, 2 Toshko's zero
+    if (colour == wheel.pick) {
+        int win = wheel.bet * (colour == 2 ? 14 : 2);
+        player.gold += win; stats.goldEarned += win - wheel.bet;
+        wheel.message = TextFormat("%s! You win %d gold", colour == 2 ? "TOSHKO'S ZERO" : colour == 0 ? "Red" : "Black", win);
+        play(colour == 2 ? "victory" : "quest");
+    }
+    else {
+        stats.goldLost += wheel.bet;
+        wheel.message = colour == 2 ? "Toshko's zero. The house wins." : "No luck. Toshko pockets your bet.";
+        play("hurt");
     }
 }
 
@@ -266,7 +443,7 @@ void Game::movePlayer(float dt, Vector2 mv) {
         delta = Vector2Scale(player.rollDir, ROLL_SPEED * dt);
     }
     else {
-        float speed = (in::down(settings.keys.run) ? RUN : WALK) * c.speedMul
+        float speed = (in::down(settings.keys.run) ? RUN : WALK) * c.speedMul * (1 + player.speedBonus)
             * (player.has(VP_MANGO) ? 1.1f : 1.0f) * (player.jumpT > 0 ? 1.5f : 1.0f);
         delta = Vector2Scale(mv, speed * dt);
     }
@@ -449,6 +626,7 @@ void Game::hitEnemy(Enemy& e, int damage, Color fx) {
         if (boss && before > fight.gate(e)) e.hp = fmaxf(e.hp, fight.gate(e));    // every stage gets its turn
     }
     e.hitFlash = 0.12f;
+    stats.damageDealt += damage;
     floaters.push_back({ { e.pos.x + frand(-6, 6), e.pos.y - e.r - 8 }, 0, damage, fx });
     burst(parts, e.pos, 5, 60, 0.4f, fx);
     if (champ().kind == Special::CoinBarrage)
@@ -462,6 +640,17 @@ void Game::hurtPlayer(float damage, float invuln) {
     player.hitFlash = 0.15f; player.invuln = invuln;
     floaters.push_back({ { player.pos.x, player.pos.y - 26 }, 0, (int)ceilf(dealt), { 255, 110, 110, 255 } });
     play("hurt");
+    hapticBuzz(dealt >= 15 ? 70 : 35);
+    // for the summary: who did it (the boss, the nearest monster, or the room itself)
+    stats.damageTaken += (int)ceilf(dealt);
+    const char* by = "a trap";
+    if (fight.active()) by = fight.def->name;
+    else {
+        float best = 1e9f;
+        for (auto& e : enemies)
+            if (e.alive && Vector2Distance(e.pos, player.pos) < best) { best = Vector2Distance(e.pos, player.pos); by = e.name; }
+    }
+    snprintf(stats.killer, sizeof stats.killer, "%s", by);
 }
 
 void Game::updateShots(float dt) {
@@ -574,6 +763,26 @@ void Game::spellEnded(const Projectile& p, const Enemy* hit) {
 }
 
 // ------------------------------------------------------------------- enemies
+// Who shoots at you, and how long between shots.
+static float shotGap(const Enemy& e) {
+    if (e.bossForm >= 0) return 0;
+    if (e.kind == EK_SOLDIER) return 2.4f;
+    if (e.kind == EK_SKULL) return 2.8f;
+    return e.kind == EK_BLOOD && e.scale >= 1 ? 3.2f : 0;     // its halves have only their claws
+}
+
+void Game::enemyShoot(const Enemy& e) {
+    Projectile p;
+    p.pos = { e.pos.x, e.pos.y - e.r * 0.6f };
+    bool arrow = e.kind == EK_SOLDIER;
+    p.vel = Vector2Scale(Vector2Normalize(Vector2Subtract(player.pos, p.pos)), arrow ? ARROW_SPEED : ORB_SHOT_SPEED);
+    p.r = arrow ? 4.0f : 5.0f; p.life = 3; p.damage = e.dmg;
+    p.kind = arrow ? ShotKind::Arrow : ShotKind::Orb;
+    p.color = e.color;
+    enemyShots.push_back(p);
+    play("throw");
+}
+
 // A gentle push away from nearby walls, so monsters round corners instead of
 // scraping along them and snagging.
 static Vector2 wallAvoid(const Room& room, Vector2 pos, float r, bool doorsOpen) {
@@ -628,7 +837,7 @@ void Game::updateEnemies(float dt, float slow) {
         if (e.bossForm < 0 && scared) {
             if (fabsf(to.x) > 2) e.flip = to.x > 0;            // facing away, running
             e.moving = true;
-            e.lunge = 0; e.atkAnim = 0;
+            e.lunge = 0; e.atkAnim = 0; e.swinging = false;
             Vector2 away = d > 0.01f ? Vector2Scale(to, -1.0f / d) : Vector2{ 1, 0 };
             e.pos = moveInRoom(e.pos, Vector2Scale(away, e.speed * FLEE_SPEED * edt), e.r, room, doorsOpen);
         }
@@ -654,7 +863,11 @@ void Game::updateEnemies(float dt, float slow) {
             e.moving = d > 1 && e.atkAnim <= 0 && Vector2LengthSqr(e.knock) < 400;     // plant feet while swinging or reeling
             e.lunge = fmaxf(0, e.lunge - edt);
             e.lungeCd = fmaxf(0, e.lungeCd - edt);
-            if (e.moving) {
+            if (e.kind == EK_SOLDIER && d < SOLDIER_RANGE && d > 0.01f && lineClear(room, e.pos, player.pos, e.r + 4)) {
+                e.moving = e.moving && d < SOLDIER_CLOSE;       // in bowshot: he stands, backing off if you crowd him
+                if (e.moving) e.pos = moveInRoom(e.pos, Vector2Scale(to, -e.speed * edt / d), e.r, room, doorsOpen);
+            }
+            else if (e.moving) {
                 bool sees = lineClear(room, e.pos, player.pos, e.r + 4);
                 Vector2 goal;
                 if (!sees) goal = nextWaypoint(room, flow, e.pos, e.r);   // route around walls
@@ -665,6 +878,9 @@ void Game::updateEnemies(float dt, float slow) {
                     goal = lineClear(room, e.pos, flank, e.r) ? flank : player.pos;
                 }
                 else goal = player.pos;
+                // just found jammed: step back to the middle of its tile first, off whatever corner holds it
+                Vector2 tileMid = { floorf(e.pos.x / TILE) * TILE + TILE / 2.0f, floorf(e.pos.y / TILE) * TILE + TILE / 2.0f };
+                if (e.ghostT > 0.8f && Vector2Distance(tileMid, e.pos) > 2) goal = tileMid;
                 Vector2 dir = Vector2Normalize(Vector2Subtract(goal, e.pos));
                 if (e.kind == EK_SKULL) {
                     // wisps weave side to side, harder to hit with spells
@@ -673,12 +889,21 @@ void Game::updateEnemies(float dt, float slow) {
                 }
                 // only out in the open: a push off the path pins a wide body on a corner in a tight lane
                 if (sees) dir = Vector2Normalize(Vector2Add(dir, Vector2Scale(wallAvoid(room, e.pos, e.r, doorsOpen), 1.2f)));
-                // hounds that see you crouch and lunge
-                if (e.kind == EK_SKELETON2 && sees && d < 130 && d > 40 && e.lungeCd <= 0) { e.lunge = 0.35f; e.lungeCd = 2.5f; }
+                // hounds that see you crouch and lunge; demons leap from further off
+                bool leaps = e.kind == EK_SKELETON2 || e.kind == EK_DEMON;
+                if (leaps && sees && d < (e.kind == EK_DEMON ? 190 : 130) && d > 40 && e.lungeCd <= 0) { e.lunge = 0.35f; e.lungeCd = 2.5f; }
+                if (e.kind == EK_DEMON && e.lunge > 0 && frand(0, 1) < edt * 70)     // a streak of embers behind it
+                    parts.push_back({ { e.pos.x + frand(-6, 6), e.pos.y - frand(0, 16) }, { frand(-12, 12), frand(-24, 6) }, 0.35f, 0.35f, frand(1.5f, 3.2f), { 200, 40, 50, 255 }, 0, true });
                 float spd = e.speed * (e.lunge > 0 ? 2.6f : 1.0f);
                 e.pos = moveInRoom(e.pos, Vector2Scale(dir, spd * edt), e.r, room, doorsOpen);
             }
         }
+
+        // An enemy that stops getting closer is jammed behind its friends in a narrow gap:
+        // let it slip through them for a moment.
+        if (d < e.bestDist - 8) { e.bestDist = d; e.stuckT = 0; }
+        else if ((e.stuckT += edt) > 1.5f) { e.ghostT = 1.2f; e.stuckT = 0; e.bestDist = d; }
+        e.ghostT = fmaxf(0, e.ghostT - edt);
 
         // solid bodies: push out of the player and out of each other (nothing shifts the Bad Plasmodium)
         bool rooted = e.bossForm == 0 && fight.active() && fight.def->kind == BossKind::Rooted;
@@ -691,7 +916,7 @@ void Game::updateEnemies(float dt, float slow) {
         }
         for (auto& o : enemies) {
             if (rooted) break;
-            if (&o == &e || !o.alive) continue;
+            if (&o == &e || !o.alive || e.ghostT > 0 || o.ghostT > 0) continue;
             Vector2 sep = Vector2Subtract(e.pos, o.pos);
             float sd = Vector2Length(sep), need = e.r + o.r;
             if (sd >= need) continue;
@@ -699,12 +924,40 @@ void Game::updateEnemies(float dt, float slow) {
             e.pos = moveInRoom(e.pos, Vector2Scale(n, (need - sd) * 0.5f), e.r, room, doorsOpen);
         }
 
+        // A swing takes a moment: what it does comes partway through the animation
+        if (e.swinging && e.atkAnim <= (e.kind == EK_SOLDIER ? 2 : 3) / attackFps(e.kind)) {
+            e.swinging = false;
+            if (e.kind != EK_ORC) enemyShoot(e);
+            else if (d < e.r + PLAYER_R + ORC_REACH && !untouchable) {
+                hurtPlayer((float)e.dmg, 0.4f);
+                shake = fmaxf(shake, 0.2f);
+                play("bonk");
+                untouchable = true;
+            }
+        }
+        if (shotGap(e) > 0 && !scared && (e.shootCd -= edt) <= 0 && d < 340 && lineClear(room, e.pos, player.pos, 4)) {
+            e.shootCd = shotGap(e);
+            if (e.kind == EK_SKULL) enemyShoot(e);     // a wisp has no wind-up to show
+            else {
+                e.swinging = true;
+                e.atkAnim = SPR.enemy[e.kind].attack.length(attackFps(e.kind));
+            }
+        }
+        if (e.kind == EK_ORC) {                    // it winds up, so you can step out of the way
+            if (!e.swinging && e.atkCd <= 0 && d < e.r + PLAYER_R + 5 && !scared) {
+                e.swinging = true; e.atkCd = 1.6f;
+                e.atkAnim = SPR.enemy[e.kind].attack.length(attackFps(e.kind));
+                play("swing");
+            }
+            continue;
+        }
+
         // Toshko doesn't hit you: he snatches up to 50 gold and runs
         if (e.kind == EK_TOSHKO) {
             if (e.stolen == 0 && d < e.r + PLAYER_R + 4 && !scared && player.gold > 0) {
                 e.stolen = std::min(50, player.gold);
                 player.gold -= e.stolen;
-                e.atkAnim = SPR.enemy[e.kind].attack.length(16);
+                e.atkAnim = SPR.enemy[e.kind].attack.length(attackFps(e.kind));
                 showBanner(TextFormat("Toshko snatched %d gold!", e.stolen), "Kill him before he gets away", 2.0f);
                 play("coin");
             }
@@ -715,7 +968,7 @@ void Game::updateEnemies(float dt, float slow) {
         if (d < e.r + PLAYER_R + 4 && e.atkCd <= 0 && !untouchable && !scared) {
             hurtPlayer((float)e.dmg, 0.4f);
             e.atkCd = 1.0f;
-            if (e.kind != EK_SKULL && e.bossForm < 0) e.atkAnim = SPR.enemy[e.kind].attack.length(16);
+            if (e.kind != EK_SKULL && e.bossForm < 0) e.atkAnim = SPR.enemy[e.kind].attack.length(attackFps(e.kind));
             untouchable = true;
         }
     }
@@ -754,13 +1007,25 @@ void Game::killEnemy(Enemy& e) {
     corpses.push_back(corpse);
     int n = e.bossForm == 0 ? 12 + 2 * floor : e.bossForm > 0 ? 1 : 1 + GetRandomValue(0, 2);
     n += champ().extraCoins;
+    if (e.elite) n += 15;
+    if (e.kind == EK_MIMIC) n += 10;
     if (e.stolen > 0) {                    // caught Toshko: every snatched coin drops back
         n += e.stolen;
         showBanner("Your gold is back", "", 1.6f);
     }
     for (int k = 0; k < n; ++k) coins.push_back({ e.pos, { frand(-90, 90), frand(-140, -40) }, 0 });
-    if (e.kind == EK_GAKEV)
+    if (e.kind == EK_BLOOD && e.scale >= 1)    // it bursts into two smaller ones
+        for (float side : { -1.0f, 1.0f }) {
+            Enemy half = e;
+            half.alive = true; half.hp = half.maxHp = e.maxHp * 0.35f;
+            half.scale = 0.7f; half.r = 10; half.speed = e.speed * 1.4f; half.xp = e.xp / 3;
+            half.pos.x += side * 12; half.knock = { side * 120, 0 };
+            half.hitFlash = 0; half.burnT = 0;
+            spawned.push_back(half);
+        }
+    if (e.kind == EK_GAKEV || e.elite || (e.kind == EK_MIMIC && GetRandomValue(0, 1)))
         coins.push_back({ e.pos, { frand(-40, 40), -160 }, 0, true });
+    if (e.elite) { showBanner(TextFormat("%s falls", e.name), "+15 gold and a cigarette pack", 2.0f); hapticBuzz(120); }
     burst(parts, e.pos, 14, 120, 0.7f, e.color);
     if (e.bossForm == 0) shake = 0.5f;
     fight.onDeath(e, spawned);
@@ -779,6 +1044,7 @@ void Game::killEnemy(Enemy& e) {
         player.maxHp += 18; player.hp = player.maxHp;
         player.maxMana += 10; player.mana = player.maxMana;
         showBanner("The Unmarked grows stronger", TextFormat("Level %d", player.level), 2.5f);
+        if (mode == Mode::Run) player.spins++;     // the prize wheel comes up as soon as it can
         play("levelup");
     }
 }
@@ -901,7 +1167,9 @@ void Game::updateLoot(float dt) {
             showBanner("Cigarette pack", "Galin can upgrade your weapon with this", 2.2f);
             return true;
         }
-        player.gold++; play("coin");
+        int worth = player.has(VP_PEACH) && GetRandomValue(1, 4) == 1 ? 2 : 1;
+        player.gold += worth; stats.goldEarned += worth;
+        play("coin");
         return true; }), coins.end());
 }
 
@@ -914,7 +1182,8 @@ void Game::checkRoomExits() {
     Vector2& p = player.pos;
     // the boss lair stays shut until the key is found: step back out of the doorway
     for (int dir : { DIR_N, DIR_E, DIR_S, DIR_W }) {
-        if (!dungeon.bossDoorLocked(dir)) continue;
+        int lock = dungeon.doorLock(dir);
+        if (!lock) continue;
         bool at = dir == DIR_N ? p.y < TILE + 8 && fabsf(p.x - dcx) < TILE
                 : dir == DIR_S ? p.y > (ROOM_TH - 1) * TILE - 8 && fabsf(p.x - dcx) < TILE
                 : dir == DIR_W ? p.x < TILE + 8 && fabsf(p.y - dcy) < TILE
@@ -922,7 +1191,8 @@ void Game::checkRoomExits() {
         if (!at) continue;
         p.y += dir == DIR_N ? 14.0f : dir == DIR_S ? -14.0f : 0.0f;
         p.x += dir == DIR_W ? 14.0f : dir == DIR_E ? -14.0f : 0.0f;
-        showBanner("The lair is locked", "Find the boss key on this floor", 1.8f);
+        if (lock == 1) showBanner("The lair is locked", "Find the boss key on this floor", 1.8f);
+        else showBanner("The treasure room is locked", "Find the silver key on this floor", 1.8f);
         play("hurt");
         return;
     }
@@ -935,18 +1205,19 @@ void Game::checkRoomExits() {
     if (!moved) return;
     for (auto& c : coins) player.packs += c.pack;   // a pack still in the air comes along
     enterRoom();
+    autosave();
 }
 
 // --------------------------------------------------------------------- shops
 void Game::buy(int i) {
     const ShopItem& it = SHOP_ITEMS[i];
     if (it.vape >= 0 && player.has((Vape)it.vape)) return;
+    if (it.vape < 0 && player.potions[i] >= POTION_MAX) { shopMsgT = 1.5f; shopMsg = "Your belt is full"; play("hurt"); return; }
     if (player.gold < it.price) { shopMsgT = 1.5f; shopMsg = "Not enough gold"; play("hurt"); return; }
     player.gold -= it.price;
     if (it.vape >= 0) { player.vapes |= 1u << it.vape; play("levelup"); }
     else {
-        if (i == 0) player.hp = fminf(player.maxHp, player.hp + 35);
-        else player.mana = fminf(player.maxMana, player.mana + 50);
+        player.potions[i]++;          // into the belt, for when you need it
         play("pickup");
     }
     shopMsgT = 1.5f; shopMsg = std::string("Bought ") + it.name;

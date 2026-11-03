@@ -19,9 +19,13 @@ namespace touch {
     void setLayout(const TouchLayout& t);
     const TouchLayout& layout();
     Vector2 controlPos(int control);    // where a TouchControl sits right now
+    float controlSize(int control);     // its radius (the hotbar: the size of one slot)
     bool editFrame();                   // the move-and-resize screen; true when Done is pressed
 
     void zone(Rectangle r, int key);    // tapping r presses key (HUD slots register themselves each frame)
     Vector2 stickDir();                 // normalised direction of the stick, {0,0} when idle
 
 } // namespace touch
+
+// The hotbar's width for a slot size: two potions, three powers, the special.
+inline float hotbarWidth(float slot) { return 6 * slot + 3 * (slot / 6) + 28; }

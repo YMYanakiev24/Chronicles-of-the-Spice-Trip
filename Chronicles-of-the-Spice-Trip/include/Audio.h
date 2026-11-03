@@ -30,6 +30,10 @@ namespace au {
         Pluck plucks[4];
         float vol = 0.32f;
         int   scale[8] = { 0, 2, 3, 5, 7, 8, 10, 12 };   // aeolian, matches _scale
+        int   song = -1;                                  // a boss's theme (SONGS), or -1 for the drone alone
+        int   step = 0;
+        float stepT = 0;
+        float bassPhase = 0, bassT = 9, bassFreq = 0;
 
         void init();
         void setMood(const std::string& mood);

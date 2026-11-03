@@ -76,7 +76,7 @@ void Game::menuScreen() {
         ui::handCursor();
     }
     if ((overCastle && in::mousePressed(MOUSE_BUTTON_LEFT)) || in::pressed(KEY_ENTER) || in::pressed(KEY_SPACE)) {
-        play("ui"); screen = Screen::Intro; t = 0;
+        play("ui"); screen = Screen::Setup; t = 0;
         return;
     }
 
@@ -101,7 +101,7 @@ void Game::menuScreen() {
         if (!continueRun()) hasSave = false;
         return;
     }
-    if (ui::button(next(), "New Run", ui::Style::Primary)) { play("ui"); screen = Screen::Intro; t = 0; return; }
+    if (ui::button(next(), "New Run", ui::Style::Primary)) { play("ui"); screen = Screen::Setup; t = 0; return; }
     if (ui::button(next(), "Boss Rush")) { play("ui"); startBossRush(); return; }
     if (ui::button(next(), "Champions")) { play("ui"); screen = Screen::Champions; t = 0; return; }
     if (ui::button(next(), "Settings")) { play("ui"); screen = Screen::Settings; rebinding = -1; t = 0; return; }
@@ -156,6 +156,7 @@ void Game::championsScreen() {
     drawName(shown, d.x + 18, d.y + 14, 30, ui::ACCENT);
     float nameW = ui::measure(c.name, 30) + (c.fearFace ? 30 * 1.2f + 3 : 0);
     if (shown == profile.champion) ui::text("chosen", d.x + 26 + nameW, d.y + 26, 10, ui::GOOD);
+    ui::text(TextFormat("\"%s\"", c.quote), d.x + 80 + nameW, d.y + 26, 10, ui::ACCENT);
     ui::text("Perk", d.x + 18, d.y + 56, 10, ui::MUTED);
     ui::text(c.perk, d.x + 70, d.y + 54, 20, ui::TEXT);
     ui::text("Special", d.x + 18, d.y + 90, 10, ui::MUTED);
@@ -167,9 +168,11 @@ void Game::championsScreen() {
 void Game::settingsScreen() {
     int sw = GetScreenWidth(), sh = GetScreenHeight();
     int* binds[] = { &settings.keys.up, &settings.keys.down, &settings.keys.left, &settings.keys.right,
-                     &settings.keys.run, &settings.keys.roll, &settings.keys.interact, &settings.keys.special };
-    const char* names[] = { "Move up", "Move down", "Move left", "Move right", "Run", "Dodge-roll", "Interact", "Special" };
-    constexpr int BINDS = 8;
+                     &settings.keys.run, &settings.keys.roll, &settings.keys.interact, &settings.keys.special,
+                     &settings.keys.potionHp, &settings.keys.potionMana };
+    const char* names[] = { "Move up", "Move down", "Move left", "Move right", "Run", "Dodge-roll", "Interact", "Special",
+                            "Health potion", "Mana potion" };
+    constexpr int BINDS = 10;
     auto leave = [&]() { save::writeSettings(settings); screen = Screen::Menu; rebinding = -1; t = 0; };
 
     if (rebinding >= 0) {
@@ -222,7 +225,7 @@ void Game::settingsScreen() {
     ui::text("Keys", x, y, 20, ui::ACCENT);
     ui::text("click a key, then press the new one (Esc cancels)", x + 70, y + 6, 10, ui::MUTED);
     for (int i = 0; i < BINDS; ++i) {
-        float rx = x + (i / 4) * (pw / 2 - 20), ry = y + 36 + (i % 4) * 40;
+        float rx = x + (i / 5) * (pw / 2 - 20), ry = y + 36 + (i % 5) * 40;
         ui::text(names[i], rx, ry + 6, 20, ui::TEXT);
         Rectangle box = { rx + 170, ry, 130, 32 };
         bool active = rebinding == i;
@@ -235,6 +238,11 @@ void Game::settingsScreen() {
         y += 112;
         ui::text("Touch controls", x, y, 20, ui::ACCENT);
         if (ui::button({ x, y + 32, 320, 44 }, "Move and Resize Buttons")) { play("ui"); screen = Screen::Controls; }
+        if (ui::button({ x + 336, y + 32, 240, 44 }, settings.vibrate ? "Vibration: On" : "Vibration: Off",
+            settings.vibrate ? ui::Style::Good : ui::Style::Normal)) {
+            settings.vibrate = !settings.vibrate; play("ui");
+            if (settings.vibrate) hapticBuzz(60);
+        }
     }
 
     if (ui::button({ panel.x + pw - 190, panel.y + ph - 70, 160, 46 }, "Back", ui::Style::Primary)) { play("ui"); leave(); }
@@ -250,6 +258,40 @@ void Game::controlsScreen() {
         play("ui");
         screen = Screen::Settings;
     }
+}
+
+// ------------------------------------------------------------------ new run
+void Game::setupScreen() {
+    int sw = GetScreenWidth(), sh = GetScreenHeight();
+    if (in::pressed(KEY_ESCAPE)) { play("ui"); screen = Screen::Menu; t = 0; return; }
+    drawMenuBackground();
+    ui::veil(0.8f);
+    float pw = fminf(760.0f, sw - 60.0f), ph = fminf(470.0f, sh - 40.0f);
+    Rectangle p = { (sw - pw) / 2, (sh - ph) / 2, pw, ph };
+    ui::titledPanel(p, "New Run");
+    float x = p.x + 30, y = p.y + 84;
+
+    ui::text("Difficulty", x, y, 20, ui::ACCENT);
+    float bw = (pw - 60 - 2 * 14) / 3;
+    for (int i = 0; i < 3; ++i)
+        if (ui::button({ x + i * (bw + 14), y + 32, bw, 48 }, DIFFICULTIES[i].name, i == difficulty ? ui::Style::Good : ui::Style::Normal)) {
+            difficulty = i; play("ui");
+        }
+    ui::text(DIFFICULTIES[difficulty].desc, x, y + 94, 20, ui::MUTED);
+
+    y += 146;
+    ui::text("Hardcore", x, y, 20, ui::ACCENT);
+    if (ui::button({ x, y + 32, 220, 48 }, hardcore ? "Hardcore: On" : "Hardcore: Off", hardcore ? ui::Style::Danger : ui::Style::Normal)) {
+        hardcore = !hardcore; play("ui");
+    }
+    ui::textWrapped(hardcore ? "One life. Dying ends the run and wipes the save."
+                             : "Dying sends you back to the entrance, and Toshko picks your pockets.",
+        x + 240, y + 40, pw - 300, 10, ui::MUTED);
+    if (profile.bestHardcore > 0) ui::text(TextFormat("Hardcore best: floor %d", profile.bestHardcore), x, y + 92, 10, ui::TEXT);
+
+    float by = p.y + ph - 74;
+    if (ui::button({ p.x + pw - 230, by, 200, 50 }, "Begin", ui::Style::Primary)) { play("ui"); screen = Screen::Intro; t = 0; return; }
+    if (ui::button({ x, by, 160, 50 }, "Back")) { play("ui"); screen = Screen::Menu; t = 0; }
 }
 
 // --------------------------------------------------------------------- intro

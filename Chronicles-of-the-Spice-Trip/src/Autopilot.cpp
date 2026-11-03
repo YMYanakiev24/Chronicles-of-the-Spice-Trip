@@ -41,7 +41,7 @@ namespace {
         return false;
     }
 
-    bool isCombatRoom(const Room& r) { return !r.isStart && !r.isShop && !r.isBoss; }
+    bool isCombatRoom(const Room& r) { return !r.special(); }
 
     int countShots(const Game& g, ShotKind k) {
         int n = 0;
@@ -77,6 +77,7 @@ void Autopilot::start(Game& g, const std::string& d) {
     dir = d;
     log = fopen((dir + "/autopilot.log").c_str(), "w");
     in::setScripted(true);
+    g.testMode = true;
     build();
 }
 
@@ -167,6 +168,12 @@ void Autopilot::build() {
     add("new run", 4, [this](Game& g, float t) {
         if (t < 0.3f) return false;
         return clickLabel("New Run");
+    });
+    add("run setup", 4, [this](Game& g, float t) {
+        if (t < 0.4f) return false;
+        check("New Run asks for a difficulty first", g.screen == Screen::Setup);
+        shot(g, "setup");
+        return clickLabel("Begin");
     });
     add("intro", 5, [this](Game& g, float t) {
         if (t < 2.0f) return false;
@@ -420,6 +427,139 @@ void Autopilot::build() {
         return true;
     });
 
+    // ===== the Soldier, the Orc, the Demon and the Blood Monster =====
+    auto foe = [](Enemy& e, int kind, float r, float speed, int dmg) {
+        e.kind = kind; e.r = r; e.speed = speed; e.dmg = dmg; e.shootCd = 99;
+    };
+    add("the new enemies", 3, [this, stageDummy, foe](Game& g, float t) {
+        if (t == 0) {
+            stageDummy(g, 200);
+            int kinds[4] = { EK_SOLDIER, EK_ORC, EK_DEMON, EK_BLOOD };
+            g.enemies.clear();
+            for (int i = 0; i < 4; ++i) {
+                Enemy e = dummy({ 200 + i * 60.0f, 176 });
+                foe(e, kinds[i], 13, 0, 0);
+                g.enemies.push_back(e);
+            }
+            return false;
+        }
+        g.player.invuln = 1;
+        if (t < 0.4f) return false;
+        check("all four have their sprites, and the Soldier his arrow",
+            SPR.enemy[EK_SOLDIER].attack.frames == 9 && SPR.enemy[EK_ORC].idle.ok() && SPR.enemy[EK_DEMON].death.ok() && SPR.enemy[EK_BLOOD].move.ok() && SPR.arrow.ok());
+        shot(g, "new-enemies");
+        return true;
+    });
+    add("soldier shoots", 6, [this, stageDummy, foe](Game& g, float t) {
+        if (t == 0) {
+            stageDummy(g, 330);
+            foe(g.enemies.front(), EK_SOLDIER, 12, 70, 8);
+            g.enemies.front().shootCd = 0.2f;
+            return false;
+        }
+        g.player.invuln = 1;
+        if (countShots(g, ShotKind::Arrow) < 1) return false;
+        check("the Soldier looses an arrow from range", true);
+        shot(g, "soldier-arrow");
+        return true;
+    });
+    add("soldier backs off", 4, [this](Game& g, float t) {
+        Enemy& e = g.enemies.front();
+        if (t == 0) { e.pos.x = 190; e.atkAnim = 0; e.swinging = false; e.shootCd = 99; g.enemyShots.clear(); markX = e.pos.x; return false; }
+        g.player.invuln = 1;
+        if (t < 0.8f) return false;
+        check("and backs away if you get close", e.pos.x > markX + 15);
+        return true;
+    });
+    add("wisp shoots", 6, [this, stageDummy, foe](Game& g, float t) {
+        if (t == 0) {
+            stageDummy(g, 330);
+            foe(g.enemies.front(), EK_SKULL, 10, 0, 5);
+            g.enemies.front().shootCd = 0.2f; g.enemies.front().color = { 120, 180, 230, 255 };
+            g.enemyShots.clear();
+            return false;
+        }
+        g.player.invuln = 1;
+        if (countShots(g, ShotKind::Orb) < 1) return false;
+        check("the Wisp fires a magic orb", true);
+        shot(g, "wisp-orb");
+        return true;
+    });
+    add("blood spits", 6, [this, stageDummy, foe](Game& g, float t) {
+        if (t == 0) {
+            stageDummy(g, 330);
+            foe(g.enemies.front(), EK_BLOOD, 14, 0, 10);
+            g.enemies.front().shootCd = 0.2f; g.enemies.front().color = { 170, 30, 60, 255 };
+            g.enemyShots.clear();
+            return false;
+        }
+        g.player.invuln = 1;
+        if (countShots(g, ShotKind::Orb) < 1) return false;
+        check("the Blood Monster spits at you", true);
+        shot(g, "blood-spit");
+        g.enemyShots.clear();
+        return true;
+    });
+    add("orc swings", 5, [this, stageDummy, foe](Game& g, float t) {
+        if (t == 0) {
+            stageDummy(g, 165);
+            foe(g.enemies.front(), EK_ORC, 13, 75, 16);
+            g.player.hp = g.player.maxHp; markF = g.player.hp; markB = false;
+            return false;
+        }
+        g.player.invuln = 0;
+        Enemy& e = g.enemies.front();
+        if (e.swinging && !markB) { shot(g, "orc-swing"); markB = true; }
+        if (g.player.hp >= markF) return false;
+        markB = false;
+        check("the Orc's axe lands if you stand there", true);
+        return true;
+    });
+    add("orc dodged", 5, [this](Game& g, float t) {
+        Enemy& e = g.enemies.front();
+        if (t == 0) { e.pos.x = 150; e.atkCd = 0; g.player.pos = { 120, 176 }; markB = false; return false; }
+        if (e.swinging && !markB) { markB = true; g.player.pos = { 560, 176 }; markF = g.player.hp; }
+        if (!markB) { g.player.invuln = 0; return false; }
+        g.player.invuln = 1;
+        if (e.swinging) return false;
+        markB = false;
+        check("and misses if you step away in time", g.player.hp == markF);
+        return true;
+    });
+    add("demon leaps", 6, [this, stageDummy, foe](Game& g, float t) {
+        if (t == 0) {
+            stageDummy(g, 290);
+            foe(g.enemies.front(), EK_DEMON, 12, 105, 12);
+            g.enemies.front().lungeCd = 0.2f;
+            return false;
+        }
+        g.player.invuln = 1;
+        if (g.enemies.front().lunge <= 0) return false;
+        check("the Demon leaps at you", true);
+        shot(g, "demon-leap");
+        return true;
+    });
+    add("blood splits", 3, [this, stageDummy, foe](Game& g, float t) {
+        if (t == 0) {
+            stageDummy(g, 300);
+            foe(g.enemies.front(), EK_BLOOD, 14, 60, 10);
+            g.enemies.front().hp = 0;
+            return false;
+        }
+        g.player.invuln = 1;
+        if (t < 0.15f) return false;
+        check("the Blood Monster splits in two", g.enemies.size() == 2 && g.enemies[0].scale < 1 && g.enemies[1].scale < 1);
+        shot(g, "blood-split");
+        return true;
+    });
+    add("blood gone", 3, [this](Game& g, float t) {
+        g.player.invuln = 1;
+        if (t == 0) { for (auto& e : g.enemies) e.hp = 0; return false; }
+        if (t < 0.15f) return false;
+        check("and the halves don't split again", g.enemies.empty());
+        return true;
+    });
+
     // ===== a chest and Marin =====
     add("chest", 4, [this](Game& g, float t) {
         if (t == 0) {
@@ -483,7 +623,7 @@ void Autopilot::build() {
     });
     add("bought", 3, [this](Game& g, float t) {
         if (t < 0.2f) return false;
-        check("buying a Health Potion takes 8 gold and heals", g.player.gold == 192 && g.player.hp > g.player.maxHp - 40);
+        check("buying a Health Potion takes 8 gold and puts it in the belt", g.player.gold == 192 && g.player.potions[0] == 1);
         check("Marin sells potions and vapes, nothing else", SHOP_COUNT == 2 + VP_COUNT);
         return clickLabel("30 g");              // Mango Haze
     });
@@ -767,19 +907,27 @@ void Autopilot::build() {
         shot(g, "triceps-well");
         return true;
     });
-    add("blast", 4, [this](Game& g, float) {
+    // The boots can fly while the blast is still being waited for, so both steps watch for them.
+    auto watchBoots = [this](Game& g) {
+        int boots = 0, curving = 0;
+        for (auto& p : g.enemyShots) if (p.kind == ShotKind::Boot) { boots++; curving += p.curve != 0; }
+        if (boots > markX) { markX = (float)boots; markY = (float)curving; }
+        return boots >= 3;
+    };
+    add("blast", 4, [this, watchBoots](Game& g, float t) {
+        if (t == 0) markX = markY = 0;
         Grenade& gr = g.fight.grenades[0];
         g.player.pos = gr.to; g.player.invuln = 0;      // stay in the middle for the blast
+        watchBoots(g);
         if (!gr.hit) return false;
         check("the well goes off under you", true);
         return true;
     });
-    add("magnetic boots", 8, [this](Game& g, float) {
-        int boots = 0, curving = 0;
-        for (auto& p : g.enemyShots) if (p.kind == ShotKind::Boot) { boots++; curving += p.curve != 0; }
-        if (boots < 3) return false;
-        check("she kicks three magnetic boots, two curving in from the sides", boots == 3 && curving == 2);
-        shot(g, "triceps-boots");
+    add("magnetic boots", 8, [this, watchBoots](Game& g, float) {
+        bool now = watchBoots(g);
+        if (markX < 3) return false;
+        check("she kicks three magnetic boots, two curving in from the sides", markX == 3 && markY == 2);
+        if (now) shot(g, "triceps-boots");
         return true;
     });
     add("fulcrum staff", 9, [this](Game& g, float) {
@@ -950,6 +1098,7 @@ void Autopilot::build() {
         static const Walker walkers[] = {
             { "Mistling", 12, 60, EK_SKELETON }, { "Hollow Hound", 13, 110, EK_SKELETON2 },
             { "Gakev", 12, 120, EK_GAKEV }, { "Melon Warrior", 14, 50, EK_MELON },
+            { "Orc", 13, 75, EK_ORC }, { "Demon", 12, 105, EK_DEMON }, { "Blood Monster", 14, 60, EK_BLOOD },
             { "Wisp", 10, 85, EK_SKULL }, { "Toshko", 12, 175, EK_TOSHKO },
         };
         const float dt = 1 / 30.0f, limit = 40;
@@ -1020,6 +1169,26 @@ void Autopilot::build() {
         }
         check(TextFormat("every floor has one shop (%d of %d)", oneShop, floors), oneShop == floors);
         check(TextFormat("Marin and Galin take turns, so Galin is there by floor 2 (%d of %d)", turns, floors - 1), turns == floors - 1);
+        return true;
+    });
+    add("rooms as they really spawn", 5, [this](Game& g, float) {
+        const int rooms = 80;
+        int armed = 0, seen[11] = {};
+        int floorWas = g.floor;
+        g.floor = 2;                            // deep enough for everyone
+        for (int i = 0; i < rooms; ++i) {
+            g.dungeon.generate();
+            goToRoom(g, isCombatRoom);
+            bool shooter = false;
+            for (auto& e : g.enemies) { seen[e.kind]++; shooter |= e.kind == EK_SOLDIER || e.kind == EK_SKULL || e.kind == EK_BLOOD; }
+            armed += shooter;
+        }
+        g.floor = floorWas;
+        check(TextFormat("every combat room has something that shoots (%d of %d)", armed, rooms), armed == rooms);
+        check(TextFormat("picked at random: Soldiers, Wisps and Blood Monsters (%d, %d, %d)", seen[EK_SOLDIER], seen[EK_SKULL], seen[EK_BLOOD]),
+            seen[EK_SOLDIER] > 0 && seen[EK_SKULL] > 0 && seen[EK_BLOOD] > 0);
+        check(TextFormat("Orcs and Demons turn up too (%d, %d)", seen[EK_ORC], seen[EK_DEMON]), seen[EK_ORC] > 0 && seen[EK_DEMON] > 0);
+        g.enemies.clear();
         return true;
     });
     add("gakev the enemy", 3, [this](Game& g, float t) {
@@ -1331,6 +1500,33 @@ void Autopilot::build() {
         TouchLayout saved = save::readTouchLayout();
         check("Done saves the layout and returns to pause", g.overlay == Overlay::Pause && saved.custom && saved.r[TC_BLADE] > 80);
         touch::setEnabled(false);
+        return true;
+    });
+
+    // ===== the prize wheel, and a hardcore death =====
+    add("drink", 2, [this](Game& g, float t) {
+        if (t == 0) { g.overlay = Overlay::None; g.player.potions[0] = 1; g.player.hp = g.player.maxHp - 40; in::tap(g.settings.keys.potionHp); return false; }
+        if (t < 0.2f) return false;
+        check("R drinks a health potion from the belt", g.player.potions[0] == 0 && g.player.hp > g.player.maxHp - 40);
+        return true;
+    });
+    add("prize wheel", 12, [this](Game& g, float t) {
+        if (t == 0) { g.testMode = false; g.overlay = Overlay::None; g.rewardT = 0; g.player.spins = 1; markF = (float)g.stats.spins; return false; }
+
+        if (g.overlay != Overlay::Roulette) return false;
+        if (!g.wheel.spinning && !g.wheel.done) { clickLabel("SPIN"); return false; }
+        if (!g.wheel.done) return false;
+        check("a level-up spins the prize wheel, and it pays out", g.wheel.result >= 0 && g.stats.spins == (int)markF + 1);
+        shot(g, "prize-wheel");
+        clickLabel("Collect");
+        return true;
+    });
+    add("hardcore death", 4, [this](Game& g, float t) {
+        if (t == 0) { g.testMode = true; g.overlay = Overlay::None; g.saveRun(); g.hardcore = true; g.player.invuln = 0; g.player.hp = 0; return false; }
+        if (t < 0.3f) return false;
+        check("a hardcore death ends the run with a summary and deletes the save", g.overlay == Overlay::Summary && !save::hasRun());
+        shot(g, "summary");
+        g.hardcore = false;
         return true;
     });
 }

@@ -63,6 +63,29 @@ Movement, run, roll, interact and the special can be rebound in **Settings**.
   Records (deepest floor, bosses beaten, best Boss Rush) and settings are kept
   between runs.
 
+### Runs, rooms and rewards
+
+- **New Run** asks for a **difficulty** (Easy, Normal, Hard: monster health and
+  damage) and whether to play **hardcore**: one life, and dying ends the run and
+  deletes the save. Otherwise dying sends you back to the entrance, and Toshko
+  picks 30% of your gold from your pockets.
+- **Level-ups** spin a prize wheel: max health, max mana, blade damage, speed,
+  gold, a cigarette pack, the jackpot, or Toshko stealing the prize.
+- **Special rooms** on every floor (shown on the minimap): a **treasure room**
+  behind a silver door (its silver key lies in a combat room) with a hoard of
+  gold, two packs, a full heal and a free vape; a **challenge room** where waves
+  keep coming for 30 seconds; and **Toshko's Roulette**, where you bet gold on red,
+  black (x2) or Toshko's zero (x14). One combat room a floor holds a **mini-boss**,
+  and some chests are **Mimics**.
+- **Floors** each have their own look: the Mistwood Depths, the Drowned Crypt,
+  the Ember Halls, the Bone Gardens, the Toxic Sewers and the Gilded Vault.
+- **Potions** from Marin go into your belt (three of each): **R** drinks health,
+  **F** mana.
+- **Every boss has its own theme**, and a run that ends shows a summary: kills,
+  gold, damage, deaths and what got you.
+- The game **saves itself** whenever you change rooms and every 20 seconds in a
+  safe room.
+
 ### The shops
 
 Every floor has one shop, and the minimap shows it from the start (gold for
@@ -86,6 +109,19 @@ the Iron Sword, the quick but short Police Baton, the slow and heavy Baseball
 Bat, and the Pink Sword. Each has its own knockback (bosses stand their ground)
 and hit sound. To add one, raise `WEAPON_COUNT` and give it a line with its PNG
 from `assets/` and the angle its art rises from hilt to tip.
+
+### The enemies
+
+Alongside the Mistlings, Hollow Hounds, Melon Warriors, Gakev and Toshko, every
+combat room has a random pick of things that shoot at you:
+
+- **Soldier:** an archer who stops at range and backs away if you crowd him.
+- **Wisp:** weaves toward you, firing magic orbs.
+- **Blood Monster:** spits blood, and bursts into two smaller, faster halves when
+  it dies.
+
+Then there are the **Orc**, tough, with a slow overhead axe you can step away
+from, and from floor 2 the **Demon**, which leaps at you from across the room.
 
 ### The bosses
 
@@ -181,7 +217,7 @@ through the menus, fights a room, opens a chest, shops, beats all six bosses
 (and checks each of Triceps' attacks),
 completes a run, saves and continues, wins a Boss Rush, and tries every
 champion's special, Momiche's scare on a boss, Gakev's coins and casting with
-Enter. It writes a PASS/FAIL line for each check (155) to
+Enter. It writes a PASS/FAIL line for each check (171) to
 `<folder>/autopilot.log`, saves screenshots next to it, and exits with the
 number of failures:
 
@@ -195,3 +231,8 @@ never touched. `--savedir <folder>` moves the normal saves too.
 ## Android
 
 Pushing a tag like `v0.2.0` makes GitHub Actions build the APK (.github/workflows/android.yml) and publish it as a release. The Android project is in `Chronicles-of-the-Spice-Trip/android`. Run the desktop build with `--touch` to try the phone controls with the mouse.
+
+To sign every APK with the same key (so new versions install over old ones), add
+the repository secrets `ANDROID_KEYSTORE_BASE64` and `ANDROID_KEYSTORE_PASSWORD`.
+Without them each build uses a throwaway key. On phones, the game buzzes when
+you're hit (Settings > Vibration).

@@ -17,6 +17,9 @@ struct RunSave {
     Dungeon  dungeon;
     int      floor = 1, kills = 0;
     float    runTime = 0;
+    int      difficulty = 1;        // DIFFICULTIES
+    bool     hardcore = false;
+    RunStats stats;
 };
 
 // Records kept between runs.
@@ -27,6 +30,7 @@ struct Profile {
     int      runsCompleted = 0;     // times the Cinder-Maw fell
     unsigned bossesBeaten = 0;      // bit per BOSSES entry
     float    bestRush = 0;          // best Boss Rush time, 0 = none yet
+    int      bestHardcore = 0;      // deepest floor reached in a hardcore run
 };
 
 namespace save {
@@ -37,6 +41,7 @@ namespace save {
     bool writeRun(const RunSave& run);
     bool readRun(RunSave& run);
     bool hasRun();
+    bool deleteRun();                        // a hardcore death takes the save with it
 
     bool writeProfile(const Profile& p);
     Profile readProfile();

@@ -3,6 +3,8 @@
 // ============================================================================
 #include "Rooms.h"
 #include <cmath>
+#include <algorithm>
+#include <cstdlib>
 #include <initializer_list>
 #include "raymath.h"
 
@@ -85,17 +87,53 @@ void Dungeon::generate() {
         galinNext = !galinNext;
     }
 
-    // The boss key waits in one random combat room.
-    {
-        int kx = -1, ky = -1, n = 0;
+    // The special rooms, each in a room nothing else has claimed, as long as two plain
+    // combat rooms are left for the keys: a treasure room (a dead end if there is one),
+    // a challenge room and Toshko's casino. One combat room also gets a mini-boss.
+    auto pick = [&](bool deadEnd, bool combatOk) -> Room* {
+        Room* chosen = nullptr;
+        int n = 0;
         for (int y = 0; y < DUNGEON_G; ++y)
             for (int x = 0; x < DUNGEON_G; ++x) {
-                const Room& rm = grid[y][x];
-                if (!rm.exists || rm.isStart || rm.isBoss || rm.isShop) continue;
-                if (GetRandomValue(0, n++) == 0) { kx = x; ky = y; }
+                Room& rm = grid[y][x];
+                if (!rm.exists || rm.special() || (!combatOk && rm.isElite)) continue;
+                int doors = 0;
+                for (int b : { DIR_N, DIR_E, DIR_S, DIR_W }) if (rm.doors & b) doors++;
+                if (deadEnd && doors != 1) continue;
+                if (GetRandomValue(0, n++) == 0) chosen = &rm;
             }
-        if (kx >= 0) grid[ky][kx].hasKey = true;
-        keyFound = kx < 0;
+        return chosen;
+    };
+    auto plainRooms = [&]() {
+        int n = 0;
+        for (auto& row : grid) for (auto& rm : row) n += rm.exists && !rm.special();
+        return n;
+    };
+    Room* treasure = nullptr;
+    if (plainRooms() > 2) {
+        treasure = pick(true, false);
+        if (!treasure) treasure = pick(false, false);
+        if (treasure) { treasure->isTreasure = true; treasure->cleared = true; }
+    }
+    if (plainRooms() > 2)
+        if (Room* c = pick(false, false)) c->isChallenge = true;
+    if (plainRooms() > 2) {
+        Room* casino = pick(true, false);
+        if (!casino) casino = pick(false, false);
+        if (casino) { casino->isCasino = true; casino->cleared = true; }
+    }
+    if (Room* e = pick(false, false)) e->isElite = true;
+
+    // The boss key waits in one combat room, the silver key (if there's a treasure room) in another.
+    Room* gold = pick(false, true);
+    if (gold) gold->hasKey = true;
+    keyFound = gold == nullptr;
+    silverFound = treasure == nullptr;
+    if (treasure) {
+        Room* silver = nullptr;
+        for (int tries = 0; tries < 20 && (!silver || silver == gold); ++tries) silver = pick(false, true);
+        if (silver) silver->hasSilverKey = true;
+        else silverFound = true;
     }
 
     for (int y = 0; y < DUNGEON_G; ++y)
@@ -103,18 +141,23 @@ void Dungeon::generate() {
             if (grid[y][x].exists) grid[y][x].buildLayout();
 }
 
-bool Dungeon::bossDoorLocked(int dir) const {
-    if (keyFound || !(cur().doors & dir)) return false;
+int Dungeon::doorLock(int dir) const {
+    if (!(cur().doors & dir)) return 0;
     int nx = cx + (dir == DIR_E) - (dir == DIR_W), ny = cy + (dir == DIR_S) - (dir == DIR_N);
-    if (nx < 0 || ny < 0 || nx >= DUNGEON_G || ny >= DUNGEON_G) return false;
-    return grid[ny][nx].isBoss;
+    if (nx < 0 || ny < 0 || nx >= DUNGEON_G || ny >= DUNGEON_G) return 0;
+    const Room& n = grid[ny][nx];
+    if (n.isBoss && !keyFound) return 1;
+    if (n.isTreasure && !silverFound) return 2;
+    return 0;
 }
+
+bool Dungeon::bossDoorLocked(int dir) const { return doorLock(dir) == 1; }
 
 void Dungeon::generateArena() {
     for (auto& row : grid) for (auto& r : row) r = Room{};
     cx = cy = DUNGEON_G / 2;
     Room& arena = grid[cy][cx];
-    keyFound = true;                                      // nothing to unlock in the arena
+    keyFound = silverFound = true;                        // nothing to unlock in the arena
     arena.exists = arena.isBoss = arena.visited = true;   // no doors: the only way out is through
     arena.buildLayout();
 }
@@ -122,6 +165,83 @@ void Dungeon::generateArena() {
 bool Room::isFloor(int tx, int ty) const {
     if (tx <= 0 || ty <= 0 || tx >= ROOM_TW - 1 || ty >= ROOM_TH - 1) return false;
     return tiles[ty][tx] == RT_FLOOR;
+}
+
+// Carve the room's outline: tiles outside the chosen shape become solid void.
+// The centre row and column are never carved, so every door stays connected.
+static void carveShape(Room& r) {
+    int midX = ROOM_TW / 2, midY = ROOM_TH / 2;
+    int shape = GetRandomValue(0, 6), quad = GetRandomValue(0, 3);
+    for (int y = 1; y < ROOM_TH - 1; ++y)
+        for (int x = 1; x < ROOM_TW - 1; ++x) {
+            if (x == midX || y == midY) continue;
+            int ax = abs(x - midX), ay = abs(y - midY);           // distance from the centre lanes
+            int ex = std::min(x - 1, ROOM_TW - 2 - x), ey = std::min(y - 1, ROOM_TH - 2 - y);   // from the edges
+            bool right = x > midX, down = y > midY;
+            bool cut = false;
+            switch (shape) {
+            case 0: cut = ax > 3 && ay > 1; break;                                   // plus / cross
+            case 1: cut = ex + ey < 3; break;                                        // octagon (clipped corners)
+            case 2: cut = ax > 1 && ay > 1 && right == (quad & 1) && down == (quad >> 1); break;   // L (one quadrant gone)
+            case 3: cut = ax > 1 && ay > 1 && (right == down) == (quad & 1); break;  // Z (two opposite quadrants gone)
+            case 4: cut = ax * 4 + ay * 9 > 46; break;                               // diamond
+            case 5: cut = ay > 1 && ax > 2 && (down == (quad & 1)); break;            // T (a bar with a stem)
+            default: cut = (ax > 6 && ay > 0 && ay < 4) || (ex + ey < 2); break;     // hourglass-ish pinched sides
+            }
+            if (cut) r.tiles[y][x] = RT_VOID;
+        }
+}
+
+// Mount up to MAX_FLAMERS fire-throwers on walls, aimed into open floor.
+static void placeFlamers(Room& r) {
+    int midX = ROOM_TW / 2, midY = ROOM_TH / 2;
+    static const int ddx[4] = { 0, 1, 0, -1 }, ddy[4] = { -1, 0, 1, 0 };
+    static const int dbit[4] = { DIR_N, DIR_E, DIR_S, DIR_W };
+    int want = GetRandomValue(0, 99) < 35 ? 0 : GetRandomValue(1, MAX_FLAMERS);
+    for (int tries = 0; tries < 300 && r.flamerCount < want; ++tries) {
+        int x = GetRandomValue(1, ROOM_TW - 2), y = GetRandomValue(1, ROOM_TH - 2);
+        if (x == midX || y == midY || r.tiles[y][x] != RT_FLOOR) continue;
+        int k = GetRandomValue(0, 3);
+        int bx = x - ddx[k], by = y - ddy[k];                     // it must be backed by a wall
+        bool backed = bx <= 0 || by <= 0 || bx >= ROOM_TW - 1 || by >= ROOM_TH - 1 || tileSolid(r.tiles[by][bx]);
+        if (!backed) continue;
+        bool open = true;
+        for (int s = 1; s <= 2 && open; ++s) {
+            int fx = x + ddx[k] * s, fy = y + ddy[k] * s;
+            open = fx > 0 && fy > 0 && fx < ROOM_TW - 1 && fy < ROOM_TH - 1 && !tileSolid(r.tiles[fy][fx]);
+        }
+        if (!open) continue;
+        r.tiles[y][x] = RT_FLAMER;
+        r.flamers[r.flamerCount++] = { x, y, dbit[k], frand(0, FLAMER_CYCLE) };
+    }
+}
+
+int flamerState(const Flamer& f, float t) {
+    float ph = fmodf(t + f.phase, FLAMER_CYCLE);
+    float idle = FLAMER_CYCLE - FLAMER_WARN - FLAMER_BURN;
+    return ph < idle ? 0 : ph < idle + FLAMER_WARN ? 1 : 2;
+}
+
+int flameTiles(const Room& r, const Flamer& f, int outX[], int outY[]) {
+    int dx = (f.dir == DIR_E) - (f.dir == DIR_W), dy = (f.dir == DIR_S) - (f.dir == DIR_N);
+    int n = 0;
+    for (int s = 1; s <= FLAMER_RANGE; ++s) {
+        int x = f.tx + dx * s, y = f.ty + dy * s;
+        if (x <= 0 || y <= 0 || x >= ROOM_TW - 1 || y >= ROOM_TH - 1 || tileSolid(r.tiles[y][x])) break;
+        outX[n] = x; outY[n] = y; n++;
+    }
+    return n;
+}
+
+bool inFlames(const Room& r, Vector2 p, float t) {
+    int tx = (int)floorf(p.x / TILE), ty = (int)floorf(p.y / TILE);
+    int fx[FLAMER_RANGE], fy[FLAMER_RANGE];
+    for (int i = 0; i < r.flamerCount; ++i) {
+        if (flamerState(r.flamers[i], t) != 2) continue;
+        for (int k = 0, n = flameTiles(r, r.flamers[i], fx, fy); k < n; ++k)
+            if (fx[k] == tx && fy[k] == ty) return true;
+    }
+    return false;
 }
 
 // Fill a rectangle of interior tiles (clipped to the interior).
@@ -134,7 +254,8 @@ static void fillRect(Room& r, int x0, int y0, int w, int h, unsigned char v) {
 void Room::buildLayout() {
     for (auto& row : tiles) for (auto& c : row) c = RT_FLOOR;
     hasChest = chestOpened = false;
-    if (isStart || isBoss || isShop) return;    // start, boss and shop rooms stay open
+    flamerCount = 0;
+    if (isStart || isBoss || isShop || isTreasure || isCasino) return;    // start, boss and shop rooms stay plain rectangles
 
     int midX = ROOM_TW / 2, midY = ROOM_TH / 2;
     switch (GetRandomValue(0, 5)) {
@@ -170,6 +291,9 @@ void Room::buildLayout() {
         if (tiles[y][x] == RT_FLOOR) tiles[y][x] = RT_SPIKES;
     }
 
+    carveShape(*this);
+    placeFlamers(*this);
+
     // Keep the door lanes (centre row/column) clear so every door is reachable.
     for (int x = 1; x < ROOM_TW - 1; ++x) if (tiles[midY][x] == RT_WALL) tiles[midY][x] = RT_FLOOR;
     for (int y = 1; y < ROOM_TH - 1; ++y) if (tiles[y][midX] == RT_WALL) tiles[y][midX] = RT_FLOOR;
@@ -184,13 +308,13 @@ void Room::buildLayout() {
         for (int k = 0; k < 4; ++k) {
             int nx = x + dx[k], ny = y + dy[k];
             if (nx <= 0 || ny <= 0 || nx >= ROOM_TW - 1 || ny >= ROOM_TH - 1) continue;
-            if (seen[ny][nx] || tiles[ny][nx] == RT_WALL) continue;
+            if (seen[ny][nx] || tileSolid(tiles[ny][nx])) continue;
             seen[ny][nx] = true; qx[tail] = nx; qy[tail] = ny; tail++;
         }
     }
     for (int y = 1; y < ROOM_TH - 1; ++y)
         for (int x = 1; x < ROOM_TW - 1; ++x)
-            if (!seen[y][x]) tiles[y][x] = RT_WALL;
+            if (!seen[y][x] && !tileSolid(tiles[y][x])) tiles[y][x] = RT_WALL;
 
     // Roughly half the rooms hide a chest on a reachable floor tile.
     if (GetRandomValue(0, 99) < 50) {
@@ -221,7 +345,7 @@ static int doorCellDir(int tx, int ty) {
 
 bool roomWallSolid(const Room& r, int tx, int ty, bool doorsOpen) {
     bool border = (tx <= 0 || ty <= 0 || tx >= ROOM_TW - 1 || ty >= ROOM_TH - 1);
-    if (!border) return r.tiles[ty][tx] == RT_WALL;
+    if (!border) return tileSolid(r.tiles[ty][tx]);
     int dir = doorCellDir(tx, ty);
     if (dir && (r.doors & dir) && doorsOpen) return false;  // open passage
     return true;
@@ -258,7 +382,7 @@ Vector2 moveInRoom(Vector2 pos, Vector2 delta, float radius, const Room& r, bool
 // ---------------------------------------------------------------- pathfinding
 static bool walkable(const Room& r, int tx, int ty) {
     if (tx <= 0 || ty <= 0 || tx >= ROOM_TW - 1 || ty >= ROOM_TH - 1) return false;
-    return r.tiles[ty][tx] != RT_WALL;
+    return !tileSolid(r.tiles[ty][tx]);
 }
 
 void buildFlowField(const Room& r, Vector2 target, bool avoidSpikes, FlowField& out) {

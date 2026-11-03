@@ -22,13 +22,23 @@
 #include <string>
 #include <vector>
 
-enum class Screen { Menu, Champions, Settings, Controls, Intro, Play };
+enum class Screen { Menu, Setup, Champions, Settings, Controls, Intro, Play };
 enum class Mode { Run, BossRush };
-enum class Overlay { None, Pause, Controls, Shop, Galin, RunComplete, RushOver };
+enum class Overlay { None, Pause, Controls, Shop, Galin, RunComplete, RushOver, Roulette, Casino, Summary };
 
 struct Popup { const Anim* anim; Vector2 pos; float t; };        // a flask rising from a chest
 struct Coin { Vector2 pos, vel; float t; bool pack = false; };    // loot that flies to you (gold, or a cigarette pack)
 struct FloatText { Vector2 pos; float t; int value; Color color; };  // damage numbers
+
+// A roulette wheel: the prize wheel of a level-up, or Toshko's casino.
+struct Wheel {
+    bool  casino = false;
+    bool  spinning = false, done = false;
+    float angle = 0, speed = 0;         // degrees, and degrees a second
+    int   result = -1;                  // the wedge under the pointer when it stopped
+    int   bet = 10, pick = 0;           // the casino: the stake, and 0 red / 1 black / 2 Toshko's zero
+    std::string message;
+};
 
 // Share-friendly borderless fullscreen (see Game.cpp).
 bool isFullscreen();
@@ -61,6 +71,7 @@ struct Game {
     void menuScreen();
     void championsScreen();
     void settingsScreen();
+    void setupScreen();                 // a new run: difficulty and hardcore
     void controlsScreen();
     void introScreen();
     void playScreen();
@@ -85,7 +96,24 @@ struct Game {
     void hurtPlayer(float damage, float invuln);
     void killEnemy(Enemy& e);
     void finalBlow(const Enemy& e);     // the last of the boss: freeze, slow down, fall apart
+    void enemyShoot(const Enemy& e);    // an arrow, a magic orb or a gob of blood at the player
     void checkRoomExits();
+    Enemy& spawnEnemy(const char* name, float hp, float spd, int dmg, int xp, float rad, Color col,
+        const char* weak, int kind, float minFromPlayer = 0);
+    void spawnMonster(int type, float tough, float minFromPlayer = 0);   // a MonsterType
+    void spawnElite();
+    void updateChallenge(float dt);
+    void usePotion(int which);          // 0 health, 1 mana
+    void openMimic();
+    void playerDied();
+    void autosave();
+    void hapticBuzz(int ms);
+    void spinWheel();
+    void updateWheel(float dt);
+    void wheelLanded();
+    int   theme() const;                // THEMES index for this floor
+    float diffHp() const;               // the difficulty's monster health...
+    float diffDmg() const;              // ...and damage
     void buy(int item);
     void buyWeapon(int weapon);         // buys it, or just equips it if it's owned
     void buyUpgrade(int upgrade);       // for the weapon in hand
@@ -111,6 +139,10 @@ struct Game {
     void drawControlsEditor();
     void drawRunComplete();
     void drawRushOver();
+    void drawWheel(Vector2 c, float radius);
+    void drawRoulette();
+    void drawCasino();
+    void drawSummary();
     void drawMenuBackground();
     void drawFear(float x, float above, float below, float size) const;   // over a scared enemy
     void drawName(int champion, float x, float y, int size, Color color, bool centred = false) const;
@@ -164,6 +196,16 @@ struct Game {
     bool  chestLooting = false;         // its loot is still in the air: the glow stays
     bool  chestMana = false;            // what the chest held, for when the lid goes up
     bool  chestPack = false;            // and whether a cigarette pack was in there too
+    Vector2 camPos = { 0, 0 };     // where the follow camera looks (eases after the player)
+    int   difficulty = 1;               // DIFFICULTIES
+    bool  hardcore = false;             // one life: dying ends the run
+    RunStats stats;
+    float challengeT = 0, challengeWaveT = 0;   // a challenge room: seconds left, and to the next wave
+    float autosaveT = 0;
+    bool  testMode = false;             // the autopilot: no mimics, and level-ups skip the prize wheel
+    Wheel wheel;
+    bool  summaryWon = false;           // the summary: a finished run, or a hardcore death
+    void updateCamera(float dt);
     float banner = 0;
     std::string bannerText, bannerSub;
     std::string dialogue;
@@ -195,23 +237,78 @@ struct Game {
 inline constexpr Vector2 MERCHANT_POS = { ROOM_PX_W / 2, ROOM_PX_H / 2 - 10 };
 inline constexpr Vector2 ORACLE_POS = { ROOM_PX_W / 2 - 90, ROOM_PX_H / 2 - 40 };
 inline constexpr Vector2 ROOM_CENTER = { ROOM_PX_W / 2, ROOM_PX_H / 2 };
+inline constexpr Vector2 SILVER_POS = { ROOM_PX_W / 2 + 64, ROOM_PX_H / 2 };   // the silver key, beside the gold one
+
+// Difficulty: how much health monsters (and bosses) have, and how hard they hit.
+struct DifficultyDef { const char* name; const char* desc; float hp, dmg; };
+inline constexpr DifficultyDef DIFFICULTIES[3] = {
+    { "Easy",   "Monsters have 30% less health and hit 40% softer.", 0.7f, 0.6f },
+    { "Normal", "The Spice Trip as it was meant to be.",             1.0f, 1.0f },
+    { "Hard",   "Monsters have 35% more health and hit 40% harder.", 1.35f, 1.4f },
+};
+
+// Each floor of a cycle has its own look: a tint over the stone and a fog colour.
+struct FloorTheme { const char* name; Color tint, fog; };
+inline constexpr FloorTheme THEMES[6] = {
+    { "The Mistwood Depths", { 255, 255, 255, 255 }, { 122, 154, 138, 255 } },
+    { "The Drowned Crypt",   { 175, 205, 255, 255 }, {  80, 120, 190, 255 } },
+    { "The Ember Halls",     { 255, 190, 155, 255 }, { 200,  90,  50, 255 } },
+    { "The Bone Gardens",    { 240, 230, 205, 255 }, { 200, 190, 150, 255 } },
+    { "The Toxic Sewers",    { 190, 255, 175, 255 }, {  90, 170,  70, 255 } },
+    { "The Gilded Vault",    { 255, 228, 160, 255 }, { 220, 180,  80, 255 } },
+};
+
+// The monsters a room can hold (spawnMonster).
+enum MonsterType { MT_MISTLING, MT_HOUND, MT_WISP, MT_GAKEV, MT_TOSHKO, MT_MELON, MT_SOLDIER, MT_BLOOD, MT_ORC, MT_DEMON };
+
+// One combat room a floor holds a mini-boss: a named, bigger, tougher monster.
+struct EliteDef { const char* name; int type; };
+inline constexpr EliteDef ELITES[5] = {
+    { "Orc Warlord", MT_ORC }, { "Gakev the Elder", MT_GAKEV }, { "Captain of the Guard", MT_SOLDIER },
+    { "Mega Melon", MT_MELON }, { "Alpha Hound", MT_HOUND },
+};
+
+// The prize wheel spun on every level-up.
+enum Prize { PZ_HEALTH, PZ_MANA, PZ_DAMAGE, PZ_SPEED, PZ_GOLD, PZ_PACK, PZ_TOSHKO, PZ_JACKPOT, PZ_COUNT };
+struct PrizeDef { const char* label; const char* won; Color color; };
+inline constexpr PrizeDef PRIZES[PZ_COUNT] = {
+    { "+25 HP",    "+25 max health",          { 180,  50,  60, 255 } },
+    { "+20 MANA",  "+20 max mana",            {  50,  90, 190, 255 } },
+    { "+5 DMG",    "+5 blade damage",         { 200, 120,  40, 255 } },
+    { "SPEED",     "You move 8% faster",      {  60, 150,  90, 255 } },
+    { "+40 GOLD",  "+40 gold",                { 190, 160,  50, 255 } },
+    { "PACK",      "A cigarette pack",        { 140,  90,  60, 255 } },
+    { "TOSHKO",    "Toshko stole the prize!", {  40,  40,  60, 255 } },
+    { "JACKPOT",   "JACKPOT! +120 gold",      { 230, 200,  90, 255 } },
+};
+
+// Toshko's casino: his green zero, then red and black. Colours pay double, the zero fourteen times.
+inline constexpr int CASINO_SLOTS = 15;
+inline constexpr int CASINO_BETS[4] = { 10, 25, 50, 100 };
+
+inline constexpr float CHALLENGE_TIME = 30, CHALLENGE_WAVE = 7;   // a challenge room: how long, and how often a wave comes
+inline constexpr int   MIMIC_PERCENT = 18;    // the chance a chest is a Mimic
+inline constexpr int   POTION_MAX = 3;        // potions of each kind the belt holds
 
 // What Marin sells. Potions (vape == -1) can be bought again and again; a vape
 // is a permanent buff, one of each.
 struct ShopItem { const char* name; const char* desc; int price; int vape; };
 inline constexpr ShopItem SHOP_ITEMS[] = {
-    { "Health Potion",   "Heals 35 HP (never above max)",         8, -1 },
-    { "Mana Potion",     "Restores 50 mana",                      6, -1 },
+    { "Health Potion",   "Into your belt: heals 35 HP",           8, -1 },
+    { "Mana Potion",     "Into your belt: restores 50 mana",      6, -1 },
     { "Mango Haze",      "Vape: move 10% faster, for good",      30, VP_MANGO },
     { "Blue Razz Ice",   "Vape: powers cost 20% less, for good", 35, VP_RAZZ },
     { "Watermelon Rage", "Vape: +4 blade damage, for good",      30, VP_MELON },
     { "Cool Mint Fog",   "Vape: take 15% less damage, for good", 40, VP_MINT },
+    { "Grape Ice",       "Vape: mana refills 50% faster, for good", 30, VP_GRAPE },
+    { "Peach Rings",     "Vape: 1 coin in 4 counts double, for good", 35, VP_PEACH },
 };
 inline constexpr int SHOP_COUNT = (int)(sizeof SHOP_ITEMS / sizeof SHOP_ITEMS[0]);
 
 // The colour of each vape's vapour puffs.
 inline constexpr Color VAPE_COLOR[VP_COUNT] = {
-    { 255, 176, 64, 255 }, { 96, 160, 255, 255 }, { 240, 80, 96, 255 }, { 170, 250, 220, 255 } };
+    { 255, 176, 64, 255 }, { 96, 160, 255, 255 }, { 240, 80, 96, 255 }, { 170, 250, 220, 255 },
+    { 190, 120, 255, 255 }, { 255, 150, 110, 255 } };
 
 // What Galin sells.
 struct WeaponDef {
@@ -232,6 +329,8 @@ inline constexpr WeaponDef WEAPONS[WEAPON_COUNT] = {
     { "Police Baton", "police-baton/sprite-128.png",       45,  90,  3, 0.30f, 36,  6, "bonk" },
     { "Baseball Bat", "baseball-bat/sprite-128.png",       45, 130, 12, 0.55f, 48, 28, "bonk" },
     { "Pink Sword",   "pink-sword/sprite-128.png",         45, 190, 13, 0.40f, 50, 14, "clang", true },
+    { "Frying Pan",   "frying-pan/sprite-128.png",         45, 110,  8, 0.45f, 38, 34, "bonk" },
+    { "Toshko's Katana", "katana/sprite-128.png",          45, 240, 16, 0.32f, 54, 10, "clang" },
 };
 
 // An upgrade's price: one cigarette pack, and `gold` times the level it's going to.
@@ -244,6 +343,11 @@ inline constexpr UpgradeDef UPGRADES[UPGRADE_COUNT] = {
 
 // Every Gakev drops a cigarette pack. This is the chance (in percent) that a chest holds one too.
 inline constexpr int CHEST_PACK_PERCENT = 25;
+
+// Soldiers hold their ground this far from you, and back off when you get closer than this.
+inline constexpr float SOLDIER_RANGE = 220, SOLDIER_CLOSE = 130;
+inline constexpr float ARROW_SPEED = 300, ORB_SHOT_SPEED = 190;
+inline constexpr float ORC_REACH = 24;          // an orc's axe lands this far beyond touching you
 
 // The feel of combat.
 inline constexpr float HIT_FREEZE = 0.05f;      // seconds the world stops on a blade hit

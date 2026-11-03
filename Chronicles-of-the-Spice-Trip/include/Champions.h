@@ -42,6 +42,9 @@ struct ChampionDef {
     int   extraCoins = 0;     // extra coins per kill
     float stillRegen = 0;     // health per second while standing still
     float spellHoming = 0;    // spells curve toward enemies (rad/s)
+
+    const char* quote = "";   // their line on the champion select
+    const char* winLine = ""; // what they say when a boss falls
 };
 
 inline constexpr int CHAMPION_COUNT = 11;

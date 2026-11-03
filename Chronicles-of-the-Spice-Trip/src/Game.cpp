@@ -6,6 +6,7 @@
 #include "Touch.h"
 #include "Render.h"
 #include "Ui.h"
+#include "Platform.h"
 #include "rlgl.h"
 #include <algorithm>
 #include <cmath>
@@ -187,6 +188,7 @@ void Game::frame() {
     ClearBackground(ui::INK);
     switch (screen) {
     case Screen::Menu:      menuScreen(); break;
+    case Screen::Setup:     setupScreen(); break;
     case Screen::Champions: championsScreen(); break;
     case Screen::Settings:  settingsScreen(); break;
     case Screen::Controls:  controlsScreen(); break;
@@ -228,6 +230,7 @@ void Game::startRun() {
     dungeon.galinNext = GetRandomValue(0, 1);
     dungeon.generate();
     floor = 1; kills = 0; runTime = 0;
+    stats = RunStats{}; wheel = Wheel{}; challengeT = 0; autosaveT = 0;
     dialogue.clear(); overlay = Overlay::None; scareT = 0;
     screen = Screen::Play; t = 0;
     enterRoom();
@@ -241,6 +244,7 @@ void Game::startBossRush() {
     dungeon.generateArena();
     floor = 1; kills = 0;
     rushStage = 0; rushTime = 0; rushNextT = -1; rushWon = rushRecord = false;
+    stats = RunStats{}; wheel = Wheel{}; challengeT = 0;
     dialogue.clear(); overlay = Overlay::None; scareT = 0;
     screen = Screen::Play; t = 0;
     enterRoom();
@@ -252,6 +256,8 @@ bool Game::continueRun() {
     mode = Mode::Run;
     player = run.player; dungeon = run.dungeon;
     floor = run.floor; kills = run.kills; runTime = run.runTime;
+    difficulty = run.difficulty; hardcore = run.hardcore; stats = run.stats;
+    wheel = Wheel{}; challengeT = 0; autosaveT = 0;
     dialogue.clear(); overlay = Overlay::None; scareT = 0;
     screen = Screen::Play; t = 0;
     enterRoom();
@@ -265,6 +271,7 @@ bool Game::saveRun() {
     run = RunSave{};
     run.player = player; run.dungeon = dungeon;
     run.floor = floor; run.kills = kills; run.runTime = runTime;
+    run.difficulty = difficulty; run.hardcore = hardcore; run.stats = stats;
     bool ok = save::writeRun(run);
     hasSave = hasSave || ok;
     return ok;
@@ -290,7 +297,20 @@ int Game::currentBossIndex() const {
 
 const BossDef& Game::currentBoss() const { return BOSSES[currentBossIndex()]; }
 
-float Game::currentStrength() const { return mode == Mode::BossRush ? 1.0f : bossStrength(floor); }
+float Game::currentStrength() const { return mode == Mode::BossRush ? 1.0f : bossStrength(floor) * diffHp(); }
+
+int   Game::theme() const { return mode == Mode::Run ? (floor - 1) % 6 : 0; }
+float Game::diffHp() const { return mode == Mode::Run ? DIFFICULTIES[difficulty].hp : 1.0f; }
+float Game::diffDmg() const { return mode == Mode::Run ? DIFFICULTIES[difficulty].dmg : 1.0f; }
+
+void Game::autosave() {
+    autosaveT = 0;
+    if (mode == Mode::Run && screen == Screen::Play && player.hp > 0) saveRun();
+}
+
+void Game::hapticBuzz(int ms) {
+    if (settings.vibrate && touch::enabled()) platform::vibrate(ms);
+}
 
 // ------------------------------------------------------------------- rooms
 void Game::enterRoom() {
@@ -301,37 +321,17 @@ void Game::enterRoom() {
     flashes.clear(); arcs.clear(); cracks.clear(); spikes.clear(); rubble.clear();
     skyFlash = 0; finaleT = 0; slowMo = 0; rewardT = 0;
     chestOpenT = 99; chestLight = 0; chestLooting = false;
-    castT = 0; hitStop = 0;
-    if (overlay == Overlay::Shop || overlay == Overlay::Galin) overlay = Overlay::None;
+    castT = 0; hitStop = 0; challengeT = 0;
+    if (overlay == Overlay::Shop || overlay == Overlay::Galin || overlay == Overlay::Casino) overlay = Overlay::None;
 
     Room& r = dungeon.cur();
     if (r.isShop && !r.visited) showBanner(r.isGalin ? "Galin's Dobrich Stock" : "Marin's Market", "Press E to trade", 2.0f);
+    else if (r.isCasino && !r.visited) showBanner("Toshko's Roulette", "Press E to gamble", 2.0f);
+    else if (r.isTreasure && !r.visited) showBanner("Treasure room", "Press E to open the hoard", 2.0f);
     r.visited = true;
     inFight = false;
-    music.setMood(r.isBoss && !r.cleared ? "boss" : "mist");
+    music.setMood(r.isBoss && !r.cleared ? TextFormat("boss%d", currentBossIndex()) : "mist");
     if (r.cleared) return;
-
-    auto spawn = [&](const char* name, float hp, float spd, int dmg, int xp, float rad, Color col,
-        const char* weak, int kind) {
-        Enemy e;
-        e.name = name; e.hp = e.maxHp = hp; e.speed = spd; e.dmg = dmg; e.xp = xp;
-        e.r = rad; e.color = col; e.weakness = weak; e.kind = kind;
-        e.wobble = frand(0, 6.28f); e.animT = frand(0, 1);
-        e.flankSide = GetRandomValue(0, 1) ? 1.0f : -1.0f; e.lungeCd = frand(0.5f, 2.0f);
-        // a random open floor spot away from the walls
-        int tx = 0, ty = 0;
-        for (int tries = 0; tries < 100; ++tries) {
-            tx = GetRandomValue(3, ROOM_TW - 4);
-            ty = GetRandomValue(3, ROOM_TH - 4);
-            if (!r.isFloor(tx, ty)) continue;
-            // Toshko starts well away from the player, so there's time to react
-            Vector2 at = { tx * (float)TILE + 16, ty * (float)TILE + 16 };
-            if (kind == EK_TOSHKO && tries < 90 && Vector2Distance(at, player.pos) < 340) continue;
-            break;
-        }
-        e.pos = { tx * (float)TILE + 16, ty * (float)TILE + 16 };
-        enemies.push_back(e);
-    };
 
     if (r.isBoss) {
         const BossDef& b = currentBoss();
@@ -342,24 +342,82 @@ void Game::enterRoom() {
         play("ultimate");
         shake = 0.6f;
     }
+    else if (r.isChallenge) {
+        // the first wave; updateChallenge sends the rest until the clock runs out
+        challengeT = CHALLENGE_TIME; challengeWaveT = CHALLENGE_WAVE;
+        float tough = 1.0f + 0.15f * (floor - 1);
+        for (int i = 0; i < 3; ++i) spawnMonster(i == 2 ? MT_SOLDIER : MT_MISTLING, tough, 140);
+        showBanner("Challenge room", TextFormat("Survive %d seconds", (int)CHALLENGE_TIME), 2.4f);
+        play("ultimate");
+    }
     else {
         // deeper floors send more and tougher monsters
         float tough = 1.0f + 0.15f * (floor - 1);
         int extra = (floor - 1) / 2;
-        for (int i = 0, n = 3 + GetRandomValue(0, 2) + extra; i < n; ++i)
-            spawn("Mistling", 30 * tough, 60, 6, 12, 12, { 138,168,154,255 }, "Fire", EK_SKELETON);
-        for (int i = 0, n = GetRandomValue(0, 1); i < n; ++i)
-            spawn("Hollow Hound", 70 * tough, 110, 14, 26, 13, { 42,31,46,255 }, "Fire", EK_SKELETON2);
-        for (int i = 0, n = GetRandomValue(0, 2); i < n; ++i)
-            spawn("Wisp", 20 * tough, 85, 5, 10, 10, { 120,180,230,255 }, "Lightning", EK_SKULL);
-        if (GetRandomValue(0, 2) == 0)         // Gakev: the only one who carries cigarette packs
-            spawn("Gakev", 45 * tough, 120, 9, 30, 12, { 40,60,140,255 }, "Lightning", EK_GAKEV);
-        if (GetRandomValue(1, 100) <= 30)      // Toshko: snatches 50 gold and runs
-            spawn("Toshko", 40 * tough, 175, 0, 40, 12, { 30,30,60,255 }, "Lightning", EK_TOSHKO);
-        if (GetRandomValue(0, 2) == 0)
-            spawn("Melon Warrior", 110 * tough, 50, 16, 24, 14, { 230,150,60,255 }, "Fire", EK_MELON);
+        for (int i = 0, n = 2 + GetRandomValue(0, 2) + extra; i < n; ++i) spawnMonster(MT_MISTLING, tough);
+        for (int i = 0, n = GetRandomValue(0, 1); i < n; ++i) spawnMonster(MT_HOUND, tough);
+        for (int i = 0, n = GetRandomValue(0, 1); i < n; ++i) spawnMonster(MT_WISP, tough);
+        if (GetRandomValue(0, 2) == 0) spawnMonster(MT_GAKEV, tough);           // the only one who carries cigarette packs
+        if (GetRandomValue(1, 100) <= 30) spawnMonster(MT_TOSHKO, tough);       // snatches 50 gold and runs
+        if (GetRandomValue(0, 2) == 0) spawnMonster(MT_MELON, tough);
+        for (int i = 0, n = 1 + GetRandomValue(0, 1) + extra / 2; i < n; ++i) {  // something that shoots, in every combat room
+            int shooter = GetRandomValue(0, 2);
+            spawnMonster(shooter == 0 ? MT_SOLDIER : shooter == 1 ? MT_WISP : MT_BLOOD, tough);
+        }
+        if (GetRandomValue(1, 100) <= 33) spawnMonster(MT_ORC, tough);          // a slow axe you can step away from
+        if (floor >= 2 && GetRandomValue(1, 100) <= 25) spawnMonster(MT_DEMON, tough);   // leaps at you from across the room
+        if (r.isElite) spawnElite();
     }
     inFight = true;
+}
+
+// A monster on a random open floor spot away from the walls (and, if asked, away from the player).
+Enemy& Game::spawnEnemy(const char* name, float hp, float spd, int dmg, int xp, float rad, Color col,
+    const char* weak, int kind, float minFromPlayer) {
+    Room& r = dungeon.cur();
+    Enemy e;
+    e.name = name; e.hp = e.maxHp = hp * diffHp(); e.speed = spd; e.dmg = (int)ceilf(dmg * diffDmg()); e.xp = xp;
+    e.r = rad; e.color = col; e.weakness = weak; e.kind = kind;
+    e.wobble = frand(0, 6.28f); e.animT = frand(0, 1);
+    e.flankSide = GetRandomValue(0, 1) ? 1.0f : -1.0f; e.lungeCd = frand(0.5f, 2.0f);
+    e.shootCd = frand(0.8f, 2.2f);
+    int tx = 0, ty = 0;
+    for (int tries = 0; tries < 100; ++tries) {
+        tx = GetRandomValue(3, ROOM_TW - 4);
+        ty = GetRandomValue(3, ROOM_TH - 4);
+        if (!r.isFloor(tx, ty)) continue;
+        Vector2 at = { tx * (float)TILE + 16, ty * (float)TILE + 16 };
+        if (minFromPlayer > 0 && tries < 90 && Vector2Distance(at, player.pos) < minFromPlayer) continue;
+        break;
+    }
+    e.pos = { tx * (float)TILE + 16, ty * (float)TILE + 16 };
+    enemies.push_back(e);
+    return enemies.back();
+}
+
+void Game::spawnMonster(int type, float tough, float minFromPlayer) {
+    switch (type) {
+    case MT_MISTLING: spawnEnemy("Mistling", 30 * tough, 60, 6, 12, 12, { 138,168,154,255 }, "Fire", EK_SKELETON, minFromPlayer); break;
+    case MT_HOUND:    spawnEnemy("Hollow Hound", 70 * tough, 110, 14, 26, 13, { 42,31,46,255 }, "Fire", EK_SKELETON2, minFromPlayer); break;
+    case MT_WISP:     spawnEnemy("Wisp", 20 * tough, 85, 5, 10, 10, { 120,180,230,255 }, "Lightning", EK_SKULL, minFromPlayer); break;
+    case MT_GAKEV:    spawnEnemy("Gakev", 45 * tough, 120, 9, 30, 12, { 40,60,140,255 }, "Lightning", EK_GAKEV, minFromPlayer); break;
+    // Toshko starts well away from the player, so there's time to react
+    case MT_TOSHKO:   spawnEnemy("Toshko", 40 * tough, 175, 0, 40, 12, { 30,30,60,255 }, "Lightning", EK_TOSHKO, fmaxf(minFromPlayer, 340)); break;
+    case MT_MELON:    spawnEnemy("Melon Warrior", 110 * tough, 50, 16, 24, 14, { 230,150,60,255 }, "Fire", EK_MELON, minFromPlayer); break;
+    case MT_SOLDIER:  spawnEnemy("Soldier", 35 * tough, 70, 8, 20, 12, { 150,160,180,255 }, "Lightning", EK_SOLDIER, minFromPlayer); break;
+    case MT_BLOOD:    spawnEnemy("Blood Monster", 70 * tough, 60, 10, 24, 14, { 170,30,60,255 }, "Fire", EK_BLOOD, minFromPlayer); break;
+    case MT_ORC:      spawnEnemy("Orc", 90 * tough, 75, 16, 28, 13, { 110,150,70,255 }, "Fire", EK_ORC, minFromPlayer); break;
+    case MT_DEMON:    spawnEnemy("Demon", 55 * tough, 105, 12, 32, 12, { 120,30,40,255 }, "Water", EK_DEMON, minFromPlayer); break;
+    }
+}
+
+void Game::spawnElite() {
+    const EliteDef& d = ELITES[GetRandomValue(0, 4)];
+    spawnMonster(d.type, 1.0f + 0.15f * (floor - 1), 160);
+    Enemy& e = enemies.back();
+    e.name = d.name; e.elite = true;
+    e.hp = e.maxHp = e.maxHp * 4; e.dmg = (int)ceilf(e.dmg * 1.5f); e.xp *= 4; e.r *= 1.35f;
+    showBanner(d.name, "A champion of the depths guards this room", 2.4f);
 }
 
 void Game::descend() {
@@ -371,8 +429,9 @@ void Game::descend() {
     player.pos = ROOM_CENTER;
     overlay = Overlay::None;
     enterRoom();
-    showBanner(TextFormat("Floor %d", floor), std::string(currentBoss().name) + " waits at the bottom", 2.5f);
+    showBanner(THEMES[theme()].name, TextFormat("Floor %d  -  %s waits at the bottom", floor, currentBoss().name), 2.8f);
     play("ultimate");
+    autosave();
 }
 
 void Game::bossDefeated() {
@@ -388,12 +447,14 @@ void Game::bossDefeated() {
         parts.push_back({ { ROOM_CENTER.x + frand(-50, 50), ROOM_CENTER.y }, Vector2Scale(fromAngle(-PI / 2 + frand(-1.1f, 1.1f)), frand(120, 320)), life, life,
             frand(3, 6), k % 3 ? Color{ 255, 222, 110, 255 } : Color{ 255, 255, 235, 255 }, 300, false, true });
     }
-    std::string fell = std::string(b.name) + " falls!";
+    std::string fell = std::string(b.name) + " falls!  \"" + champ().winLine + "\"";
     showBanner("BOSS DEFEATED", fell, 3.0f);
+    hapticBuzz(200);
     auto thenShow = [this](Overlay o) { rewardOverlay = o; rewardT = 2.4f; };
 
     if (mode == Mode::Run) {
         profile.deepestFloor = std::max(profile.deepestFloor, floor);
+        if (hardcore) profile.bestHardcore = std::max(profile.bestHardcore, floor);
         if (floor % BOSS_COUNT == 0) { profile.runsCompleted++; thenShow(Overlay::RunComplete); }
         else showBanner("BOSS DEFEATED", fell + " The stairs lead down", 3.0f);
     }
