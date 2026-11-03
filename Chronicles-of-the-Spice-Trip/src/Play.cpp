@@ -52,6 +52,7 @@ std::string Game::vasilGreeting() const {
 }
 
 Camera2D Game::camera() const {
+    if (hunt.active) return toiletCamera();
     int sw = GetScreenWidth(), sh = GetScreenHeight();
     Camera2D cam{};
     cam.offset = { sw / 2.0f, sh / 2.0f };
@@ -306,7 +307,8 @@ void Game::updatePlay(float dt) {
     checkRoomExits();
     bool lootTaken = coins.empty() && corpses.empty();
     if (mode == Mode::Run && room.isBoss && room.cleared && lootTaken && rewardT <= 0 && Vector2Distance(player.pos, ROOM_CENTER) < 18) {
-        descend();
+        if (currentBoss().kind == BossKind::Physics) startToilet();   // after Triceps: the toilets, then on down
+        else descend();
         return;
     }
     if (mode == Mode::BossRush && rushNextT > 0) {

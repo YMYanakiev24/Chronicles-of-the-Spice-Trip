@@ -19,6 +19,7 @@
 #include "Settings.h"
 #include "Sprites.h"
 #include "Video.h"
+#include "Toilet.h"
 #include <map>
 #include <string>
 #include <vector>
@@ -128,6 +129,12 @@ struct Game {
     void buyWeapon(int weapon);         // buys it, or just equips it if it's owned
     void buyUpgrade(int upgrade);       // for the weapon in hand
     Camera2D camera() const;
+    // the toilets after Triceps (Toilet.cpp)
+    void startToilet();
+    void updateToilet(float dt);
+    void drawToilet();
+    void drawToiletHud();
+    Camera2D toiletCamera() const;
     Vector2 mouseWorld() const;
     Vector2 aimDir() const;
     Vector2 castHand() const;           // where a spell gathers as it winds up
@@ -188,6 +195,7 @@ struct Game {
     std::vector<IceSpike> spikes;       // kept sorted by y, so nearer ones stand in front
     std::vector<Rubble> rubble;
     std::vector<Laser> lasers;          // the Gym Rat's C++, fading
+    toilet::Level hunt;                 // the toilets after Triceps: hiding from The Sergeant
     float gymT = 0;                     // the Gym Rat holds his arms-out pose this long...
     Vector2 gymDir{ 1, 0 };             // ...lasers this way, creatine the other
     float finaleT = 0, slowMo = 0;      // a boss is falling: seconds left of it, and of the slow motion
@@ -249,6 +257,8 @@ struct Game {
     Texture2D fearTex{};                // the fearful face (assets/walk/fear.png)
     VasilArt vasil;
     VideoPlayer introVideo;             // assets/intro/marin-trip.mpg
+    Texture2D toiletMap{}, sergeantTex{};   // assets/arenas/toilets.png, assets/sergeant.png
+    WalkSheet sergeantWalk;             // assets/walk/walk-sergeant.png
     BossArt bossArt;
 };
 

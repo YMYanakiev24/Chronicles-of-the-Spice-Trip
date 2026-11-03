@@ -136,6 +136,9 @@ void Game::init(bool windowed) {
     vasil.stool = loadCutout("vasil/stool.png");
     vasil.portrait = loadCutout("vasil/portrait.png");
     vasil.crowd = loadCutout("vasil/crowd.png");
+    toiletMap = loadArt("arenas/toilets.png");
+    sergeantTex = loadArt("sergeant.png");
+    sergeantWalk.load("walk-sergeant.png");
     SPR.load();
     bossArt.load();
     fight.sfx = [this](const char* s) { play(s); };
@@ -146,12 +149,14 @@ void Game::shutdown() {
     SPR.unload();
     bossArt.unload();
     for (Texture2D* tx : { &menuBg, &castleTex, &marinTex, &shopTex, &galinTex, &galinShopTex, &packTex,
-                           &vasil.seated, &vasil.story[0], &vasil.story[1], &vasil.sign, &vasil.stool, &vasil.portrait, &vasil.crowd })
+                           &vasil.seated, &vasil.story[0], &vasil.story[1], &vasil.sign, &vasil.stool, &vasil.portrait, &vasil.crowd,
+                           &toiletMap, &sergeantTex })
         if (tx->id) UnloadTexture(*tx);
     for (auto& tx : weaponTex) if (tx.id) UnloadTexture(tx);
     for (auto& tx : champTex) if (tx.id) UnloadTexture(tx);
     for (auto& w : walk) w.unload();
     introVideo.close();
+    sergeantWalk.unload();
     if (fearTex.id) UnloadTexture(fearTex);
     for (auto& [name, s] : sounds) UnloadSound(s);
     music.unload();
@@ -244,12 +249,14 @@ void Game::startRun() {
     stats = RunStats{}; wheel = Wheel{}; challengeT = 0; autosaveT = 0;
     dialogue.clear(); overlay = Overlay::None; scareT = 0;
     vasilGreetT = 9; vasilBowT = 0;     // Vasil calls you over to hear the floor's tale
+    hunt = toilet::Level{};
     screen = Screen::Play; t = 0;
     enterRoom();
     showBanner("The Mistwood Depths", std::string(currentBoss().name) + " waits at the bottom of floor 1", 3.0f);
 }
 
 void Game::startBossRush() {
+    hunt = toilet::Level{};
     mode = Mode::BossRush;
     player = freshPlayer(profile.champion, 5);
     player.pos = { ROOM_CENTER.x, ROOM_PX_H - TILE * 2.0f };
@@ -263,6 +270,7 @@ void Game::startBossRush() {
 }
 
 bool Game::continueRun() {
+    hunt = toilet::Level{};
     static RunSave run;                 // a Dungeon is large; keep it off the stack
     if (!save::readRun(run)) { hasSave = false; return false; }
     mode = Mode::Run;
@@ -290,6 +298,7 @@ bool Game::saveRun() {
 }
 
 void Game::toMenu() {
+    hunt = toilet::Level{};
     fight.end();
     overlay = Overlay::None;
     screen = Screen::Menu; t = 0;

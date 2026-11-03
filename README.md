@@ -152,6 +152,9 @@ to (x1.6 damage).
 | 5 | Triceps | Walks her cave like a champion; gravity grenades, magnetic boots, the fulcrum staff and the circuit chain (see below) |
 | 6 | Pyraketh, the Cinder-Maw | Chases you, breathes rings of embers, and throws fireballs once wounded |
 
+Between Triceps and the Cinder-Maw the stairs lead to the toilets first (see
+below).
+
 Beating floor 6 completes the Spice Trip. You can keep descending; every cycle
 the bosses get 50% stronger. The numbers for each boss are at the top of
 `src/Bosses.cpp`.
@@ -175,6 +178,29 @@ them:
 Below half health she walks less, throws two grenades and kicks five boots, and
 her circuit has five nodes. She is weak to Water. Momiche's scare sends her
 running, but a grenade or circuit she has already started keeps going.
+
+### The toilets: hiding from The Sergeant
+
+After Triceps falls, her stairs lead to the school toilets
+(`assets/arenas/toilets.png`) instead of straight down. The Sergeant
+(`assets/sergeant.png`, walking as `assets/walk/walk-sergeant.png`) is hunting
+you, and you have to stay hidden for one minute.
+
+- **You smoke the whole time**, and the smoke gives you away: she smells it from
+  a fair way off and follows it to where you were.
+- **Stalls.** Walk up into a stall's door, or press **E** in front of it, to
+  hide behind it; down or **E** again to come out. She can't see you in there,
+  but your smoke still rises over the door, and she tries doors on her rounds.
+- **Q is a pee** in this level (3 s, then 6 s before you can go again). While you
+  pee you can't move and you don't smoke, and you leave a puddle. If she walks
+  into a puddle she slips and is down for almost 2 seconds.
+- **If she sees you** in the open she runs at you. If she catches you, or opens
+  the stall you're in, the toilets start over with a fresh minute.
+- **Last the minute** and you get 60 gold and a cigarette pack, and the stairs
+  lead on to floor 6.
+
+The floors, stalls and her rounds are at the top of `src/Toilet.cpp`, and the
+numbers (time, speeds, how far she smells and sees) in `include/Toilet.h`.
 
 ### Vasil the Storyteller
 
@@ -233,6 +259,7 @@ Chronicles-of-the-Spice-Trip/
   src/Save.cpp        savegame.dat, profile.dat, settings.dat
   src/Autopilot.cpp   the automated play-through (see below)
   src/Video.cpp       plays the intro video (MPEG-1) with its sound
+  src/Toilet.cpp      the toilets after Triceps: hiding from The Sergeant
   assets/             art; assets/arenas/ holds the bosses' painted arenas,
                       assets/walk/ the champions' and Triceps' walk sheets,
                       assets/vasil/ Vasil the Storyteller and his listeners
@@ -245,8 +272,9 @@ Chronicles-of-the-Spice-Trip/
 `--autopilot <folder>` plays the whole game with scripted input. It watches
 the start of Marin's video and skips it, clicks through the menus, fights a room, opens a chest, shops, beats all six bosses
 (and checks each of Triceps' attacks),
-completes a run, saves and continues, wins a Boss Rush, checks Vasil has each
-floor's tale, and tries every
+hides from The Sergeant in the toilets (smoke, the pee and its puddle, a stall,
+being found, a minute survived), completes a run, saves and continues, wins a
+Boss Rush, checks Vasil has each floor's tale, and tries every
 champion's special, Momiche's scare on a boss, Gakev's coins and casting with
 Enter. It writes a PASS/FAIL line for each check (186) to
 `<folder>/autopilot.log`, saves screenshots next to it, and exits with the

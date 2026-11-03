@@ -749,7 +749,86 @@ void Autopilot::build() {
             return true;
         });
     };
-    auto slayAndDescend = [this, add](int index, const char* shotName) {
+    // The toilets after Triceps: smoke, the pee and its puddle, a stall, being found, and a minute survived.
+    auto toiletSteps = [this, add]() {
+        using namespace toilet;
+        add("to the toilets", 8, [this](Game& g, float) {
+            g.player.pos = ROOM_CENTER;               // the stairs
+            if (!g.hunt.active) return false;
+            check("after Triceps the stairs lead to the toilets, a minute on the clock", g.floor == 5 && g.hunt.timeLeft > 59);
+            check("the toilets, The Sergeant and her walking figure are loaded", g.toiletMap.id && g.sergeantTex.id && g.sergeantWalk.ok() && g.sergeantWalk.frames == 5);
+            return true;
+        });
+        add("toilet smoke", 3, [this](Game& g, float t) {
+            if (t < 0.8f) return false;
+            check("you smoke the whole time", g.hunt.smoke.size() >= 4);
+            shot(g, "toilets");
+            return true;
+        });
+        add("toilet pee", 4, [this](Game& g, float t) {
+            Level& L = g.hunt;
+            if (t == 0) { L.sPos = { 1150, 225 }; L.state = Hunt::Patrol; in::tap(g.settings.keys.special); return false; }
+            if (t < 1.0f) return false;
+            bool fresh = false;
+            for (auto& p : L.smoke) fresh |= p.t < 0.7f;
+            check("Q: a 3 second pee, and no smoke while it lasts", L.peeT > 1.5f && L.peeT < PEE_TIME && !fresh);
+            check("the pee leaves a puddle", L.puddles.size() == 1 && L.puddles[0].r > 5);
+            shot(g, "toilet-pee");
+            return true;
+        });
+        add("toilet slip", 5, [this](Game& g, float t) {
+            Level& L = g.hunt;
+            if (t == 0) {
+                L.puddles.push_back({ { 600, 730 }, PUDDLE_R, 0 });
+                L.sPos = { 520, 730 }; L.state = Hunt::Sniff; L.target = { 700, 730 }; L.checkStall = -1;
+                return false;
+            }
+            if (L.state != Hunt::Slip) return false;
+            check("The Sergeant slips in your puddle", L.slipT > 0);
+            shot(g, "toilet-slip");
+            return true;
+        });
+        add("toilet hide", 6, [this](Game& g, float t) {
+            Level& L = g.hunt;
+            if (t == 0) markF = 0;
+            L.sPos = { 1150, 225 }; L.state = Hunt::Patrol;   // keep her away for now
+            if (L.peeT > 0) return false;
+            if (markF == 0) { L.pos = stallFront(stalls()[7]); in::tap(g.settings.keys.interact); markF = t + 0.0001f; return false; }
+            if (t < markF + 0.6f) return false;
+            check("E at a stall door: you hide inside", L.hiddenIn == 7);
+            check("your smoke still rises over the stall door", !L.smoke.empty() && L.smoke.back().stall == 7);
+            shot(g, "toilet-hidden");
+            return true;
+        });
+        add("toilet found", 8, [this](Game& g, float t) {
+            Level& L = g.hunt;
+            if (t == 0) { L.sPos = { 450, 546 }; L.state = Hunt::Patrol; L.checkCd = 9; return false; }   // near enough to smell it
+            if (!L.caught) return false;
+            check("she follows your smoke to the stall, tries the door and finds you", L.hiddenIn == 7);
+            return true;
+        });
+        add("toilet retry", 5, [this](Game& g, float) {
+            Level& L = g.hunt;
+            if (L.caught || L.tries != 1) return false;
+            check("caught: the toilets start over with a fresh minute", L.active && L.timeLeft > 59 && L.hiddenIn < 0);
+            return true;
+        });
+        add("toilet survived", 8, [this](Game& g, float t) {
+            Level& L = g.hunt;
+            if (t == 0) {
+                L.sPos = { 1300, 230 }; L.state = Hunt::Patrol; L.checkCd = 99;
+                L.hiddenIn = 4; L.pos = stallInside(stalls()[4]);
+                L.timeLeft = 0.5f; markX = (float)g.player.gold; markY = (float)g.player.packs;
+                return false;
+            }
+            if (g.floor != 6) return false;
+            check("hide for the whole minute: +60 gold and a pack, and on to floor 6",
+                !g.hunt.active && g.dungeon.cur().isStart && g.player.gold == (int)markX + 60 && g.player.packs == (int)markY + 1);
+            check("Vasil waits there with floor 6's own tale", g.vasilGreetT > 0 && g.vasilGreeting().find(THEMES[5].name) != std::string::npos);
+            return true;
+        });
+    };
+    auto slayAndDescend = [this, add, toiletSteps](int index, const char* shotName) {
         add(TextFormat("slay boss %d", index + 1), 15, [this, index, shotName](Game& g, float t) {
             if (t < 0.2f) return false;
             slayBosses(g);
@@ -758,6 +837,7 @@ void Autopilot::build() {
             if (shotName) shot(g, shotName);
             return true;
         });
+        if (BOSSES[index].kind == BossKind::Physics) { toiletSteps(); return; }   // after Triceps: the toilets first
         if (index + 1 < BOSS_COUNT)
             add(TextFormat("descend from %d", index + 1), 8, [this, index](Game& g, float t) {
                 g.player.pos = ROOM_CENTER;           // stand on the stairs once the loot is in
@@ -1039,7 +1119,7 @@ void Autopilot::build() {
     add("continued", 3, [this](Game& g, float t) {
         if (t < 0.4f) return false;
         check("Continue resumes on floor 7", g.screen == Screen::Play && g.floor == 7);
-        check("the save keeps the vape, the weapon and the pack", g.player.has(VP_MANGO) && g.player.weapon == 1 && g.player.upgrades[1][UP_SHARPEN] == 1 && g.player.packs == 1);
+        check("the save keeps the vape, the weapon and the packs", g.player.has(VP_MANGO) && g.player.weapon == 1 && g.player.upgrades[1][UP_SHARPEN] == 1 && g.player.packs == 2);   // one from Gakev, one from the toilets
         g.toMenu();
         return true;
     });

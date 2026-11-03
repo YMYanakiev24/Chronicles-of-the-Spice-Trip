@@ -19,6 +19,15 @@ void Game::playScreen() {
         else if (overlay == Overlay::None) overlay = Overlay::Pause;
         play("ui");
     }
+    if (hunt.active) {                              // the toilets: their own map, rules and HUD
+        if (overlay == Overlay::None) updateToilet(dt);
+        if (screen != Screen::Play) return;
+        drawToilet();
+        drawToiletHud();
+        if (overlay == Overlay::Pause) drawPause();
+        else if (overlay == Overlay::Controls) drawControlsEditor();
+        return;
+    }
     // a level-up's prize wheel comes up once the moment is calm
     if (overlay == Overlay::None && player.spins > 0 && mode == Mode::Run && finaleT <= 0 && rewardT <= 0 && hitStop <= 0) {
         if (testMode) player.spins = 0;             // the autopilot measures exact numbers: no surprise prizes
