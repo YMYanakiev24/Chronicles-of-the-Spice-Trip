@@ -24,7 +24,7 @@ add_library(spicetrip SHARED
     ${RL}/rmodels.c ${RL}/utils.c ${RL}/raudio.c
     ${GLUE}/android_native_app_glue.c)
 
-target_include_directories(spicetrip PRIVATE ${GAME}/include ${RL} ${GLUE})
+target_include_directories(spicetrip PRIVATE ${GAME}/include ${GAME}/vendor/pl_mpeg ${RL} ${GLUE})
 target_compile_definitions(spicetrip PRIVATE PLATFORM_ANDROID GRAPHICS_API_OPENGL_ES2)
 target_compile_options(spicetrip PRIVATE -w)
 target_link_options(spicetrip PRIVATE -u ANativeActivity_onCreate -Wl,-z,max-page-size=16384)

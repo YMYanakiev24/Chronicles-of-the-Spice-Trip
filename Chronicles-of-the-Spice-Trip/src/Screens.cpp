@@ -56,6 +56,26 @@ static void drawPortrait(const Game& g, int i, Rectangle dst) {
     }
 }
 
+// ------------------------------------------------------------- the video
+// Marin's video plays once as the game starts. A click, a tap or a key skips it.
+void Game::videoScreen() {
+    int sw = GetScreenWidth(), sh = GetScreenHeight();
+    bool skip = t > 0.3f && (in::mousePressed(MOUSE_BUTTON_LEFT) || in::pressed(KEY_ENTER) || in::pressed(KEY_SPACE) || in::pressed(KEY_ESCAPE));
+    introVideo.update(fminf(GetFrameTime(), 0.25f));    // real time, so the pictures keep up with the sound
+    if (skip || introVideo.finished()) {
+        introVideo.close();
+        screen = Screen::Menu; t = 0;
+        menuScreen();
+        return;
+    }
+    ClearBackground(BLACK);
+    introVideo.draw({ 0, 0, (float)sw, (float)sh });
+    if (t > 1.0f) {
+        float a = fminf(1, (t - 1.0f) * 2) * (0.45f + 0.15f * sinf(t * 3));
+        ui::textRight(touch::enabled() ? "tap to skip" : "click to skip", sw - 24.0f, sh - 34.0f, 20, Fade(ui::TEXT, a));
+    }
+}
+
 // ------------------------------------------------------------------ the menu
 void Game::menuScreen() {
     int sw = GetScreenWidth(), sh = GetScreenHeight();

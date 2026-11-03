@@ -117,10 +117,22 @@ void Autopilot::build() {
         steps.push_back({ name, timeout, std::move(run) });
     };
 
-    // ===== menus =====
+    // ===== Marin's video, then the menus =====
+    add("video", 5, [this](Game& g, float t) {
+        if (t < 1.5f) return false;
+        check("the game opens with Marin's video", g.screen == Screen::Video && g.introVideo.playing());
+        check("its pictures keep coming", g.introVideo.framesShown > 20 && g.introVideo.duration > 19);
+        shot(g, "video");
+        return true;
+    });
+    add("skip video", 3, [](Game&, float t) {
+        if (t < 0.1f) return false;
+        in::click(MOUSE_BUTTON_LEFT);
+        return true;
+    });
     add("menu", 6, [this](Game& g, float t) {
         if (t < 1.5f) return false;
-        check("boots to the main menu", g.screen == Screen::Menu);
+        check("a click skips the video to the main menu", g.screen == Screen::Menu && !g.introVideo.playing());
         shot(g, "menu");
         return true;
     });

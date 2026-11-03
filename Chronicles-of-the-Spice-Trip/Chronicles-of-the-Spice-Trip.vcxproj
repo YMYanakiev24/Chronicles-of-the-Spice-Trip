@@ -47,7 +47,7 @@
       <SDLCheck>true</SDLCheck>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp20</LanguageStandard>
-      <AdditionalIncludeDirectories>$(ProjectDir)vendor\raylib\include;$(ProjectDir)include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir)vendor\raylib\include;$(ProjectDir)vendor\pl_mpeg;$(ProjectDir)include</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
     <Link>
@@ -100,6 +100,7 @@
     <ClCompile Include="src\Touch.cpp" />
     <ClCompile Include="src\Save.cpp" />
     <ClCompile Include="src\Autopilot.cpp" />
+    <ClCompile Include="src\Video.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="include\Common.h" />
@@ -116,6 +117,7 @@
     <ClInclude Include="include\Save.h" />
     <ClInclude Include="include\Settings.h" />
     <ClInclude Include="include\Autopilot.h" />
+    <ClInclude Include="include\Video.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

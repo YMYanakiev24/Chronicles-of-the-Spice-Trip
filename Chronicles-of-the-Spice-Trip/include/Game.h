@@ -18,11 +18,12 @@
 #include "Save.h"
 #include "Settings.h"
 #include "Sprites.h"
+#include "Video.h"
 #include <map>
 #include <string>
 #include <vector>
 
-enum class Screen { Menu, Setup, Champions, Settings, Controls, Intro, Play };
+enum class Screen { Video, Menu, Setup, Champions, Settings, Controls, Intro, Play };
 enum class Mode { Run, BossRush };
 enum class Overlay { None, Pause, Controls, Shop, Galin, RunComplete, RushOver, Roulette, Casino, Summary };
 
@@ -76,6 +77,7 @@ struct Game {
     void  saveProfile();
 
     // ------------------------------------------------------------------ screens
+    void videoScreen();                 // Marin's video, once as the game starts
     void menuScreen();
     void championsScreen();
     void settingsScreen();
@@ -246,8 +248,11 @@ struct Game {
     WalkSheet walk[CHAMPION_COUNT];     // each champion from every side (assets/walk/)
     Texture2D fearTex{};                // the fearful face (assets/walk/fear.png)
     VasilArt vasil;
+    VideoPlayer introVideo;             // assets/intro/marin-trip.mpg
     BossArt bossArt;
 };
+
+inline constexpr const char* INTRO_VIDEO = "intro/marin-trip.mpg";   // plays once as the game starts
 
 // Fixed spots in the start and shop rooms.
 inline constexpr Vector2 MERCHANT_POS = { ROOM_PX_W / 2, ROOM_PX_H / 2 - 10 };

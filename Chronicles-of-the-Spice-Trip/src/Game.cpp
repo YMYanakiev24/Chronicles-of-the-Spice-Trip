@@ -139,6 +139,7 @@ void Game::init(bool windowed) {
     SPR.load();
     bossArt.load();
     fight.sfx = [this](const char* s) { play(s); };
+    if (introVideo.open(INTRO_VIDEO)) screen = Screen::Video;   // Marin's video first, then the menu
 }
 
 void Game::shutdown() {
@@ -150,6 +151,7 @@ void Game::shutdown() {
     for (auto& tx : weaponTex) if (tx.id) UnloadTexture(tx);
     for (auto& tx : champTex) if (tx.id) UnloadTexture(tx);
     for (auto& w : walk) w.unload();
+    introVideo.close();
     if (fearTex.id) UnloadTexture(fearTex);
     for (auto& [name, s] : sounds) UnloadSound(s);
     music.unload();
@@ -187,7 +189,7 @@ void Game::frame() {
         settings.fullscreen = isFullscreen();
         save::writeSettings(settings);
     }
-    music.vol = 0.5f * settings.musicVol;
+    music.vol = screen == Screen::Video ? 0.0f : 0.5f * settings.musicVol;   // the video has its own sound
     music.update();
 
     touch::update(screen == Screen::Play && overlay == Overlay::None, settings.keys);
@@ -195,6 +197,7 @@ void Game::frame() {
     BeginDrawing();
     ClearBackground(ui::INK);
     switch (screen) {
+    case Screen::Video:     videoScreen(); break;
     case Screen::Menu:      menuScreen(); break;
     case Screen::Setup:     setupScreen(); break;
     case Screen::Champions: championsScreen(); break;
@@ -204,7 +207,7 @@ void Game::frame() {
     case Screen::Play:      playScreen(); break;
     }
     if (touch::enabled()) touch::draw(settings.keys);
-    else drawCursor();
+    else if (screen != Screen::Video) drawCursor();
     if (!pendingShot.empty()) {            // the autopilot's screenshot, taken before the buffers swap
         rlDrawRenderBatchActive();
         Image shot = LoadImageFromScreen();

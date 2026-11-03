@@ -9,8 +9,8 @@ Cinder-Maw.
 ## Building and running
 
 You need Visual Studio 2026 with the **Desktop development with C++** workload.
-raylib is included in `Chronicles-of-the-Spice-Trip/vendor/`, so there is
-nothing else to install.
+raylib (and pl_mpeg, which plays the intro video) is included in
+`Chronicles-of-the-Spice-Trip/vendor/`, so there is nothing else to install.
 
 1. Open `Chronicles-of-the-Spice-Trip/Chronicles-of-the-Spice-Trip.slnx`.
 2. Pick **Release | x64** (or Debug) and press **F5**.
@@ -46,6 +46,13 @@ the first time it runs.
 Movement, run, roll, interact and the special can be rebound in **Settings**.
 
 ## What's in the game
+
+- **Marin's video.** Every time the game starts, Marin's video plays once
+  before the main menu: the vape, the coughing fit, and waking up in the valley
+  below the castle. A click, a tap or any of Enter, Space and Esc skips it. It
+  is `assets/intro/marin-trip.mpg` (MPEG-1 video with MP2 sound, which
+  `src/Video.cpp` plays). To swap in another video, convert it with ffmpeg:
+  `ffmpeg -i in.mp4 -vf scale=480:640:flags=area -r 30 -c:v mpeg1video -q:v 4 -c:a mp2 -b:a 192k -ar 44100 -f mpeg marin-trip.mpg`
 
 - **The dungeon.** Each floor is a grid of single-screen rooms, and the whole
   room is always on screen. Doors stay barred until a room is cleared. There are
@@ -225,21 +232,23 @@ Chronicles-of-the-Spice-Trip/
   src/Input.cpp       keyboard and mouse (real or scripted)
   src/Save.cpp        savegame.dat, profile.dat, settings.dat
   src/Autopilot.cpp   the automated play-through (see below)
+  src/Video.cpp       plays the intro video (MPEG-1) with its sound
   assets/             art; assets/arenas/ holds the bosses' painted arenas,
                       assets/walk/ the champions' and Triceps' walk sheets,
                       assets/vasil/ Vasil the Storyteller and his listeners
   vendor/raylib/      raylib headers and library
+  vendor/pl_mpeg/     pl_mpeg, the MPEG-1 decoder (MIT, one header)
 ```
 
 ## Automated play-through
 
-`--autopilot <folder>` plays the whole game with scripted input. It clicks
-through the menus, fights a room, opens a chest, shops, beats all six bosses
+`--autopilot <folder>` plays the whole game with scripted input. It watches
+the start of Marin's video and skips it, clicks through the menus, fights a room, opens a chest, shops, beats all six bosses
 (and checks each of Triceps' attacks),
 completes a run, saves and continues, wins a Boss Rush, checks Vasil has each
 floor's tale, and tries every
 champion's special, Momiche's scare on a boss, Gakev's coins and casting with
-Enter. It writes a PASS/FAIL line for each check (184) to
+Enter. It writes a PASS/FAIL line for each check (186) to
 `<folder>/autopilot.log`, saves screenshots next to it, and exits with the
 number of failures:
 
