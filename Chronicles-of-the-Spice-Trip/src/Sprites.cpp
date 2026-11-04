@@ -57,6 +57,8 @@ void Sprites::load() {
     key = loadStrip("key.png", 16);
     keySilver = loadStrip("key_silver.png", 16);
     rock = loadStrip("rock.png", 64);
+    galinSmoke = loadStrip("galin_smoke.png", 60);
+    galinDodge = loadStrip("galin_dodge.png", 60);
     vapes = loadStrip("vapes.png", 32);
     spellIcons = loadStrip("spell_icons.png", 32);
     enemy[EK_SKELETON] = loadEnemy("skel1");
@@ -76,7 +78,7 @@ void Sprites::unload() {
     auto un = [](Texture2D& t) { if (t.id) UnloadTexture(t); t = Texture2D{}; };
     un(tileset);
     for (Anim* a : { &peaks, &chest, &chestOpen, &torch, &sideTorch, &candle, &candle2,
-                     &flaskRed, &flaskBlue, &flag, &coin, &skull, &flame, &key, &keySilver, &rock, &arrow, &vapes, &spellIcons })
+                     &flaskRed, &flaskBlue, &flag, &coin, &skull, &flame, &key, &keySilver, &rock, &arrow, &vapes, &spellIcons, &galinSmoke, &galinDodge })
         un(a->tex);
     for (auto& e : enemy)
         for (Anim* a : { &e.idle, &e.move, &e.attack, &e.hurt, &e.death }) un(a->tex);

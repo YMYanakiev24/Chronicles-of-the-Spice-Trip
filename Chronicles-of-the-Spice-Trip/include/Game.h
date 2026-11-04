@@ -105,6 +105,7 @@ struct Game {
     void updateEnemyShots(float dt, float slow);
     void updateLoot(float dt);
     void hitEnemy(Enemy& e, int damage, Color fx);
+    void stubOut();                     // Galin's cig, on the nearest monster's skin
     void hurtPlayer(float damage, float invuln);
     void killEnemy(Enemy& e);
     void finalBlow(const Enemy& e);     // the last of the boss: freeze, slow down, fall apart
@@ -218,6 +219,7 @@ struct Game {
     int   dripChampion = 0, dripHover = -1;   // Beray's: who you're dressing, the outfit pointed at
     float gymT = 0;                     // the Gym Rat holds his arms-out pose this long...
     Vector2 gymDir{ 1, 0 };             // ...lasers this way, creatine the other
+    float cigT = 0, stubT = 0;          // Galin: seconds of smoke left, then of the stub pose
     float finaleT = 0, slowMo = 0;      // a boss is falling: seconds left of it, and of the slow motion
     float rewardT = 0;                  // BOSS DEFEATED gets its moment before this overlay
     Overlay rewardOverlay = Overlay::None;

@@ -39,6 +39,7 @@ struct Sprites {
     Anim peaks, chest, chestOpen, torch, sideTorch, candle, candle2;
     Anim flaskRed, flaskBlue, flag, coin, skull, flame, key, keySilver, rock, arrow;
     Anim vapes, spellIcons;                    // 32px icons: one frame per Vape / SPELLS entry
+    Anim galinSmoke, galinDodge;               // Galin's poses, 3:4 frames facing right: his smoke (last frame the stub), his dodge-roll
     EnemyAnims enemy[12];                     // indexed by EnemyKind (skull slot unused)
 
     void load();

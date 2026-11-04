@@ -15,6 +15,7 @@ inline constexpr int   TILE = 32;
 inline constexpr float WALK = 130.0f;
 inline constexpr float RUN = 210.0f;
 inline constexpr float ROLL_SPEED = 360.0f;
+inline constexpr float ROLL_TIME = 0.28f;      // seconds a dodge-roll lasts
 inline constexpr float PLAYER_R = 11.0f;
 
 // --- Audio ------------------------------------------------------------------

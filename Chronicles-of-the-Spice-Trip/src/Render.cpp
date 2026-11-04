@@ -50,6 +50,12 @@ void drawChampion(const WalkSheet& w, Vector2 p, Vector2 look, bool walking, flo
     }
 }
 
+void drawPose(const Anim& a, int frame, Vector2 p, bool flipX, bool flash) {
+    drawShadow(p, PLAYER_R);
+    const float fh = 32 * 1.4f;                    // as tall as the walking figures
+    drawAnim(a, frame, { p.x, p.y - 10 }, fh / a.fh, flipX, flash ? Color{ 255, 170, 170, 255 } : WHITE);
+}
+
 void drawFigureIn(const WalkSheet& w, Facing facing, int frame, Rectangle box, Color tint) {
     float h = fminf(box.height, box.width * 4 / 3), fw = h * 3 / 4;
     w.draw(facing, frame, { box.x + (box.width - fw) / 2, box.y + box.height - h, fw, h }, tint);

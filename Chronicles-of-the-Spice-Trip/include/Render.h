@@ -17,6 +17,8 @@ struct Blade { Texture2D tex; float slant; float length; };
 void drawChampion(const WalkSheet& w, Vector2 p, Vector2 look, bool walking, float time,
                   Vector2 facing, float meleeAnim, bool flash, Color cloak, const Blade& blade, float lift = 0);
 // One frame of a walking figure, as large as fits in `box` (3:4), feet at the bottom.
+// A champion's own pose (Galin's smoke, his dodge) in place of their walking figure, the same size.
+void drawPose(const Anim& a, int frame, Vector2 p, bool flipX, bool flash);
 void drawFigureIn(const WalkSheet& w, Facing facing, int frame, Rectangle box, Color tint = WHITE);
 // A row of four figures (front, left, back, right) walking in place inside `box`.
 void drawTurnaround(const WalkSheet& w, Rectangle box, float time);
