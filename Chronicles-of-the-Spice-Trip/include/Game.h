@@ -27,7 +27,7 @@
 
 enum class Screen { Video, Menu, Setup, Champions, Settings, Controls, Intro, Play };
 enum class Mode { Run, BossRush };
-enum class Overlay { None, Pause, Controls, Shop, Galin, RunComplete, RushOver, Casino, Summary, Drip };
+enum class Overlay { None, Pause, Controls, Shop, Galin, RunComplete, RushOver, Casino, Summary, Drip, Cutscene };
 
 struct Popup { const Anim* anim; Vector2 pos; float t; };        // a flask rising from a chest
 struct Coin { Vector2 pos, vel; float t; bool pack = false; };    // loot that flies to you (gold, or a cigarette pack)
@@ -179,6 +179,7 @@ struct Game {
     void drawWheel(Vector2 c, float radius);
     void drawCasino();
     void drawSummary();
+    void drawCutscene();                // a video over the game, e.g. after the Bad Plasmodium
     void drawMenuBackground();
     void drawVasil();
     void drawFear(float x, float above, float below, float size) const;   // over a scared enemy
@@ -276,6 +277,7 @@ struct Game {
     Texture2D fearTex{};                // the fearful face (assets/walk/fear.png)
     VasilArt vasil;
     VideoPlayer introVideo;             // assets/intro/marin-trip.mpg
+    VideoPlayer cutscene;               // the one playing in Overlay::Cutscene
     Texture2D toiletMap{}, sergeantTex{};   // assets/arenas/toilets.png, assets/sergeant.png
     WalkSheet sergeantWalk;             // assets/walk/walk-sergeant.png
     Texture2D castleArt[castle::PLACE_COUNT]{}, berayTex{};   // assets/castle/
@@ -285,6 +287,7 @@ struct Game {
 };
 
 inline constexpr const char* INTRO_VIDEO = "intro/marin-trip.mpg";   // plays once as the game starts
+inline constexpr const char* BAD_PLASMODIUM_CUTSCENE = "cutscenes/red-eyes.mpg";   // plays when the Bad Plasmodium falls (in a run)
 
 // Fixed spots in the start and shop rooms.
 // The door to the castle, in the top wall of every floor's first room, and where you come back out.
