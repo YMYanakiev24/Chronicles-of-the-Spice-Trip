@@ -1025,6 +1025,7 @@ void Autopilot::build() {
     add("aura", 3, [this](Game& g, float t) {
         if (t == 0) {
             g.player.hp = 50; g.player.specialCd = 0; g.player.invuln = 1;   // no stray hits while measuring
+            g.player.xp = 0;                      // ...and no level-up refilling health mid-check
             in::tap(g.settings.keys.special);
             return false;
         }
@@ -1310,6 +1311,7 @@ void Autopilot::build() {
                 switch (c.kind) {
                 case Special::ArcaneSurge: g.player.mana = 10; break;
                 case Special::Drink:       g.player.hp = 50; break;
+                case Special::SmokeBreak:  g.player.hp = 50; g.player.invuln = 3; break;   // no spike trap spoils the heal
                 case Special::CoinBarrage: g.player.charge = COIN_POWER_MAX; break;
                 case Special::Scare:       g.enemies.front().speed = 70; g.enemies.front().dmg = 10; break;   // close enough to bite
                 case Special::BlownKiss:   g.enemies.front().speed = 70; g.enemies.front().dmg = 10; break;   // coming to bite
@@ -1327,7 +1329,7 @@ void Autopilot::build() {
                 in::tap(g.settings.keys.special);
                 return false;
             }
-            float checkAt = c.kind == Special::CoinBarrage || c.kind == Special::Koi ? 0.05f : c.kind == Special::CreatineCpp ? 0.12f : 0.8f;
+            float checkAt = c.kind == Special::CoinBarrage || c.kind == Special::Koi ? 0.05f : c.kind == Special::CreatineCpp ? 0.12f : c.kind == Special::SmokeBreak ? 1.05f : 0.8f;
             if (c.kind == Special::BlownKiss && t >= 0.1f && t < 0.1f + 1 / 30.0f) shot(g, "vanessa-kiss");   // the hearts on their way
             if (t < checkAt) return false;
             const Enemy* d = g.enemies.empty() ? nullptr : &g.enemies.front();
@@ -1346,6 +1348,9 @@ void Autopilot::build() {
             case Special::Koi:         ok = koi == 3; break;
             case Special::Blink:       ok = g.player.pos.x > markX + 100 && g.player.charge < DUST_MAX; break;
             case Special::Scare:       ok = g.scareT > 0 && d && d->pos.x > ROOM_CENTER.x + 40 && g.player.hp == g.player.maxHp; break;
+            case Special::SmokeBreak:                  // healed by the smoke, then the dummy gets the cig, and burns
+                ok = g.player.hp >= 50 + CIG_HEAL - 1 && d && d->hp <= d->maxHp - CIG_DAMAGE && d->burnT > 0;
+                break;
             case Special::BlownKiss:                   // a heart lands: it stands lovestruck where it was hit, and doesn't bite
                 ok = d && d->charmT > 0 && d->hp <= d->maxHp - KISS_DAMAGE && d->pos.x > ROOM_CENTER.x + 30
                     && g.player.hp == g.player.maxHp;
@@ -1358,8 +1363,10 @@ void Autopilot::build() {
             }
             }
             check(TextFormat("%s's special (%s) works", c.name, c.special), ok);
+            check(TextFormat("%s has a dodge-roll drawn", c.name), g.roll[i].ok() && g.roll[i].frames == 6);
             if (c.kind == Special::Koi) shot(g, "koi");
             if (c.kind == Special::CreatineCpp) shot(g, "gymrat-special");
+            if (c.kind == Special::SmokeBreak) shot(g, "galin-special");
             if (c.kind == Special::BlownKiss) {
                 shot(g, "vanessa-special");
                 g.player.hp = 50;                     // her perk: a kill gives her 3 back

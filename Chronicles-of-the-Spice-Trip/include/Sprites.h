@@ -34,11 +34,15 @@ enum EnemyKind { EK_SKELETON = 0, EK_SKELETON2 = 1, EK_VAMPIRE = 2, EK_SKULL = 3
 // How fast a kind's attack animation plays: the bow and the axe take their time.
 inline float attackFps(int kind) { return kind == EK_SOLDIER ? 12.0f : kind == EK_ORC ? 9.0f : 16.0f; }
 
+// A strip of equal-width frames from assets/dungeon/ (frame height = image height; tex.id 0 if missing).
+Anim loadStrip(const char* file, int frameW);
+
 struct Sprites {
     Texture2D tileset{};                       // 16px tiles, 10x10
     Anim peaks, chest, chestOpen, torch, sideTorch, candle, candle2;
     Anim flaskRed, flaskBlue, flag, coin, skull, flame, key, keySilver, rock, arrow;
     Anim vapes, spellIcons;                    // 32px icons: one frame per Vape / SPELLS entry
+    Anim galinSmoke;                           // Galin's smoke, 3:4 frames facing right (the last frame stubs it out)
     EnemyAnims enemy[12];                     // indexed by EnemyKind (skull slot unused)
 
     void load();
@@ -66,6 +70,7 @@ struct WalkSheet {
     void unload();
     // The frame index for standing (0), or stepping through the walk cycle at 8 frames a second.
     int  frameAt(bool walking, float time) const;
-    // Draws one frame stretched over `dst`; `flash` adds a white flash (struck).
-    void draw(Facing facing, int frame, Rectangle dst, Color tint = WHITE, bool flash = false) const;
+    // Draws one frame stretched over `dst`; `flash` adds a white flash (struck), `rotation`
+    // (degrees) turns it about the middle of `dst`.
+    void draw(Facing facing, int frame, Rectangle dst, Color tint = WHITE, bool flash = false, float rotation = 0) const;
 };

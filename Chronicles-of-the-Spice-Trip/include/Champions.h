@@ -20,6 +20,7 @@ enum class Special {
     Scare,         // Momiche: every enemy runs from you and can't attack
     CreatineCpp,   // the Gym Rat: C++ lasers ahead, a creatine cloud behind
     BlownKiss,     // Vanessa: a fan of hearts that leaves monsters lovestruck
+    SmokeBreak,    // Galin: smoke a cig to heal, then stub it out on the nearest monster
 };
 
 struct ChampionDef {
@@ -50,7 +51,7 @@ struct ChampionDef {
     const char* winLine = ""; // what they say when a boss falls
 };
 
-inline constexpr int CHAMPION_COUNT = 13;
+inline constexpr int CHAMPION_COUNT = 14;
 
 // Beray's outfits. Every champion can wear each one; their walking figure in it is
 // assets/outfits/<key>/<their walk sheet> (made by tools/outfits.py). 0 is their own clothes.
@@ -97,3 +98,11 @@ inline constexpr float KISS_SPREAD = 0.22f;        // radians between neighbouri
 inline constexpr float KISS_SPEED = 260;
 inline constexpr int   KISS_DAMAGE = 12;
 inline constexpr float CHARM_TIME = 3.5f;          // seconds a monster stays lovestruck
+
+// Galin's Smoke Break: he stands and smokes, healing as he does, then steps to the nearest
+// monster in reach and stubs the cig out on its skin. It burns.
+inline constexpr float CIG_TIME = 0.9f;            // seconds of smoking (he can't walk meanwhile)
+inline constexpr float CIG_HEAL = 30;              // health back over the smoke
+inline constexpr float CIG_REACH = 160;            // how far he'll step to stub it out
+inline constexpr int   CIG_DAMAGE = 24;
+inline constexpr float CIG_STUB_TIME = 0.3f;       // he holds the stub pose this long

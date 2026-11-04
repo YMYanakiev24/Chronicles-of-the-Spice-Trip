@@ -261,6 +261,29 @@ sheets: facing you and from behind are her portraits (a lower leg lifted in turn
 to walk), and from the side is the walk cycle on her sheet, mirrored. Her card
 art is `assets/vanessa.png`.
 
+### Galin
+
+The weapon-shop owner, playable. His perk, **Smoke breaks**: standing still heals
+him 1.5 a second. His special, **Smoke Break** (Q, 8 s cooldown): he stands and
+smokes for 0.9 s, healing 30, then steps up to the nearest monster within reach
+and stubs the cig out on its skin for 24 damage, setting it alight. With no one
+close he just flicks it away. He also has his own dodge-roll. The numbers are
+under `CIG_` in `include/Champions.h`.
+
+His walk sheet (`assets/walk/walk-galin.png`) and his poses
+(`assets/dungeon/galin_smoke.png`, the stub as its last frame, and
+`assets/dungeon/roll-galin.png`, 60 x 80 frames facing right) were drawn with
+ChatGPT from his picture. His card art is `assets/Galin.png`.
+
+### Dodge-rolls
+
+Every champion has a drawn dodge-roll in `assets/dungeon/roll-<champion>.png`
+(six 60 x 80 frames facing right, mirrored when rolling left): crouch, curl into
+a ball and tumble, land on a knee, stand. They are made from each champion's own
+side-view walk frame by `tools/rolls.py` (run it after changing a figure);
+Galin's is drawn by hand and left alone. A champion with no roll sheet tumbles
+their walking figure instead.
+
 ### Momiche, Gakev and the walking figures
 
 - **Momiche😨** walks with the frames cut from her own sprite sheet. Her

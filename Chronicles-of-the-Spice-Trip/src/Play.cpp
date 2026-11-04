@@ -122,6 +122,15 @@ void Game::updatePlay(float dt) {
     castleDoorCd = fmaxf(0, castleDoorCd - dt);
     vasilBowT = fmaxf(0, vasilBowT - dt);
     gymT = fmaxf(0, gymT - dt);
+    stubT = fmaxf(0, stubT - dt);
+    if (cigT > 0) {                                    // Galin's smoke break: heal as he smokes
+        cigT -= dt;
+        player.hp = fminf(player.maxHp, player.hp + CIG_HEAL / CIG_TIME * dt);
+        if (frand(0, 1) < dt * 14)
+            parts.push_back({ { player.pos.x + player.facing.x * 6 + frand(-2, 2), player.pos.y - 30 }, { frand(-10, 10), frand(-45, -25) },
+                0.9f, 0.9f, frand(2, 4), { 200, 200, 206, 255 } });
+        if (cigT <= 0) stubOut();
+    }
     for (auto& l : lasers) l.t += dt;
     std::erase_if(lasers, [](const Laser& l) { return l.t >= GYM_POSE_TIME; });
     player.mana = fminf(player.maxMana, player.mana + 9.0f * (player.has(VP_GRAPE) ? 1.5f : 1.0f) * dt);
@@ -147,12 +156,13 @@ void Game::updatePlay(float dt) {
         if (in::down(K.left))  mv.x -= 1;
         if (in::down(K.right)) mv.x += 1;
     }
+    if (cigT > 0) mv = { 0, 0 };                      // Galin stands still to smoke
     if (mv.x || mv.y) { mv = Vector2Normalize(mv); player.facing = mv; heroMoveDir = mv; }
     heroMoving = mv.x || mv.y || player.roll > 0 || player.dashT > 0 || player.rollAtkT > 0;
     Vector2 aim = Vector2Subtract(mouseWorld(), player.pos);
     if (Vector2Length(aim) > 1) player.facing = Vector2Normalize(aim);
     if (!talking && in::pressed(K.roll) && player.rollCd <= 0 && (mv.x || mv.y)) {
-        player.roll = 0.28f; player.rollCd = 0.7f;
+        player.roll = ROLL_TIME; player.rollCd = 0.7f;
         player.invuln = fmaxf(player.invuln, 0.3f); player.rollDir = mv;
     }
     if (!talking && in::pressed(K.special)) useSpecial(mv);
@@ -490,6 +500,30 @@ void Game::movePlayer(float dt, Vector2 mv) {
     }
 }
 
+// Galin's cig goes out on the nearest monster in reach: he steps up to it and stubs it out.
+void Game::stubOut() {
+    Enemy* best = nullptr;
+    float bestD = CIG_REACH;
+    for (auto& e : enemies) {
+        if (!e.alive || e.dying) continue;
+        float d = Vector2Distance(e.pos, player.pos);
+        if (d < bestD) { bestD = d; best = &e; }
+    }
+    stubT = CIG_STUB_TIME;
+    if (!best) {                              // no one close: he just flicks it away
+        burst(parts, { player.pos.x + player.facing.x * 10, player.pos.y - 20 }, 6, 60, 0.4f, { 255, 150, 60, 255 });
+        return;
+    }
+    Vector2 dir = bestD > 0.01f ? Vector2Scale(Vector2Subtract(best->pos, player.pos), 1 / bestD) : player.facing;
+    Room& room = dungeon.cur();
+    player.pos = moveInRoom(player.pos, Vector2Scale(dir, fmaxf(0, bestD - (best->r + PLAYER_R + 2))), PLAYER_R, room, room.cleared);
+    player.facing = dir;
+    hitEnemy(*best, CIG_DAMAGE, { 255, 150, 60, 255 });
+    best->burnT = BURN_TIME;
+    burst(parts, best->pos, 10, 80, 0.5f, { 255, 170, 70, 255 });
+    play("hit");
+}
+
 void Game::useSpecial(Vector2 mv) {
     const ChampionDef& c = champ();
     if (player.specialCd > 0) return;
@@ -569,6 +603,10 @@ void Game::useSpecial(Vector2 mv) {
         break;
     case Special::CreatineCpp:
         creatineAndCpp(player.facing);
+        break;
+    case Special::SmokeBreak:                // light up: the heal runs while cigT does, then stubOut()
+        cigT = CIG_TIME; stubT = 0;
+        play("heal");
         break;
     case Special::BlownKiss: {               // a fan of hearts toward the aim, curving after monsters
         float base = atan2f(player.facing.y, player.facing.x);
@@ -1003,6 +1041,20 @@ void Game::updateEnemies(float dt, float slow) {
                 float spd = e.speed * (e.lunge > 0 ? 2.6f : 1.0f);
                 e.pos = moveInRoom(e.pos, Vector2Scale(dir, spd * edt), e.r, room, doorsOpen);
             }
+        }
+
+        // Never left inside a wall or out past the edge: a shove that went too far puts it back on the nearest floor.
+        if (e.bossForm < 0 && roomWallSolid(room, (int)floorf(e.pos.x / TILE), (int)floorf(e.pos.y / TILE), false)) {
+            float best = 1e9f;
+            Vector2 back = e.pos;
+            for (int ty = 1; ty < ROOM_TH - 1; ++ty)
+                for (int tx = 1; tx < ROOM_TW - 1; ++tx) {
+                    if (roomWallSolid(room, tx, ty, false)) continue;
+                    Vector2 mid = { tx * (float)TILE + TILE / 2.0f, ty * (float)TILE + TILE / 2.0f };
+                    float dist = Vector2Distance(mid, e.pos);
+                    if (dist < best) { best = dist; back = mid; }
+                }
+            e.pos = back; e.knock = { 0, 0 };
         }
 
         // An enemy that stops getting closer is jammed behind its friends in a narrow gap:

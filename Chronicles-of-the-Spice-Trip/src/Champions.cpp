@@ -97,4 +97,12 @@ const ChampionDef CHAMPIONS[CHAMPION_COUNT] = {
       .special = "Blown Kiss", .specialDesc = "Five hearts fly out and hit for 12. A monster one lands on is lovestruck for 3.5 s: it stands and can't attack.",
       .kind = Special::BlownKiss, .cooldown = 7, .killHeal = 3,
       .quote = "Careful. I break hearts.", .winLine = "Another heart broken." },
+
+    // Galin: the weapon-shop owner, out from behind his counter. His card art is his sheet.
+    { .name = "Galin", .art = "Galin.png", .walk = "walk-galin.png",
+      .crop = { 0.340f, 0.000f, 0.300f, 0.300f }, .cloak = { 28, 28, 32, 255 },
+      .perk = "Smoke breaks: standing still heals him 1.5 a second.",
+      .special = "Smoke Break", .specialDesc = "Smoke a cig and heal 30, then stub it out on the nearest monster: 24 damage and it burns.",
+      .kind = Special::SmokeBreak, .cooldown = 8, .stillRegen = 1.5f,
+      .quote = "Give me a minute. I'm on my break.", .winLine = "Now that's worth a smoke." },
 };

@@ -368,8 +368,26 @@ void Game::drawActors() {
     }
     if (player.dashT > 0 || player.rollAtkT > 0)
         DrawCircleV(player.pos, PLAYER_R + 4, Fade(player.rollAtkT > 0 ? Color{ 110, 200, 80, 255 } : Color{ 245, 210, 110, 255 }, 0.35f));
+    // Galin strikes his own poses: smoking (the last frame stubs it out), and his dodge-roll
+    const Anim* pose = nullptr;
+    int poseFrame = 0;
+    bool poseFlip = player.facing.x < 0;
+    if (champ().kind == Special::SmokeBreak) {
+        const Anim& sm = SPR.galinSmoke;
+        if (sm.ok() && stubT > 0) { pose = &sm; poseFrame = sm.frames - 1; }
+        else if (sm.ok() && cigT > 0) { pose = &sm; poseFrame = std::min(sm.frames - 2, (int)((1 - cigT / CIG_TIME) * (sm.frames - 1))); }
+    }
+    if (!pose && player.roll > 0 && roll[player.champion].ok()) {   // their drawn dodge-roll
+        pose = &roll[player.champion];
+        poseFrame = std::min(pose->frames - 1, (int)((1 - player.roll / ROLL_TIME) * pose->frames));
+        poseFlip = fabsf(player.rollDir.x) > 0.01f ? player.rollDir.x < 0 : player.facing.x < 0;
+    }
+    if (pose) drawPose(*pose, poseFrame, player.pos, poseFlip, player.hitFlash > 0);
+    // no roll drawn for them: their own figure, side on, tumbling
+    else if (player.roll > 0 && figure(player.champion).ok())
+        drawRolling(figure(player.champion), player.pos, player.rollDir, player.facing, 1 - player.roll / ROLL_TIME, player.hitFlash > 0);
     // walking as their own figure, facing the way they walk (or aim, standing still)
-    drawChampion(figure(player.champion), player.pos, heroMoving ? heroMoveDir : player.facing, heroMoving, clock,
+    else drawChampion(figure(player.champion), player.pos, heroMoving ? heroMoveDir : player.facing, heroMoving, clock,
         player.facing, player.meleeAnim, player.hitFlash > 0, champ().cloak,
         { weaponTex[player.weapon], WEAPONS[player.weapon].slant, bladeReach() * 0.95f }, lift);
     if (player.shieldT > 0) {

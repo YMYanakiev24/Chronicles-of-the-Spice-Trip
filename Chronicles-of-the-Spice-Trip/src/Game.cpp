@@ -123,7 +123,11 @@ void Game::init(bool windowed) {
         weaponTex[i] = loadCutout(WEAPONS[i].art);
     for (int i = 0; i < CHAMPION_COUNT; ++i)
         if (CHAMPIONS[i].art) champTex[i] = loadArt(CHAMPIONS[i].art);
-    for (int i = 0; i < CHAMPION_COUNT; ++i) walk[i].load(CHAMPIONS[i].walk);
+    for (int i = 0; i < CHAMPION_COUNT; ++i) {
+        walk[i].load(CHAMPIONS[i].walk);
+        std::string roller = CHAMPIONS[i].walk;           // walk-<champion>.png -> roll-<champion>.png
+        roll[i] = loadStrip(("roll" + roller.substr(4)).c_str(), 60);
+    }
     if (std::string p = findAsset("walk/fear.png"); !p.empty()) {
         fearTex = LoadTexture(p.c_str());
         SetTextureFilter(fearTex, TEXTURE_FILTER_POINT);
@@ -163,6 +167,7 @@ void Game::shutdown() {
     for (auto& tx : weaponTex) if (tx.id) UnloadTexture(tx);
     for (auto& tx : champTex) if (tx.id) UnloadTexture(tx);
     for (auto& w : walk) w.unload();
+    for (auto& r : roll) if (r.tex.id) { UnloadTexture(r.tex); r = Anim{}; }
     introVideo.close();
     cutscene.close();
     sergeantWalk.unload();
@@ -450,7 +455,9 @@ void Game::spawnElite() {
     spawnMonster(d.type, 1.0f + 0.15f * (floor - 1), 160);
     Enemy& e = enemies.back();
     e.name = d.name; e.elite = true;
-    e.hp = e.maxHp = e.maxHp * 4; e.dmg = (int)ceilf(e.dmg * 1.5f); e.xp *= 4; e.r *= 1.35f;
+    e.hp = e.maxHp = e.maxHp * 4; e.dmg = (int)ceilf(e.dmg * 1.5f); e.xp *= 4;
+    // drawn half as big again, but its body stays narrow enough for one-tile lanes (wall collision needs r < TILE / 2)
+    e.r = fminf(e.r * 1.35f, 15.0f);
     showBanner(d.name, "A champion of the depths guards this room", 2.4f);
 }
 

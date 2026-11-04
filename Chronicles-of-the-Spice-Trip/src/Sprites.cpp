@@ -18,7 +18,7 @@ static Texture2D loadTexture(const char* file) {
 }
 
 // Load a strip whose frames are `frameW` wide (frame height = image height).
-static Anim loadStrip(const char* file, int frameW) {
+Anim loadStrip(const char* file, int frameW) {
     Anim a;
     a.tex = loadTexture(file);
     if (!a.ok()) return a;
@@ -57,6 +57,7 @@ void Sprites::load() {
     key = loadStrip("key.png", 16);
     keySilver = loadStrip("key_silver.png", 16);
     rock = loadStrip("rock.png", 64);
+    galinSmoke = loadStrip("galin_smoke.png", 60);
     vapes = loadStrip("vapes.png", 32);
     spellIcons = loadStrip("spell_icons.png", 32);
     enemy[EK_SKELETON] = loadEnemy("skel1");
@@ -76,7 +77,7 @@ void Sprites::unload() {
     auto un = [](Texture2D& t) { if (t.id) UnloadTexture(t); t = Texture2D{}; };
     un(tileset);
     for (Anim* a : { &peaks, &chest, &chestOpen, &torch, &sideTorch, &candle, &candle2,
-                     &flaskRed, &flaskBlue, &flag, &coin, &skull, &flame, &key, &keySilver, &rock, &arrow, &vapes, &spellIcons })
+                     &flaskRed, &flaskBlue, &flag, &coin, &skull, &flame, &key, &keySilver, &rock, &arrow, &vapes, &spellIcons, &galinSmoke })
         un(a->tex);
     for (auto& e : enemy)
         for (Anim* a : { &e.idle, &e.move, &e.attack, &e.hurt, &e.death }) un(a->tex);
@@ -140,14 +141,16 @@ int WalkSheet::frameAt(bool walking, float time) const {
     return 1 + (int)(time * 8) % (frames - 1);
 }
 
-void WalkSheet::draw(Facing facing, int frame, Rectangle dst, Color tint, bool flash) const {
+void WalkSheet::draw(Facing facing, int frame, Rectangle dst, Color tint, bool flash, float rotation) const {
     if (!ok()) return;
     int row = facing == FACE_DOWN ? 0 : facing == FACE_UP ? 1 : 2;
     Rectangle src = { (float)(frame * fw), (float)(row * fh), facing == FACE_LEFT ? -(float)fw : (float)fw, (float)fh };
-    DrawTexturePro(tex, src, dst, { 0, 0 }, 0, tint);
+    Vector2 origin = { dst.width / 2, dst.height / 2 };
+    dst.x += origin.x; dst.y += origin.y;          // DrawTexturePro places the origin at dst.x, y
+    DrawTexturePro(tex, src, dst, origin, rotation, tint);
     if (flash) {
         BeginBlendMode(BLEND_ADDITIVE);
-        DrawTexturePro(tex, src, dst, { 0, 0 }, 0, WHITE);
+        DrawTexturePro(tex, src, dst, origin, rotation, WHITE);
         EndBlendMode();
     }
 }
