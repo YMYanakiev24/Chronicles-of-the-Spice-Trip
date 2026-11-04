@@ -230,7 +230,25 @@ void drawProjectile(const Projectile& p, float t) {
     case ShotKind::Rock:        // a boulder, tumbling through the air
         drawAnim(SPR.rock, 0, p.pos, p.r * 2.6f / SPR.rock.fw, false, WHITE, t * 300 + p.pos.x);
         break;
+    case ShotKind::Heart: {     // Vanessa's kiss: a beating heart in a pink glow
+        float beat = 1 + 0.18f * fmaxf(0, sinf(t * 16 + p.pos.x * 0.03f));
+        BeginBlendMode(BLEND_ADDITIVE);
+        DrawCircleV(p.pos, p.r + 6, Fade(p.glow, 0.28f));
+        EndBlendMode();
+        drawHeart(p.pos, 15 * beat, { 70, 10, 40, 255 });          // its outline
+        drawHeart(p.pos, 12 * beat, p.color);
+        DrawRectangleV({ p.pos.x - 3.5f * beat, p.pos.y - 3.5f * beat }, { 2.5f, 2.5f }, { 255, 225, 240, 255 });   // a glint
+        break;
     }
+    }
+}
+
+// Two lobes and a point, in the chunky pixels of the rest of the art.
+void drawHeart(Vector2 c, float size, Color col) {
+    float r = size * 0.27f;
+    DrawCircleV({ c.x - r * 0.95f, c.y - r * 0.55f }, r, col);
+    DrawCircleV({ c.x + r * 0.95f, c.y - r * 0.55f }, r, col);
+    fillTriangle({ c.x - r * 1.9f, c.y - r * 0.25f }, { c.x, c.y + size * 0.48f }, { c.x + r * 1.9f, c.y - r * 0.25f }, col);
 }
 
 void drawBurn(const Enemy& e, float t) {

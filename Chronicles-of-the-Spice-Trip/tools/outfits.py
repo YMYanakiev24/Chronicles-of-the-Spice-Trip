@@ -80,6 +80,8 @@ def dress_cell(cell, o, view, scale):
         if head.sum() > 5:
             hc = np.median(rgb[head], axis=0)
             near = np.sqrt(((rgb - hc) ** 2).sum(-1)) < 60
+            if o['_hair'] == 'warm':        # black clothes as dark as the hair: hair is the redder of the two
+                near = (rgb[..., 1] - rgb[..., 0] < -4) & (lum < 90) & ~skin
             jacket &= ~(near & (y < top + (head_end + (torso_end - head_end) * 0.85) * h))
     trousers = a & legs & ~outline & (x >= core0 - pad) & (x <= core1 + pad)
     shoes = a & feet & ~outline
@@ -127,7 +129,7 @@ def dress_cell(cell, o, view, scale):
     # cap: over the top of the head, and a brim
     if o['cap']:
         c0, c1 = C(o['cap'][0]), C(o['cap'][1])
-        cap_end = top + 0.17 * h
+        cap_end = top + o['_cap'] * h
         hm = a & (y < cap_end) & ~outline
         out[hm] = c0 * (0.75 + 0.35 * (lum[hm] / 255.0))[:, None]
         by = int(round(cap_end))
@@ -162,9 +164,12 @@ def dress_cell(cell, o, view, scale):
     cell[..., :3] = np.clip(out, 0, 255).astype(np.uint8)
     return cell
 
+# where a cap's brim sits (fraction of the figure's height): higher on a big head of hair
+CAP = {'vanessa': 0.10}
+
 # how far down the figure the head and the torso end, and where the shoes start (fractions of its height)
 ZONES = {'default': (0.40, 0.68, 0.90), 'momiche': (0.33, 0.62, 0.92), 'gymrat': (0.27, 0.58, 0.93),
-         'storyteller': (0.42, 0.72, 0.90), 'fairy': (0.40, 0.70, 0.90)}
+         'storyteller': (0.42, 0.72, 0.90), 'fairy': (0.40, 0.70, 0.90), 'vanessa': (0.36, 0.57, 0.92)}
 
 def dress(src, outfit):
     im = np.array(Image.open(src).convert('RGBA'))
@@ -172,7 +177,8 @@ def dress(src, outfit):
     frames = im.shape[1] // fw
     scale = fh / 32.0
     name = os.path.basename(src)[5:-4]
-    o = dict(OUTFITS[outfit]); o['_z'] = ZONES.get(name, ZONES['default']); o['_hair'] = name in ('momiche',)
+    o = dict(OUTFITS[outfit]); o['_z'] = ZONES.get(name, ZONES['default']); o['_hair'] = {'momiche': True, 'vanessa': 'warm'}.get(name, False)
+    o['_cap'] = CAP.get(name, 0.17)
     out = im.copy()
     for r in range(3):
         for f in range(frames):

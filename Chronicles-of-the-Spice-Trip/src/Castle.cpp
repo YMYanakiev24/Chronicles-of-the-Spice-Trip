@@ -331,7 +331,7 @@ void Game::drawDrip() {
 
     // the champions: dress anyone
     float rx = panel.x + lw + 10, rw = pw - lw - 30;
-    float tabW = (rw - 11 * 4) / 12, tabH = tabW * 1.25f, ty = panel.y + 56;
+    float tabW = (rw - (CHAMPION_COUNT - 1) * 4) / CHAMPION_COUNT, tabH = tabW * 1.25f, ty = panel.y + 56;
     ui::text("Dressing", rx, panel.y + 22, 20, ui::MUTED);
     for (int i = 0; i < CHAMPION_COUNT; ++i) {
         Rectangle t = { rx + i * (tabW + 4), ty, tabW, tabH };

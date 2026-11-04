@@ -89,4 +89,12 @@ const ChampionDef CHAMPIONS[CHAMPION_COUNT] = {
       .special = "Creatine & C++", .specialDesc = "Arms out: five C++ lasers ahead hit everything for 22, and a creatine cloud behind shoves enemies away.",
       .kind = Special::CreatineCpp, .cooldown = 6, .hpBonus = 15, .bladeBonus = 2,
       .quote = "Creatine in one hand, C++ in the other.", .winLine = "New PR. Personal record AND pull request." },
+
+    // Vanessa: her walk sheet is cut from her two character sheets (see README).
+    { .name = "Vanessa", .art = "vanessa.png", .walk = "walk-vanessa.png",
+      .crop = { 0.300f, 0.090f, 0.365f, 0.192f }, .cloak = { 34, 26, 40, 255 },
+      .perk = "Heartbreaker: every kill heals her 3.",
+      .special = "Blown Kiss", .specialDesc = "Five hearts fly out and hit for 12. A monster one lands on is lovestruck for 3.5 s: it stands and can't attack.",
+      .kind = Special::BlownKiss, .cooldown = 7, .killHeal = 3,
+      .quote = "Careful. I break hearts.", .winLine = "Another heart broken." },
 };

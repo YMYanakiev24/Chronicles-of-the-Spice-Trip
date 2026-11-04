@@ -36,6 +36,7 @@ enum class ShotKind : unsigned char {
     Ball,       // the iron balls her staff bats at you
     Arrow,      // a Soldier's arrow
     Rock,       // the boulders the Bad Plasmodium throws
+    Heart,      // Vanessa's blown kiss
 };
 
 struct Projectile {
@@ -80,6 +81,7 @@ struct Enemy {
     int     stolen = 0;                // Toshko: gold he snatched and is running off with
     bool    elite = false;             // a floor's mini-boss: bigger, tougher, richer
     float   fleeT = 0;                 // Toshko: seconds spent running away
+    float   charmT = 0;                // Vanessa's kiss: seconds left lovestruck (stands, can't attack)
 
     // Boss bodies (bossForm >= 0) are moved and fired by the BossFight.
     int     bossForm = -1;             // 0 = the boss, 1 = a copy, 2 = a tiny copy

@@ -19,6 +19,7 @@ enum class Special {
     Blink,         // the Fairy: teleport to the cursor, paid in fairy dust
     Scare,         // Momiche: every enemy runs from you and can't attack
     CreatineCpp,   // the Gym Rat: C++ lasers ahead, a creatine cloud behind
+    BlownKiss,     // Vanessa: a fan of hearts that leaves monsters lovestruck
 };
 
 struct ChampionDef {
@@ -43,12 +44,13 @@ struct ChampionDef {
     int   extraCoins = 0;     // extra coins per kill
     float stillRegen = 0;     // health per second while standing still
     float spellHoming = 0;    // spells curve toward enemies (rad/s)
+    int   killHeal = 0;       // health back for every kill
 
     const char* quote = "";   // their line on the champion select
     const char* winLine = ""; // what they say when a boss falls
 };
 
-inline constexpr int CHAMPION_COUNT = 12;
+inline constexpr int CHAMPION_COUNT = 13;
 
 // Beray's outfits. Every champion can wear each one; their walking figure in it is
 // assets/outfits/<key>/<their walk sheet> (made by tools/outfits.py). 0 is their own clothes.
@@ -86,3 +88,12 @@ inline constexpr float CREATINE_CONE = 0.8f;       // ...this many radians eithe
 inline constexpr int   CREATINE_DAMAGE = 8;        // and it shoves what it catches away
 inline constexpr float CREATINE_SHOVE = 40;        // pixels
 inline constexpr float GYM_POSE_TIME = 0.45f;      // the lasers and the pose last this long
+
+// Vanessa's Blown Kiss: a fan of hearts toward the aim, curving after monsters. A heart that
+// lands hurts, and a monster it lands on is lovestruck: it stands gazing at her and can't attack.
+// Bosses have no heart to lose: they only take the damage.
+inline constexpr int   KISS_HEARTS = 5;            // hearts in the fan
+inline constexpr float KISS_SPREAD = 0.22f;        // radians between neighbouring hearts
+inline constexpr float KISS_SPEED = 260;
+inline constexpr int   KISS_DAMAGE = 12;
+inline constexpr float CHARM_TIME = 3.5f;          // seconds a monster stays lovestruck

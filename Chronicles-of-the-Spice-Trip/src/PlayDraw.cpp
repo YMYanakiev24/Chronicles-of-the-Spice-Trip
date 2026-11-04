@@ -337,6 +337,17 @@ void Game::drawActors() {
         }
         else drawFear(e.pos.x, e.pos.y - e.r * 2 - 14, e.pos.y + e.r + 10, 16);
     }
+    for (auto& e : enemies) {               // hearts float over every monster Vanessa's kiss left lovestruck
+        if (e.dying || e.charmT <= 0 || e.bossForm >= 0) continue;
+        float fade = fminf(1, e.charmT * 2), y = e.pos.y - e.r * 2 - 10;
+        for (int i = 0; i < 3; ++i) {
+            float ph = clock * 1.6f + i * 2.1f, rise = fmodf(ph, 2.0f) / 2.0f;     // each drifts up and fades, then again
+            Vector2 at = { e.pos.x + sinf(ph * 3 + i) * 7 + (i - 1) * 7, y - rise * 14 };
+            float a = fade * (1 - rise * 0.8f);
+            drawHeart(at, 9, Fade({ 70, 10, 40, 255 }, a));
+            drawHeart(at, 7, Fade({ 255, 90, 160, 255 }, a));
+        }
+    }
     for (auto& c : coins) {
         if (c.pack) ui::drawContain(packTex, { 0, 0, (float)packTex.width, (float)packTex.height }, { c.pos.x - 11, c.pos.y - 11, 22, 22 });
         else drawAnim(SPR.coin, animFrame(SPR.coin, c.t, 12, true), c.pos, 1.4f);
