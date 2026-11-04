@@ -80,10 +80,11 @@ void VideoPlayer::update(float dt) {
 void VideoPlayer::draw(Rectangle area) const {
     DrawRectangleRec(area, BLACK);
     if (!tex.id) return;
-    float sc = fminf(area.width / tex.width, area.height / tex.height);
-    float w = tex.width * sc, h = tex.height * sc;
-    DrawTexturePro(tex, { 0, 0, (float)tex.width, (float)tex.height },
-        { area.x + (area.width - w) / 2, area.y + (area.height - h) / 2, w, h }, { 0, 0 }, 0, WHITE);
+    // Cover the whole area: the video is scaled until no bars are left, and whatever
+    // reaches past a screen of another shape is trimmed evenly off both sides.
+    float sc = fmaxf(area.width / tex.width, area.height / tex.height);
+    float sw = area.width / sc, sh = area.height / sc;
+    DrawTexturePro(tex, { (tex.width - sw) / 2, (tex.height - sh) / 2, sw, sh }, area, { 0, 0 }, 0, WHITE);
 }
 
 bool VideoPlayer::finished() const {
