@@ -156,6 +156,10 @@ to (x1.6 damage).
 | 5 | Triceps | Walks her cave like a champion; gravity grenades, magnetic boots, the fulcrum staff and the circuit chain (see below) |
 | 6 | Pyraketh, the Cinder-Maw | Chases you, breathes rings of embers, and throws fireballs once wounded |
 
+When the Bad Plasmodium falls in a run, a cutscene plays once it has come apart
+(`assets/cutscenes/red-eyes.mpg`, made the same way as Marin's video); a click,
+a tap or a key skips it. Boss Rush skips it, to keep the clock fair.
+
 Between Triceps and the Cinder-Maw the stairs lead to the toilets first (see
 below).
 
@@ -277,7 +281,7 @@ Chronicles-of-the-Spice-Trip/
   src/Input.cpp       keyboard and mouse (real or scripted)
   src/Save.cpp        savegame.dat, profile.dat, settings.dat
   src/Autopilot.cpp   the automated play-through (see below)
-  src/Video.cpp       plays the intro video (MPEG-1) with its sound
+  src/Video.cpp       plays the intro video and the cutscene (MPEG-1) with their sound
   src/Toilet.cpp      the toilets after Triceps: hiding from The Sergeant
   src/Castle.cpp      the castle corridor, the shopkeepers' rooms and Beray's outfits
   assets/             art; assets/arenas/ holds the bosses' painted arenas,
@@ -299,7 +303,7 @@ hides from The Sergeant in the toilets (smoke, the pee and its puddle, a stall,
 being found, a minute survived), completes a run, saves and continues, wins a
 Boss Rush, checks Vasil has each floor's tale, and tries every
 champion's special, Momiche's scare on a boss, Gakev's coins and casting with
-Enter. It writes a PASS/FAIL line for each check (213) to
+Enter. It writes a PASS/FAIL line for each check (215) to
 `<folder>/autopilot.log`, saves screenshots next to it, and exits with the
 number of failures:
 

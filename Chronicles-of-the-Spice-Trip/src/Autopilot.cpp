@@ -962,6 +962,25 @@ void Autopilot::build() {
             if (shotName) shot(g, shotName);
             return true;
         });
+        if (BOSSES[index].kind == BossKind::Rooted) {                              // the Bad Plasmodium's cutscene
+            add("cutscene", 8, [this](Game& g, float t) {
+                g.player.pos = ROOM_CENTER;
+                if (g.overlay != Overlay::Cutscene || g.cutscene.time < 1.5f) return false;
+                check("when the Bad Plasmodium falls, its cutscene plays", g.cutscene.playing() && g.cutscene.framesShown > 20 && g.cutscene.duration > 16);
+                shot(g, "cutscene");
+                return true;
+            });
+            add("skip cutscene", 2, [](Game&, float t) {
+                if (t < 0.2f) return false;
+                in::click(MOUSE_BUTTON_LEFT);
+                return true;
+            });
+            add("cutscene skipped", 3, [this](Game& g, float t) {
+                if (t < 0.3f) return false;
+                check("a click skips the cutscene, and the game goes on", g.overlay == Overlay::None && !g.cutscene.playing() && g.screen == Screen::Play);
+                return true;
+            });
+        }
         if (BOSSES[index].kind == BossKind::Physics) { toiletSteps(); return; }   // after Triceps: the toilets first
         if (index + 1 < BOSS_COUNT)
             add(TextFormat("descend from %d", index + 1), 8, [this, index](Game& g, float t) {

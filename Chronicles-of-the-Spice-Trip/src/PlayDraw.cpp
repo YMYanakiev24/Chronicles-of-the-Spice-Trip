@@ -84,6 +84,7 @@ void Game::playScreen() {
     case Overlay::RushOver:    drawRushOver(); break;
     case Overlay::Casino:      drawCasino(); break;
     case Overlay::Summary:     drawSummary(); break;
+    case Overlay::Cutscene:    drawCutscene(); break;
     default: break;
     }
 }
@@ -1007,6 +1008,25 @@ void Game::drawCasino() {
         !wheel.spinning && player.gold >= wheel.bet)) spinWheel();
     if (!wheel.message.empty()) ui::textWrapped(wheel.message.c_str(), x, y + 74, colW, 20, wheel.done && wheel.message.find("win") != std::string::npos ? ui::GOOD : ui::MUTED);
     ui::textWrapped("\"The wheel is fair. The croupier is not.\"  - Toshko", x, p.y + ph - 50, colW, 10, ui::MUTED);
+}
+
+// A cutscene: the whole screen, its own sound, and a click, a tap or a key skips it.
+void Game::drawCutscene() {
+    int sw = GetScreenWidth(), sh = GetScreenHeight();
+    bool skip = cutscene.time > 0.3f && (in::mousePressed(MOUSE_BUTTON_LEFT) || in::pressed(KEY_ENTER) || in::pressed(KEY_SPACE)
+        || in::pressed(KEY_ESCAPE) || in::pressed(settings.keys.interact));
+    cutscene.update(fminf(GetFrameTime(), 0.25f));     // real time, so the pictures keep up with the sound
+    if (skip || cutscene.finished()) {
+        cutscene.close();
+        overlay = Overlay::None;
+        return;
+    }
+    DrawRectangle(0, 0, sw, sh, BLACK);
+    cutscene.draw({ 0, 0, (float)sw, (float)sh });
+    if (cutscene.time > 1.0f) {
+        float a = fminf(1, (cutscene.time - 1.0f) * 2) * (0.45f + 0.15f * sinf(clock * 3));
+        ui::textRight(touch::enabled() ? "tap to skip" : "click to skip", sw - 24.0f, sh - 34.0f, 20, Fade(ui::TEXT, a));
+    }
 }
 
 void Game::drawSummary() {

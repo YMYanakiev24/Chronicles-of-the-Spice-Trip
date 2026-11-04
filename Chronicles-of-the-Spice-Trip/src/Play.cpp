@@ -300,7 +300,10 @@ void Game::updatePlay(float dt) {
         if (room.isBoss) bossDefeated();
         else { showBanner("Room cleared", "", 1.4f); play("quest"); }
     }
-    if (rewardT > 0 && (rewardT -= dt) <= 0) overlay = rewardOverlay;
+    if (rewardT > 0 && (rewardT -= dt) <= 0) {
+        overlay = rewardOverlay;
+        if (overlay == Overlay::Cutscene && !cutscene.open(BAD_PLASMODIUM_CUTSCENE)) overlay = Overlay::None;   // no video: carry on
+    }
     if (overlay != Overlay::None) return;
 
     // --- leave through an open door, or take the stairs down ---

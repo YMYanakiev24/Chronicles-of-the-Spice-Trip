@@ -164,6 +164,7 @@ void Game::shutdown() {
     for (auto& tx : champTex) if (tx.id) UnloadTexture(tx);
     for (auto& w : walk) w.unload();
     introVideo.close();
+    cutscene.close();
     sergeantWalk.unload();
     if (fearTex.id) UnloadTexture(fearTex);
     for (auto& [name, s] : sounds) UnloadSound(s);
@@ -202,7 +203,8 @@ void Game::frame() {
         settings.fullscreen = isFullscreen();
         save::writeSettings(settings);
     }
-    music.vol = screen == Screen::Video ? 0.0f : 0.5f * settings.musicVol;   // the video has its own sound
+    bool video = screen == Screen::Video || (screen == Screen::Play && overlay == Overlay::Cutscene);
+    music.vol = video ? 0.0f : 0.5f * settings.musicVol;   // a video has its own sound
     music.update();
 
     touch::update(screen == Screen::Play && overlay == Overlay::None, settings.keys);
@@ -220,7 +222,7 @@ void Game::frame() {
     case Screen::Play:      playScreen(); break;
     }
     if (touch::enabled()) touch::draw(settings.keys);
-    else if (screen != Screen::Video) drawCursor();
+    else if (!video) drawCursor();
     if (!pendingShot.empty()) {            // the autopilot's screenshot, taken before the buffers swap
         rlDrawRenderBatchActive();
         Image shot = LoadImageFromScreen();
@@ -308,6 +310,7 @@ bool Game::saveRun() {
 }
 
 void Game::toMenu() {
+    cutscene.close();
     hall = castle::Hall{};
     hunt = toilet::Level{};
     fight.end();
@@ -489,6 +492,7 @@ void Game::bossDefeated() {
         if (hardcore) profile.bestHardcore = std::max(profile.bestHardcore, floor);
         if (floor % BOSS_COUNT == 0) { profile.runsCompleted++; thenShow(Overlay::RunComplete); }
         else showBanner("BOSS DEFEATED", fell + " The stairs lead down", 3.0f);
+        if (b.kind == BossKind::Rooted) thenShow(Overlay::Cutscene);   // the Bad Plasmodium: its cutscene, once it has fallen apart
     }
     else if (rushStage + 1 >= BOSS_COUNT) {
         rushWon = true;
