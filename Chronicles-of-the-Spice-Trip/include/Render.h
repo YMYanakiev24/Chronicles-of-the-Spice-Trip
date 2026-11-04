@@ -24,6 +24,7 @@ void drawEnemy(const Enemy& e);
 void drawProjectile(const Projectile& p, float t);
 
 // Combat and loot effects.
+void drawHeart(Vector2 c, float size, Color col);   // a pixel heart, `size` wide, centred on c
 void drawBurn(const Enemy& e, float t);                             // flames licking at a burning enemy
 void drawSpellCharge(int spell, Vector2 hand, float k, float t);    // k runs 0 to 1 as it winds up
 void drawIceSpike(const IceSpike& s);

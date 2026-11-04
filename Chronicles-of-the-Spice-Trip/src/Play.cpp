@@ -570,6 +570,22 @@ void Game::useSpecial(Vector2 mv) {
     case Special::CreatineCpp:
         creatineAndCpp(player.facing);
         break;
+    case Special::BlownKiss: {               // a fan of hearts toward the aim, curving after monsters
+        float base = atan2f(player.facing.y, player.facing.x);
+        for (int i = 0; i < KISS_HEARTS; ++i) {
+            Projectile p;
+            p.pos = { player.pos.x + player.facing.x * 10, player.pos.y - 10 + player.facing.y * 6 };
+            p.vel = Vector2Scale(fromAngle(base + (i - (KISS_HEARTS - 1) / 2.0f) * KISS_SPREAD), KISS_SPEED);
+            p.damage = KISS_DAMAGE; p.r = 7; p.life = 1.6f; p.kind = ShotKind::Heart; p.homing = 2.2f;
+            p.color = { 255, 70, 140, 255 }; p.glow = { 255, 170, 210, 255 };
+            shots.push_back(p);
+        }
+        for (int k = 0; k < 10; ++k)            // a puff of pink at her lips
+            parts.push_back({ { player.pos.x + player.facing.x * 10, player.pos.y - 12 }, Vector2Scale(fromAngle(base + frand(-0.8f, 0.8f)), frand(40, 110)),
+                0.45f, 0.45f, frand(1.5f, 3), k % 2 ? Color{ 255, 120, 180, 255 } : Color{ 255, 210, 230, 255 }, -30, true });
+        play("kiss");
+        break;
+    }
     }
     player.specialCd = c.cooldown;
 }
@@ -777,6 +793,10 @@ void Game::updateShots(float dt) {
             hitEnemy(e, weak ? (int)(p.damage * 1.6f) : p.damage, weak ? Color{ 255, 230, 120, 255 } : p.glow);
             if (p.spell == SP_FIRE) e.burnT = BURN_TIME;
             if (p.spell == SP_BOLT) e.hitFlash = 0.22f;   // lit up white a little longer
+            if (p.kind == ShotKind::Heart && e.alive && e.bossForm < 0) {   // bosses have no heart to lose
+                e.charmT = CHARM_TIME;
+                e.lunge = 0; e.swinging = false; e.atkAnim = 0;
+            }
             p.alive = false;
             burst(parts, p.pos, 8, 90, 0.5f, p.glow);
             spellEnded(p, &e);
@@ -912,8 +932,15 @@ void Game::updateEnemies(float dt, float slow) {
         e.atkAnim = fmaxf(0, e.atkAnim - edt);
         Vector2 to = Vector2Subtract(player.pos, e.pos);
         float d = Vector2Length(to);
+        e.charmT = fmaxf(0, e.charmT - dt);
+        bool charmed = e.charmT > 0 && e.bossForm < 0;   // Vanessa's kiss: it stands gazing at her
 
-        if (e.bossForm < 0 && scared) {
+        if (charmed) {                                       // (Toshko too: he forgets to run off with your gold)
+            if (fabsf(to.x) > 2) e.flip = to.x < 0;              // facing her
+            e.moving = false;
+            e.lunge = 0; e.atkAnim = 0; e.swinging = false;
+        }
+        else if (e.bossForm < 0 && scared) {
             if (fabsf(to.x) > 2) e.flip = to.x > 0;            // facing away, running
             e.moving = true;
             e.lunge = 0; e.atkAnim = 0; e.swinging = false;
@@ -1014,7 +1041,7 @@ void Game::updateEnemies(float dt, float slow) {
                 untouchable = true;
             }
         }
-        if (shotGap(e) > 0 && !scared && (e.shootCd -= edt) <= 0 && d < 340 && lineClear(room, e.pos, player.pos, 4)) {
+        if (shotGap(e) > 0 && !scared && !charmed && (e.shootCd -= edt) <= 0 && d < 340 && lineClear(room, e.pos, player.pos, 4)) {
             e.shootCd = shotGap(e);
             if (e.kind == EK_SKULL) enemyShoot(e);     // a wisp has no wind-up to show
             else {
@@ -1023,7 +1050,7 @@ void Game::updateEnemies(float dt, float slow) {
             }
         }
         if (e.kind == EK_ORC) {                    // it winds up, so you can step out of the way
-            if (!e.swinging && e.atkCd <= 0 && d < e.r + PLAYER_R + 5 && !scared) {
+            if (!e.swinging && e.atkCd <= 0 && d < e.r + PLAYER_R + 5 && !scared && !charmed) {
                 e.swinging = true; e.atkCd = 1.6f;
                 e.atkAnim = SPR.enemy[e.kind].attack.length(attackFps(e.kind));
                 play("swing");
@@ -1033,7 +1060,7 @@ void Game::updateEnemies(float dt, float slow) {
 
         // Toshko doesn't hit you: he snatches up to 50 gold and runs
         if (e.kind == EK_TOSHKO) {
-            if (e.stolen == 0 && d < e.r + PLAYER_R + 4 && !scared && player.gold > 0) {
+            if (e.stolen == 0 && d < e.r + PLAYER_R + 4 && !scared && !charmed && player.gold > 0) {
                 e.stolen = std::min(50, player.gold);
                 player.gold -= e.stolen;
                 e.atkAnim = SPR.enemy[e.kind].attack.length(attackFps(e.kind));
@@ -1044,7 +1071,7 @@ void Game::updateEnemies(float dt, float slow) {
         }
 
         // touch damage
-        if (d < e.r + PLAYER_R + 4 && e.atkCd <= 0 && !untouchable && !scared) {
+        if (d < e.r + PLAYER_R + 4 && e.atkCd <= 0 && !untouchable && !scared && !charmed) {
             hurtPlayer((float)e.dmg, 0.4f);
             e.atkCd = 1.0f;
             if (e.kind != EK_SKULL && e.bossForm < 0) e.atkAnim = SPR.enemy[e.kind].attack.length(attackFps(e.kind));
@@ -1086,6 +1113,11 @@ void Game::killEnemy(Enemy& e) {
     corpses.push_back(corpse);
     int n = e.bossForm == 0 ? 12 + 2 * floor : e.bossForm > 0 ? 1 : 1 + GetRandomValue(0, 2);
     n += champ().extraCoins;
+    if (champ().killHeal > 0 && player.hp < player.maxHp) {   // Vanessa: a kill gives her a little back
+        player.hp = fminf(player.maxHp, player.hp + champ().killHeal);
+        for (int k = 0; k < 3; ++k)
+            parts.push_back({ { player.pos.x + frand(-8, 8), player.pos.y - 18 }, { frand(-12, 12), frand(-50, -30) }, 0.6f, 0.6f, 2.5f, { 255, 110, 170, 255 }, 0, true });
+    }
     if (e.elite) n += 15;
     if (e.kind == EK_MIMIC) n += 10;
     if (e.stolen > 0) {                    // caught Toshko: every snatched coin drops back

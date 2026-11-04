@@ -59,9 +59,10 @@ Movement, run, roll, interact and the special can be rebound in **Settings**.
   spike traps, chests, and a start room with Vasil the Storyteller and the door to
   the castle, where the shops are (see below).
 - **Boss fights.** The last room of every floor holds a boss (see below).
-- **Champions.** Twelve champions, each with a passive perk and a special on **Q**:
+- **Champions.** Thirteen champions, each with a passive perk and a special on **Q**:
   Arcane Surge, Aura of Calmness, Coin Dash, Mug-Shield, Melon Roll, Drink,
-  Bear Jump, Coin Barrage, Release the Koi, Blink, Scare and Creatine & C++. Each one walks as
+  Bear Jump, Coin Barrage, Release the Koi, Blink, Scare, Creatine & C++ and
+  Blown Kiss. Each one walks as
   their own figure, seen from the front, the back and both sides, and the
   champion select shows every champion from all four sides.
 - **Boss Rush.** All six bosses back to back at level 5, timed. The best time
@@ -245,6 +246,21 @@ of the other hand hits whatever is behind him for 8 and shoves it away. His walk
 sheet (`assets/walk/walk-gymrat.png`) is cut from his character sheet
 (`assets/gymrat.png`).
 
+### Vanessa
+
+Her perk, **Heartbreaker**: every kill heals her 3. Her special, **Blown Kiss**
+(Q, 7 s cooldown), blows five hearts out in a fan the way you aim. They curve
+after monsters and hit for 12, and a monster a heart lands on is lovestruck for
+3.5 seconds: hearts float over it, and it stands gazing at her, can't shoot,
+swing or bite (Toshko forgets to run off with your gold). Bosses have no heart
+to lose and only take the damage. The numbers are under `KISS_` and
+`CHARM_TIME` in `include/Champions.h`.
+
+Her walk sheet (`assets/walk/walk-vanessa.png`) is cut from her two character
+sheets: facing you and from behind are her portraits (a lower leg lifted in turn
+to walk), and from the side is the walk cycle on her sheet, mirrored. Her card
+art is `assets/vanessa.png`.
+
 ### Momiche, Gakev and the walking figures
 
 - **Momiche😨** walks with the frames cut from her own sprite sheet. Her
@@ -303,7 +319,7 @@ hides from The Sergeant in the toilets (smoke, the pee and its puddle, a stall,
 being found, a minute survived), completes a run, saves and continues, wins a
 Boss Rush, checks Vasil has each floor's tale, and tries every
 champion's special, Momiche's scare on a boss, Gakev's coins and casting with
-Enter. It writes a PASS/FAIL line for each check (215) to
+Enter. It writes a PASS/FAIL line for each check (217) to
 `<folder>/autopilot.log`, saves screenshots next to it, and exits with the
 number of failures:
 

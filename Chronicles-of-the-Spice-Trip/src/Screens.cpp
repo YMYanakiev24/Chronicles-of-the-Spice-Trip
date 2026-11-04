@@ -142,7 +142,7 @@ void Game::championsScreen() {
     ui::titledPanel(panel, "Choose Your Champion");
     if (ui::button({ panel.x + pw - 50, panel.y + 18, 32, 32 }, "X")) { play("ui"); screen = Screen::Menu; return; }
 
-    int cols = 6;
+    int cols = (CHAMPION_COUNT + 1) / 2;                // two rows of cards
     float pad = 14, gx = panel.x + 28, gy = panel.y + 80;
     float cw = (pw - 56 - (cols - 1) * pad) / cols;
     float detailH = 132;

@@ -106,6 +106,7 @@ namespace au {
         b.clear(); renderTone(b, 1320, 1760, SQUARE, 0.08f, 0.12f); renderTone(b, 1760, 0, SINE, 0.20f, 0.18f, 0.06f); make("coin", b);
         // Momiche's scream: a shriek up, a wail down, and a breathy rush
         b.clear(); renderTone(b, 600, 1500, SQUARE, 0.16f, 0.12f); renderTone(b, 1500, 380, SAW, 0.48f, 0.12f, 0.14f); renderNoise(b, 0.50f, 0.12f, 2400, 0.4f, 2); make("scare", b);
+        b.clear(); renderTone(b, 900, 1300, SINE, 0.07f, 0.16f); renderNoise(b, 0.05f, 0.10f, 3000, 1.0f, 2, 0.05f); renderTone(b, 700, 1500, SINE, 0.30f, 0.14f, 0.12f); renderTone(b, 1050, 2100, TRI, 0.30f, 0.06f, 0.12f); make("kiss", b);
         // Triceps: a toss, a kick, the staff's whoosh, a well's falling hum and its blast
         b.clear(); renderNoise(b, 0.22f, 0.16f, 1800, 1.0f, 1); renderTone(b, 300, 700, SINE, 0.20f, 0.14f); make("throw", b);
         b.clear(); renderTone(b, 170, 60, SQUARE, 0.12f, 0.28f); renderNoise(b, 0.14f, 0.22f, 1200, 1.0f, 2); make("kick", b);

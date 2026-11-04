@@ -1312,6 +1312,7 @@ void Autopilot::build() {
                 case Special::Drink:       g.player.hp = 50; break;
                 case Special::CoinBarrage: g.player.charge = COIN_POWER_MAX; break;
                 case Special::Scare:       g.enemies.front().speed = 70; g.enemies.front().dmg = 10; break;   // close enough to bite
+                case Special::BlownKiss:   g.enemies.front().speed = 70; g.enemies.front().dmg = 10; break;   // coming to bite
                 case Special::CreatineCpp: g.enemies.push_back(dummy({ ROOM_CENTER.x - 50, ROOM_CENTER.y })); break;   // one behind him too
                 case Special::MugShield: {
                     Projectile p;
@@ -1327,6 +1328,7 @@ void Autopilot::build() {
                 return false;
             }
             float checkAt = c.kind == Special::CoinBarrage || c.kind == Special::Koi ? 0.05f : c.kind == Special::CreatineCpp ? 0.12f : 0.8f;
+            if (c.kind == Special::BlownKiss && t >= 0.1f && t < 0.1f + 1 / 30.0f) shot(g, "vanessa-kiss");   // the hearts on their way
             if (t < checkAt) return false;
             const Enemy* d = g.enemies.empty() ? nullptr : &g.enemies.front();
             int coinShots = 0, koi = 0;
@@ -1344,6 +1346,10 @@ void Autopilot::build() {
             case Special::Koi:         ok = koi == 3; break;
             case Special::Blink:       ok = g.player.pos.x > markX + 100 && g.player.charge < DUST_MAX; break;
             case Special::Scare:       ok = g.scareT > 0 && d && d->pos.x > ROOM_CENTER.x + 40 && g.player.hp == g.player.maxHp; break;
+            case Special::BlownKiss:                   // a heart lands: it stands lovestruck where it was hit, and doesn't bite
+                ok = d && d->charmT > 0 && d->hp <= d->maxHp - KISS_DAMAGE && d->pos.x > ROOM_CENTER.x + 30
+                    && g.player.hp == g.player.maxHp;
+                break;
             case Special::CreatineCpp: {               // the lasers hit the one ahead, the creatine shoves the one behind
                 const Enemy* b = g.enemies.size() > 1 ? &g.enemies[1] : nullptr;
                 ok = d && d->hp <= d->maxHp - CPP_DAMAGE && b && b->hp <= b->maxHp - CREATINE_DAMAGE && b->pos.x < ROOM_CENTER.x - 52
@@ -1354,6 +1360,12 @@ void Autopilot::build() {
             check(TextFormat("%s's special (%s) works", c.name, c.special), ok);
             if (c.kind == Special::Koi) shot(g, "koi");
             if (c.kind == Special::CreatineCpp) shot(g, "gymrat-special");
+            if (c.kind == Special::BlownKiss) {
+                shot(g, "vanessa-special");
+                g.player.hp = 50;                     // her perk: a kill gives her 3 back
+                g.killEnemy(g.enemies.front());
+                check("Vanessa's kills heal her", g.player.hp == 50 + c.killHeal);
+            }
             return true;
         });
     }
