@@ -450,7 +450,9 @@ void Game::spawnElite() {
     spawnMonster(d.type, 1.0f + 0.15f * (floor - 1), 160);
     Enemy& e = enemies.back();
     e.name = d.name; e.elite = true;
-    e.hp = e.maxHp = e.maxHp * 4; e.dmg = (int)ceilf(e.dmg * 1.5f); e.xp *= 4; e.r *= 1.35f;
+    e.hp = e.maxHp = e.maxHp * 4; e.dmg = (int)ceilf(e.dmg * 1.5f); e.xp *= 4;
+    // drawn half as big again, but its body stays narrow enough for one-tile lanes (wall collision needs r < TILE / 2)
+    e.r = fminf(e.r * 1.35f, 15.0f);
     showBanner(d.name, "A champion of the depths guards this room", 2.4f);
 }
 

@@ -1005,6 +1005,20 @@ void Game::updateEnemies(float dt, float slow) {
             }
         }
 
+        // Never left inside a wall or out past the edge: a shove that went too far puts it back on the nearest floor.
+        if (e.bossForm < 0 && roomWallSolid(room, (int)floorf(e.pos.x / TILE), (int)floorf(e.pos.y / TILE), false)) {
+            float best = 1e9f;
+            Vector2 back = e.pos;
+            for (int ty = 1; ty < ROOM_TH - 1; ++ty)
+                for (int tx = 1; tx < ROOM_TW - 1; ++tx) {
+                    if (roomWallSolid(room, tx, ty, false)) continue;
+                    Vector2 mid = { tx * (float)TILE + TILE / 2.0f, ty * (float)TILE + TILE / 2.0f };
+                    float dist = Vector2Distance(mid, e.pos);
+                    if (dist < best) { best = dist; back = mid; }
+                }
+            e.pos = back; e.knock = { 0, 0 };
+        }
+
         // An enemy that stops getting closer is jammed behind its friends in a narrow gap:
         // let it slip through them for a moment.
         if (d < e.bestDist - 8) { e.bestDist = d; e.stuckT = 0; }
