@@ -272,8 +272,17 @@ under `CIG_` in `include/Champions.h`.
 
 His walk sheet (`assets/walk/walk-galin.png`) and his poses
 (`assets/dungeon/galin_smoke.png`, the stub as its last frame, and
-`assets/dungeon/galin_dodge.png`, 60 x 80 frames facing right) were drawn with
+`assets/dungeon/roll-galin.png`, 60 x 80 frames facing right) were drawn with
 ChatGPT from his picture. His card art is `assets/Galin.png`.
+
+### Dodge-rolls
+
+Every champion has a drawn dodge-roll in `assets/dungeon/roll-<champion>.png`
+(six 60 x 80 frames facing right, mirrored when rolling left): crouch, curl into
+a ball and tumble, land on a knee, stand. They are made from each champion's own
+side-view walk frame by `tools/rolls.py` (run it after changing a figure);
+Galin's is drawn by hand and left alone. A champion with no roll sheet tumbles
+their walking figure instead.
 
 ### Momiche, Gakev and the walking figures
 

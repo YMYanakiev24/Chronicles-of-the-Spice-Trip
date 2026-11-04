@@ -1025,6 +1025,7 @@ void Autopilot::build() {
     add("aura", 3, [this](Game& g, float t) {
         if (t == 0) {
             g.player.hp = 50; g.player.specialCd = 0; g.player.invuln = 1;   // no stray hits while measuring
+            g.player.xp = 0;                      // ...and no level-up refilling health mid-check
             in::tap(g.settings.keys.special);
             return false;
         }
@@ -1362,6 +1363,7 @@ void Autopilot::build() {
             }
             }
             check(TextFormat("%s's special (%s) works", c.name, c.special), ok);
+            check(TextFormat("%s has a dodge-roll drawn", c.name), g.roll[i].ok() && g.roll[i].frames == 6);
             if (c.kind == Special::Koi) shot(g, "koi");
             if (c.kind == Special::CreatineCpp) shot(g, "gymrat-special");
             if (c.kind == Special::SmokeBreak) shot(g, "galin-special");

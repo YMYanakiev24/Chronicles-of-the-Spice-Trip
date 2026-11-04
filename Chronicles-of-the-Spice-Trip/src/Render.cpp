@@ -50,6 +50,15 @@ void drawChampion(const WalkSheet& w, Vector2 p, Vector2 look, bool walking, flo
     }
 }
 
+void drawRolling(const WalkSheet& w, Vector2 p, Vector2 dir, Vector2 facing, float k, bool flash) {
+    drawShadow(p, PLAYER_R);
+    bool left = fabsf(dir.x) > 0.01f ? dir.x < 0 : facing.x < 0;   // rolling straight up or down: tumble the way they face
+    float tuck = sinf(k * PI);                     // curled up tightest halfway through
+    float s = 1 - 0.3f * tuck, fw = 24 * 1.4f * s, fh = 32 * 1.4f * s;
+    float cy = p.y - 10 + tuck * 9;                // and low to the ground
+    w.draw(left ? FACE_LEFT : FACE_RIGHT, 1, { p.x - fw / 2, cy - fh / 2, fw, fh }, WHITE, flash, (left ? -360 : 360) * k);
+}
+
 void drawPose(const Anim& a, int frame, Vector2 p, bool flipX, bool flash) {
     drawShadow(p, PLAYER_R);
     const float fh = 32 * 1.4f;                    // as tall as the walking figures

@@ -276,6 +276,7 @@ struct Game {
     Texture2D weaponTex[WEAPON_COUNT]{};
     Texture2D champTex[CHAMPION_COUNT]{};
     WalkSheet walk[CHAMPION_COUNT];     // each champion from every side (assets/walk/)
+    Anim roll[CHAMPION_COUNT];          // their dodge-roll, 60 x 80 frames facing right (assets/dungeon/roll-<champion>.png)
     Texture2D fearTex{};                // the fearful face (assets/walk/fear.png)
     VasilArt vasil;
     VideoPlayer introVideo;             // assets/intro/marin-trip.mpg

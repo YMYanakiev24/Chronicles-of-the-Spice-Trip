@@ -376,13 +376,16 @@ void Game::drawActors() {
         const Anim& sm = SPR.galinSmoke;
         if (sm.ok() && stubT > 0) { pose = &sm; poseFrame = sm.frames - 1; }
         else if (sm.ok() && cigT > 0) { pose = &sm; poseFrame = std::min(sm.frames - 2, (int)((1 - cigT / CIG_TIME) * (sm.frames - 1))); }
-        else if (SPR.galinDodge.ok() && player.roll > 0) {
-            pose = &SPR.galinDodge;
-            poseFrame = std::min(pose->frames - 1, (int)((1 - player.roll / ROLL_TIME) * pose->frames));
-            poseFlip = player.rollDir.x < 0;
-        }
+    }
+    if (!pose && player.roll > 0 && roll[player.champion].ok()) {   // their drawn dodge-roll
+        pose = &roll[player.champion];
+        poseFrame = std::min(pose->frames - 1, (int)((1 - player.roll / ROLL_TIME) * pose->frames));
+        poseFlip = fabsf(player.rollDir.x) > 0.01f ? player.rollDir.x < 0 : player.facing.x < 0;
     }
     if (pose) drawPose(*pose, poseFrame, player.pos, poseFlip, player.hitFlash > 0);
+    // no roll drawn for them: their own figure, side on, tumbling
+    else if (player.roll > 0 && figure(player.champion).ok())
+        drawRolling(figure(player.champion), player.pos, player.rollDir, player.facing, 1 - player.roll / ROLL_TIME, player.hitFlash > 0);
     // walking as their own figure, facing the way they walk (or aim, standing still)
     else drawChampion(figure(player.champion), player.pos, heroMoving ? heroMoveDir : player.facing, heroMoving, clock,
         player.facing, player.meleeAnim, player.hitFlash > 0, champ().cloak,
