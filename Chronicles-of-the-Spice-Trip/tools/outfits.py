@@ -165,7 +165,7 @@ def dress_cell(cell, o, view, scale):
     return cell
 
 # where a cap's brim sits (fraction of the figure's height): higher on a big head of hair
-CAP = {'vanessa': 0.10, 'daniil': 0.09}
+CAP = {'vanessa': 0.10, 'daniil': 0.09, 'krisa': 0.11, 'filqcheto': 0.10}
 
 # how far out from the legs the jacket reaches (in steps of the figure's pixel size): further for a puffer
 REACH = {'daniil': 4.2}
@@ -173,7 +173,7 @@ REACH = {'daniil': 4.2}
 # how far down the figure the head and the torso end, and where the shoes start (fractions of its height)
 ZONES = {'default': (0.40, 0.68, 0.90), 'momiche': (0.33, 0.62, 0.92), 'gymrat': (0.27, 0.58, 0.93),
          'storyteller': (0.42, 0.72, 0.90), 'fairy': (0.40, 0.70, 0.90), 'vanessa': (0.36, 0.57, 0.92),
-         'daniil': (0.28, 0.64, 0.92)}
+         'daniil': (0.28, 0.64, 0.92), 'filqcheto': (0.27, 0.58, 0.92), 'krisa': (0.26, 0.50, 0.92)}
 
 def dress(src, outfit):
     im = np.array(Image.open(src).convert('RGBA'))
@@ -181,7 +181,7 @@ def dress(src, outfit):
     frames = im.shape[1] // fw
     scale = fh / 32.0
     name = os.path.basename(src)[5:-4]
-    o = dict(OUTFITS[outfit]); o['_z'] = ZONES.get(name, ZONES['default']); o['_hair'] = {'momiche': True, 'vanessa': 'warm'}.get(name, False)
+    o = dict(OUTFITS[outfit]); o['_z'] = ZONES.get(name, ZONES['default']); o['_hair'] = {'momiche': True, 'vanessa': 'warm', 'krisa': 'warm'}.get(name, False)
     o['_cap'] = CAP.get(name, 0.17)
     o['_reach'] = REACH.get(name, 2.5)
     out = im.copy()

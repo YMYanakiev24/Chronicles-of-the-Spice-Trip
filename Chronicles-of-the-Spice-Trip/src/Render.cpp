@@ -245,6 +245,43 @@ void drawProjectile(const Projectile& p, float t) {
     case ShotKind::Rock:        // a boulder, tumbling through the air
         drawAnim(SPR.rock, 0, p.pos, p.r * 2.6f / SPR.rock.fw, false, WHITE, t * 300 + p.pos.x);
         break;
+    case ShotKind::Grinder: {   // a grinder, spinning as it flies, trailing green dust
+        BeginBlendMode(BLEND_ADDITIVE);
+        DrawCircleV(p.pos, p.r + 4, Fade({ 120, 220, 120, 255 }, 0.18f));
+        EndBlendMode();
+        if (SPR.grinder.ok()) drawAnim(SPR.grinder, 0, p.pos, p.r * 2.2f / SPR.grinder.fw, false, WHITE, t * 900 + p.pos.x * 3);
+        else DrawCircleV(p.pos, p.r, { 60, 64, 80, 255 });
+        break;
+    }
+    case ShotKind::MetaGrinder: {   // five grinders packed in a cross, turning together, a violet-green glow round them
+        BeginBlendMode(BLEND_ADDITIVE);
+        DrawCircleV(p.pos, p.r + 9, Fade({ 150, 100, 255, 255 }, 0.18f));
+        DrawCircleV(p.pos, p.r + 4, Fade({ 120, 230, 130, 255 }, 0.2f));
+        EndBlendMode();
+        float spin = t * 4 + p.pos.x * 0.02f;
+        for (int i = 0; i < 5; ++i) {
+            Vector2 at = i == 4 ? p.pos : Vector2Add(p.pos, Vector2Scale(fromAngle(spin + i * PI / 2), p.r * 0.62f));
+            if (SPR.grinder.ok()) drawAnim(SPR.grinder, 0, at, p.r * 1.25f / SPR.grinder.fw, false, WHITE, spin * RAD2DEG * 3 + i * 40);
+            else DrawCircleV(at, p.r * 0.6f, { 60, 64, 80, 255 });
+        }
+        break;
+    }
+    case ShotKind::GrinderStorm: {  // the big grinder at the eye of a green and violet whirlwind
+        float spin = t * 5;
+        BeginBlendMode(BLEND_ADDITIVE);
+        DrawCircleV(p.pos, p.r + 10, Fade({ 120, 80, 220, 255 }, 0.14f));
+        for (int ring = 0; ring < 3; ++ring) {
+            float rr = p.r * (0.75f + ring * 0.22f);
+            for (int arm = 0; arm < 3; ++arm) {
+                float a0 = (spin * (1.2f - ring * 0.25f) + arm * 2 * PI / 3 + ring) * RAD2DEG;
+                DrawRing(p.pos, rr - 3, rr, a0, a0 + 75, 12, Fade(ring % 2 ? Color{ 170, 100, 255, 255 } : Color{ 110, 230, 140, 255 }, 0.55f - ring * 0.12f));
+            }
+        }
+        EndBlendMode();
+        if (SPR.grinderBig.ok()) drawAnim(SPR.grinderBig, 0, p.pos, p.r * 1.15f / SPR.grinderBig.fw, false, WHITE, spin * RAD2DEG * 1.6f);
+        else DrawCircleV(p.pos, p.r * 0.55f, { 60, 64, 80, 255 });
+        break;
+    }
     case ShotKind::Heart: {     // Vanessa's kiss: a beating heart in a pink glow
         float beat = 1 + 0.18f * fmaxf(0, sinf(t * 16 + p.pos.x * 0.03f));
         BeginBlendMode(BLEND_ADDITIVE);

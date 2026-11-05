@@ -1331,7 +1331,9 @@ void Autopilot::build() {
             }
             float checkAt = c.kind == Special::Koi ? 0.05f : c.kind == Special::CreatineCpp ? 0.12f : c.kind == Special::SmokeBreak ? 1.05f : 0.8f;
             if (c.kind == Special::BlownKiss && t >= 0.1f && t < 0.1f + 1 / 30.0f) shot(g, "vanessa-kiss");
-            if (c.kind == Special::Slingshot && t >= 0.2f && t < 0.2f + 1 / 30.0f) shot(g, "daniil-aims");      // the slingshot drawn back   // the hearts on their way
+            if (c.kind == Special::Slingshot && t >= 0.2f && t < 0.2f + 1 / 30.0f) shot(g, "daniil-aims");      // the slingshot drawn back
+            if (c.kind == Special::GrinderThrow && t >= 0.22f && t < 0.22f + 1 / 30.0f) shot(g, "filqcheto-throws");
+            if (c.kind == Special::Haymaker && t >= 0.2f && t < 0.2f + 1 / 30.0f) shot(g, "krisa-punches");   // the hearts on their way
             if (t < checkAt) return false;
             const Enemy* d = g.enemies.empty() ? nullptr : &g.enemies.front();
             int koi = 0;
@@ -1354,6 +1356,12 @@ void Autopilot::build() {
             case Special::SmokeBreak:                  // healed by the smoke, then the dummy gets the cig, and burns
                 ok = g.player.hp >= 50 + CIG_HEAL - 1 && d && d->hp <= d->maxHp - CIG_DAMAGE && d->burnT > 0;
                 break;
+            case Special::GrinderThrow:                // the shot's grinders land, and the next throw is the Meta-Grinder
+                ok = d && d->hp <= d->maxHp - GRINDER_DAMAGE && g.grindStep == 1;
+                break;
+            case Special::Haymaker:                    // she dashes in and punches: it flies back, dazed
+                ok = d && d->hp <= d->maxHp - HAYMAKER_DAMAGE && d->dazeT > 0 && d->pos.x > ROOM_CENTER.x + 70;
+                break;
             case Special::BlownKiss:                   // a heart lands: it stands lovestruck where it was hit, and doesn't bite
                 ok = d && d->charmT > 0 && d->hp <= d->maxHp - KISS_DAMAGE && d->pos.x > ROOM_CENTER.x + 30
                     && g.player.hp == g.player.maxHp;
@@ -1370,6 +1378,8 @@ void Autopilot::build() {
             if (c.kind == Special::Koi) shot(g, "koi");
             if (c.kind == Special::CreatineCpp) shot(g, "gymrat-special");
             if (c.kind == Special::SmokeBreak) shot(g, "galin-special");
+            if (c.kind == Special::GrinderThrow) check("Filqcheto takes 12% less damage", g.hurtMul() < 0.9f);
+            if (c.kind == Special::Haymaker) check("Krisa swings 25% faster", g.swingTime() < WEAPONS[g.player.weapon].swing * 0.8f);
             if (c.kind == Special::BlownKiss) {
                 shot(g, "vanessa-special");
                 g.player.hp = 50;                     // her perk: a kill gives her 3 back
@@ -1379,6 +1389,51 @@ void Autopilot::build() {
             return true;
         });
     }
+
+    // ===== Filqcheto's other two grinders: the Meta-Grinder bursts, the Grinder Storm drags and grinds =====
+    add("meta-grinder and storm", 6, [this](Game& g, float t) {
+        static int phase = 0;
+        static float hp0 = 0;
+        if (t == 0) {
+            for (int i = 0; i < CHAMPION_COUNT; ++i) if (CHAMPIONS[i].kind == Special::GrinderThrow) g.profile.champion = i;
+            g.startRun();
+            goToRoom(g, isCombatRoom);
+            g.enemies.clear();
+            g.enemies.push_back(dummy({ ROOM_CENTER.x + 110, ROOM_CENTER.y }));
+            g.player.pos = ROOM_CENTER; g.player.facing = { 1, 0 };
+            aimAt(g, { ROOM_CENTER.x + 160, ROOM_CENTER.y });
+            g.grindStep = 1;
+            in::tap(g.settings.keys.special);
+            phase = 0;
+            return false;
+        }
+        if (phase == 0 && t >= 0.62f) {
+            int grinders = 0;
+            for (auto& p : g.shots) grinders += p.kind == ShotKind::Grinder;
+            const Enemy& d = g.enemies.front();
+            check("the Meta-Grinder bursts into grinders where it lands", d.hp <= d.maxHp - META_DAMAGE && grinders >= META_SPLIT - 2);
+            shot(g, "filqcheto-meta");
+            // the storm: one monster in its path, one off to the side to be dragged in
+            g.shots.clear();
+            g.enemies.clear();
+            g.enemies.push_back(dummy({ ROOM_CENTER.x + 70, ROOM_CENTER.y }));
+            g.enemies.push_back(dummy({ ROOM_CENTER.x + 70, ROOM_CENTER.y + 90 }));
+            g.player.specialCd = 0;
+            in::tap(g.settings.keys.special);
+            markY = g.enemies[1].pos.y; hp0 = g.enemies[0].hp;
+            phase = 1;
+            return false;
+        }
+        if (phase == 1 && t >= 1.5f) { shot(g, "filqcheto-storm"); phase = 2; }
+        if (phase == 2 && t >= 2.4f) {
+            bool storm = false;
+            for (auto& p : g.shots) storm |= p.kind == ShotKind::GrinderStorm;
+            check("the Grinder Storm drags monsters in and grinds them",
+                  storm && g.enemies[0].hp <= hp0 - 3 * STORM_DAMAGE && g.enemies[1].pos.y < markY - 30 && g.grindStep == 0);
+            return true;
+        }
+        return false;
+    });
 
     // ===== shops, Gakev the enemy and his cigarette packs =====
     add("nobody gets stuck", 30, [this](Game& g, float) {

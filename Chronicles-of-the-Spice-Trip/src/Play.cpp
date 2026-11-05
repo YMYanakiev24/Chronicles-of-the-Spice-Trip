@@ -74,7 +74,7 @@ Vector2 Game::mouseWorld() const {
 }
 
 
-float Game::hurtMul() const { return player.has(VP_MINT) ? 0.85f : 1.0f; }
+float Game::hurtMul() const { return (player.has(VP_MINT) ? 0.85f : 1.0f) * champ().damageTakenMul; }
 
 int Game::spellCost(int spell) const {
     return (int)ceilf(SPELLS[spell].manaCost * champ().manaCostMul * (player.has(VP_RAZZ) ? 0.8f : 1.0f));
@@ -86,7 +86,7 @@ int Game::bladeDamage() const {
 }
 
 float Game::swingTime() const {
-    return WEAPONS[player.weapon].swing * (1 - 0.08f * player.upgrades[player.weapon][UP_BALANCE]);
+    return WEAPONS[player.weapon].swing * (1 - 0.08f * player.upgrades[player.weapon][UP_BALANCE]) * champ().swingMul;
 }
 
 float Game::bladeReach() const {
@@ -122,6 +122,14 @@ void Game::updatePlay(float dt) {
     castleDoorCd = fmaxf(0, castleDoorCd - dt);
     vasilBowT = fmaxf(0, vasilBowT - dt);
     gymT = fmaxf(0, gymT - dt);
+    if (throwT > 0) {                                  // Filqcheto: wind up, let go
+        throwT = fmaxf(0, throwT - dt);
+        if (!thrown && throwT <= THROW_POSE_TIME - THROW_AT) { thrown = true; throwGrinders(); }
+    }
+    if (punchT > 0) {                                  // Krisa: the punch lands as the dash ends
+        punchT = fmaxf(0, punchT - dt);
+        if (!punchLanded && punchT <= PUNCH_POSE_TIME - HAYMAKER_DASH) { punchLanded = true; haymaker(); }
+    }
     if (slingT > 0) {                                  // Daniil's slingshot: drawn, aimed, let fly
         slingT = fmaxf(0, slingT - dt);
         if (!slingFired && slingT <= SLING_TIME - SLING_DRAW) { slingFired = true; slingCoins(); }
@@ -561,6 +569,17 @@ void Game::useSpecial(Vector2 mv) {
     case Special::BearJump:
         player.jumpT = 0.6f; player.invuln = fmaxf(player.invuln, 0.6f); play("ui");
         break;
+    case Special::GrinderThrow:                  // the wind-up now; the grinders leave his hands a moment later
+        if (throwT > 0) return;
+        throwT = THROW_POSE_TIME; throwKind = grindStep; thrown = false;
+        play("swing");
+        break;
+    case Special::Haymaker:                      // a dash the way you aim, the punch at the end of it
+        if (punchT > 0) return;
+        punchT = PUNCH_POSE_TIME; punchLanded = false; punchDir = player.facing;
+        player.dashDir = player.facing; player.dashT = HAYMAKER_DASH; player.invuln = fmaxf(player.invuln, HAYMAKER_DASH + 0.05f);
+        play("swing");
+        break;
     case Special::Slingshot:                     // he draws it now; the coins fly a moment later (slingCoins)
         if (player.charge < COIN_POWER_MAX || slingT > 0) return;
         player.charge = 0;
@@ -623,6 +642,118 @@ void Game::useSpecial(Vector2 mv) {
     }
     }
     player.specialCd = c.cooldown;
+}
+
+// Filqcheto lets go of the next grinder in his rotation.
+void Game::throwGrinders() {
+    Vector2 dir = player.facing;
+    float base = atan2f(dir.y, dir.x);
+    Vector2 hand = { player.pos.x + dir.x * 18, player.pos.y - 12 + dir.y * 8 };
+    auto grinder = [&](Vector2 at, float ang, float speed, int damage) {
+        Projectile p;
+        p.pos = at; p.vel = Vector2Scale(fromAngle(ang), speed);
+        p.damage = damage; p.r = 8; p.life = 1.3f; p.kind = ShotKind::Grinder;
+        p.color = { 90, 200, 110, 255 }; p.glow = { 150, 255, 160, 255 };
+        return p;
+    };
+    if (throwKind == 0) {                       // Weed Grinder Shot: three in a fan
+        for (int i = -1; i <= 1; ++i) shots.push_back(grinder(hand, base + i * GRINDER_SPREAD, GRINDER_SPEED, GRINDER_DAMAGE));
+        play("throw");
+    }
+    else if (throwKind == 1) {                  // Meta-Grinder: one cluster, bursting when it lands
+        Projectile p = grinder(hand, base, META_SPEED, META_DAMAGE);
+        p.kind = ShotKind::MetaGrinder; p.r = 13; p.life = META_FUSE;
+        p.glow = { 170, 110, 255, 255 };
+        shots.push_back(p);
+        play("throw");
+    }
+    else {                                      // Ultra-Grinder Storm: a big one in a whirlwind
+        Projectile p = grinder(hand, base, STORM_SPEED, STORM_DAMAGE);
+        p.kind = ShotKind::GrinderStorm; p.r = STORM_RADIUS; p.life = STORM_TIME; p.tick = 0.1f;
+        p.glow = { 160, 90, 255, 255 };
+        shots.push_back(p);
+        play("ultimate");
+        shake = fmaxf(shake, 0.15f);
+    }
+    for (int k = 0; k < 10; ++k)                // a puff of green dust from his hands
+        parts.push_back({ hand, Vector2Scale(fromAngle(base + frand(-0.9f, 0.9f)), frand(30, 90)), 0.5f, 0.5f, frand(1.5f, 3.2f),
+            k % 2 ? Color{ 110, 190, 100, 255 } : Color{ 160, 120, 220, 255 }, -20, true });
+    grindStep = (grindStep + 1) % 3;
+}
+
+// The Meta-Grinder bursts: grinders flying out every way from where it landed.
+void Game::burstMeta(Vector2 at, const Enemy* hit) {
+    float spin = frand(0, 2 * PI);
+    for (int i = 0; i < META_SPLIT; ++i) {
+        Projectile p;
+        p.pos = at; p.vel = Vector2Scale(fromAngle(spin + i * 2 * PI / META_SPLIT), GRINDER_SPEED * 0.9f);
+        p.damage = META_SPLIT_DAMAGE; p.r = 8; p.life = 0.9f; p.kind = ShotKind::Grinder;
+        p.color = { 90, 200, 110, 255 }; p.glow = { 150, 255, 160, 255 };
+        p.armAt = hit ? hit->r + 10 : 0;        // clear of the one it burst on before it can hit
+        newShots.push_back(p);
+    }
+    flashes.push_back({ at, 0, 0.3f, 50, 0, { 170, 110, 255, 255 }, true });
+    for (int k = 0; k < 18; ++k)
+        parts.push_back({ at, Vector2Scale(fromAngle(frand(0, 2 * PI)), frand(60, 200)), 0.5f, 0.5f, frand(1.5f, 3.5f),
+            k % 3 ? Color{ 120, 210, 110, 255 } : Color{ 180, 120, 255, 255 }, 0, true });
+    shake = fmaxf(shake, 0.12f);
+    play("hit");
+}
+
+// The Grinder Storm drifts ahead (stopping at a wall), drags monsters in and grinds whatever it touches.
+void Game::updateStorm(Projectile& p, float dt) {
+    Room& room = dungeon.cur();
+    Vector2 next = Vector2Add(p.pos, Vector2Scale(p.vel, dt));
+    if (roomWallSolid(room, (int)floorf((next.x + Vector2Normalize(p.vel).x * 16) / TILE), (int)floorf((next.y + Vector2Normalize(p.vel).y * 16) / TILE), room.cleared))
+        p.vel = { 0, 0 };
+    else p.pos = next;
+    for (auto& e : enemies) {
+        if (!e.alive || e.bossForm >= 0) continue;          // bosses stand their ground
+        Vector2 to = Vector2Subtract(p.pos, e.pos);
+        float d = Vector2Length(to);
+        if (d > 4 && d < STORM_PULL_RADIUS) e.pos = moveInRoom(e.pos, Vector2Scale(to, fminf(d - 4, STORM_PULL * dt) / d), e.r, room, room.cleared);
+    }
+    if ((p.tick -= dt) <= 0) {
+        p.tick = STORM_TICK;
+        for (auto& e : enemies)
+            if (e.alive && Vector2Distance(e.pos, p.pos) < STORM_RADIUS + e.r) hitEnemy(e, STORM_DAMAGE, p.glow);
+    }
+    if (frand(0, 1) < dt * 40) {                            // the whirl of dust round it
+        float a = frand(0, 2 * PI);
+        Vector2 at = Vector2Add(p.pos, Vector2Scale(fromAngle(a), STORM_RADIUS * frand(0.8f, 1.3f)));
+        parts.push_back({ at, Vector2Scale(fromAngle(a + PI / 2), 120), 0.4f, 0.4f, frand(1.5f, 3), GetRandomValue(0, 1) ? Color{ 110, 200, 120, 255 } : Color{ 170, 110, 255, 255 }, 0, true });
+    }
+    if ((p.life -= dt) <= 0) {
+        p.alive = false;
+        burst(parts, p.pos, 20, 140, 0.5f, { 150, 230, 140, 255 });
+    }
+}
+
+// Krisa's punch, at the end of her dash: everything just in front of her takes it and goes flying.
+void Game::haymaker() {
+    Vector2 dir = punchDir;
+    Vector2 fist = { player.pos.x + dir.x * 22, player.pos.y - 10 + dir.y * 12 };
+    bool landed = false;
+    for (auto& e : enemies) {
+        if (!e.alive) continue;
+        Vector2 to = Vector2Subtract(e.pos, player.pos);
+        float d = Vector2Length(to);
+        if (d > HAYMAKER_REACH + e.r || (d > 1 && Vector2DotProduct(Vector2Scale(to, 1 / d), dir) < 0.2f)) continue;
+        hitEnemy(e, HAYMAKER_DAMAGE, { 255, 230, 140, 255 });
+        landed = true;
+        if (e.bossForm < 0) {                                // bosses don't fly, or see stars
+            Vector2 away = d > 1 ? Vector2Scale(to, 1 / d) : dir;
+            e.knock = Vector2Scale(away, HAYMAKER_KNOCK * KNOCK_DECAY);
+            e.dazeT = DAZE_TIME;
+            e.lunge = 0; e.swinging = false; e.atkAnim = 0;
+        }
+    }
+    flashes.push_back({ fist, 0, 0.16f, 34, atan2f(dir.y, dir.x), WHITE, false });
+    for (int k = 0; k < 10; ++k)
+        parts.push_back({ fist, Vector2Scale(fromAngle(atan2f(dir.y, dir.x) + frand(-0.8f, 0.8f)), frand(100, 260)), 0.25f, 0.25f,
+            frand(1.2f, 2.6f), k % 3 ? Color{ 255, 244, 200, 255 } : Color{ 255, 190, 90, 255 }, 0, true });
+    if (landed) { play("bonk"); shake = fmaxf(shake, 0.22f); hitStop = HIT_FREEZE; }
+    else play("swing");
 }
 
 // Daniil lets fly: a tight volley of coins from the slingshot toward the aim, a little
@@ -807,6 +938,7 @@ void Game::updateShots(float dt) {
     Room& room = dungeon.cur();
     for (auto& p : shots) {
         if (!p.alive) continue;
+        if (p.kind == ShotKind::GrinderStorm) { updateStorm(p, dt); continue; }
         if (p.homing > 0) {           // curve toward the nearest enemy in reach
             const Enemy* target = nullptr; float best = 300;
             for (auto& e : enemies) {
@@ -843,6 +975,7 @@ void Game::updateShots(float dt) {
             p.alive = false; spellEnded(p, nullptr); continue;
         }
         for (auto& e : enemies) {
+            if (p.travelled < p.armAt) break;
             if (!e.alive || Vector2Distance(p.pos, e.pos) >= e.r + p.r) continue;
             bool weak = e.weakness && p.school && TextIsEqual(e.weakness, p.school);
             hitEnemy(e, weak ? (int)(p.damage * 1.6f) : p.damage, weak ? Color{ 255, 230, 120, 255 } : p.glow);
@@ -859,6 +992,8 @@ void Game::updateShots(float dt) {
         }
     }
     shots.erase(std::remove_if(shots.begin(), shots.end(), [](const Projectile& p) { return !p.alive; }), shots.end());
+    shots.insert(shots.end(), newShots.begin(), newShots.end());   // grinders a Meta-Grinder burst into
+    newShots.clear();
 }
 
 // Tidelash's next stretch of trail: a spike that stands taller the further out it is, with
@@ -888,6 +1023,11 @@ void Game::zapFork(Vector2 from, float ang, float len) {
 
 // A god-power has hit something, or the wall, or run out.
 void Game::spellEnded(const Projectile& p, const Enemy* hit) {
+    if (p.kind == ShotKind::MetaGrinder) {          // it bursts where it landed (backed off a wall it hit)
+        Vector2 back = Vector2Length(p.vel) > 1 ? Vector2Scale(Vector2Normalize(p.vel), hit ? 0.0f : 14.0f) : Vector2{ 0, 0 };
+        burstMeta(Vector2Subtract(p.pos, back), hit);
+        return;
+    }
     if (p.spell == SP_FIRE) {
         flashes.push_back({ p.pos, 0, 0.32f, 46, 0, { 255, 130, 50, 255 }, true });
         for (int k = 0; k < 20; ++k) {
@@ -988,7 +1128,9 @@ void Game::updateEnemies(float dt, float slow) {
         Vector2 to = Vector2Subtract(player.pos, e.pos);
         float d = Vector2Length(to);
         e.charmT = fmaxf(0, e.charmT - dt);
-        bool charmed = e.charmT > 0 && e.bossForm < 0;   // Vanessa's kiss: it stands gazing at her
+        e.dazeT = fmaxf(0, e.dazeT - dt);
+        // Vanessa's kiss (it stands gazing at her) or Krisa's punch (it stands seeing stars): no moving, no attacking
+        bool charmed = (e.charmT > 0 || e.dazeT > 0) && e.bossForm < 0;
 
         if (charmed) {                                       // (Toshko too: he forgets to run off with your gold)
             if (fabsf(to.x) > 2) e.flip = to.x < 0;              // facing her

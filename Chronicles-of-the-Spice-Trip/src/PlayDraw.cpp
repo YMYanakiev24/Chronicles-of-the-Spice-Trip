@@ -337,6 +337,16 @@ void Game::drawActors() {
         }
         else drawFear(e.pos.x, e.pos.y - e.r * 2 - 14, e.pos.y + e.r + 10, 16);
     }
+    for (auto& e : enemies) {               // stars circle every monster Krisa knocked silly
+        if (e.dying || e.dazeT <= 0 || e.bossForm >= 0) continue;
+        float fade = fminf(1, e.dazeT * 3), y = e.pos.y - e.r * 2 - 6;
+        for (int i = 0; i < 3; ++i) {
+            float a = clock * 6 + i * 2 * PI / 3;
+            Vector2 at = { e.pos.x + cosf(a) * 11, y + sinf(a) * 4 };
+            DrawPoly(at, 4, 4.2f, 45 + a * 30, Fade({ 60, 40, 10, 255 }, fade));
+            DrawPoly(at, 4, 3.0f, 45 + a * 30, Fade({ 255, 225, 90, 255 }, fade));
+        }
+    }
     for (auto& e : enemies) {               // hearts float over every monster Vanessa's kiss left lovestruck
         if (e.dying || e.charmT <= 0 || e.bossForm >= 0) continue;
         float fade = fminf(1, e.charmT * 2), y = e.pos.y - e.r * 2 - 10;
@@ -376,6 +386,15 @@ void Game::drawActors() {
         const Anim& sm = SPR.galinSmoke;
         if (sm.ok() && stubT > 0) { pose = &sm; poseFrame = sm.frames - 1; }
         else if (sm.ok() && cigT > 0) { pose = &sm; poseFrame = std::min(sm.frames - 2, (int)((1 - cigT / CIG_TIME) * (sm.frames - 1))); }
+    }
+    if (champ().kind == Special::GrinderThrow && throwT > 0 && SPR.filThrow.ok()) {   // Filqcheto: wind up and throw (arms wide for the storm)
+        pose = &SPR.filThrow;
+        poseFrame = throwKind == 2 ? 2 : (THROW_POSE_TIME - throwT < THROW_AT ? 0 : 1);
+    }
+    if (champ().kind == Special::Haymaker && punchT > 0 && SPR.krisaPunch.ok()) {     // Krisa: the jab as she dashes, then the punch
+        pose = &SPR.krisaPunch;
+        poseFrame = PUNCH_POSE_TIME - punchT < HAYMAKER_DASH ? 0 : 1;
+        poseFlip = punchDir.x < 0;
     }
     if (champ().kind == Special::Slingshot && slingT > 0 && SPR.daniilSling.ok()) {   // Daniil: draw, aim, let go
         float into = SLING_TIME - slingT;
@@ -641,7 +660,7 @@ void Game::drawHud() {
         if (metered) ui::bar({ s.x + 4, s.y + slot - 8, slot - 8, 4 }, meter, c.kind == Special::Blink ? Color{ 230, 160, 255, 255 } : ui::ACCENT);
         DrawRectangleLinesEx(s, 2, ready ? ui::ACCENT : ui::EDGE);
         ui::keycap(keyName(settings.keys.special), s.x + 3, s.y + 3);
-        ui::textCentered(c.special, s.x + slot / 2, s.y + slot + 6, 10, ready ? ui::ACCENT : ui::MUTED);
+        ui::textCentered(c.kind == Special::GrinderThrow ? GRINDER_NAMES[grindStep] : c.special, s.x + slot / 2, s.y + slot + 6, 10, ready ? ui::ACCENT : ui::MUTED);
     }
 
     // a challenge room's clock, or a mini-boss's health

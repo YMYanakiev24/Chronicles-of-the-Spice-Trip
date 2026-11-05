@@ -106,4 +106,20 @@ const ChampionDef CHAMPIONS[CHAMPION_COUNT] = {
       .special = "Smoke Break", .specialDesc = "Smoke a cig and heal 30, then stub it out on the nearest monster: 24 damage and it burns.",
       .kind = Special::SmokeBreak, .cooldown = 8, .stillRegen = 1.5f,
       .quote = "Give me a minute. I'm on my break.", .winLine = "Now that's worth a smoke." },
+
+    // Filqcheto and his grinders: walk sheet, poses and grinders cut from his sheet (see README).
+    { .name = "Filqcheto", .art = "filqcheto.png", .walk = "walk-filqcheto.png",
+      .crop = { 0.003f, 0.105f, 0.199f, 0.110f }, .cloak = { 28, 28, 34, 255 },
+      .perk = "Chilled out: takes 12% less damage.",
+      .special = "Grinders", .specialDesc = "Throws the next grinder: a fan of three, then a Meta-Grinder that bursts, then a Grinder Storm that drags monsters in.",
+      .kind = Special::GrinderThrow, .cooldown = 4, .damageTakenMul = 0.88f,
+      .quote = "Fresh grind, coming through.", .winLine = "Ground to dust." },
+
+    // Krisa: walk sheet and her punches cut from her sheet (see README).
+    { .name = "Krisa", .art = "krisa.png", .walk = "walk-krisa.png",
+      .crop = { 0.003f, 0.105f, 0.199f, 0.110f }, .cloak = { 40, 44, 70, 255 },
+      .perk = "Quick hands: swings her weapon 25% faster.",
+      .special = "Haymaker", .specialDesc = "Dash the way you aim and punch: 28 damage, and monsters fly back dazed for 1.5 s.",
+      .kind = Special::Haymaker, .cooldown = 5, .swingMul = 0.75f,
+      .quote = "Hold my cap.", .winLine = "Knocked out cold." },
 };

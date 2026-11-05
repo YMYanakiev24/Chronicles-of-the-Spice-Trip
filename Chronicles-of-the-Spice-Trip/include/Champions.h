@@ -21,6 +21,8 @@ enum class Special {
     CreatineCpp,   // the Gym Rat: C++ lasers ahead, a creatine cloud behind
     BlownKiss,     // Vanessa: a fan of hearts that leaves monsters lovestruck
     SmokeBreak,    // Galin: smoke a cig to heal, then stub it out on the nearest monster
+    GrinderThrow,  // Filqcheto: grinders, three kinds in turn (shot, meta-grinder, ultra-grinder storm)
+    Haymaker,      // Krisa: a dash and a punch that sends monsters flying, dazed
 };
 
 struct ChampionDef {
@@ -46,12 +48,14 @@ struct ChampionDef {
     float stillRegen = 0;     // health per second while standing still
     float spellHoming = 0;    // spells curve toward enemies (rad/s)
     int   killHeal = 0;       // health back for every kill
+    float swingMul = 1;       // time between swings of the weapon
+    float damageTakenMul = 1; // damage he takes
 
     const char* quote = "";   // their line on the champion select
     const char* winLine = ""; // what they say when a boss falls
 };
 
-inline constexpr int CHAMPION_COUNT = 14;
+inline constexpr int CHAMPION_COUNT = 16;
 
 // Beray's outfits. Every champion can wear each one; their walking figure in it is
 // assets/outfits/<key>/<their walk sheet> (made by tools/outfits.py). 0 is their own clothes.
@@ -114,3 +118,34 @@ inline constexpr float CIG_HEAL = 30;              // health back over the smoke
 inline constexpr float CIG_REACH = 160;            // how far he'll step to stub it out
 inline constexpr int   CIG_DAMAGE = 24;
 inline constexpr float CIG_STUB_TIME = 0.3f;       // he holds the stub pose this long
+
+// Filqcheto's grinders. Each Q throws the next of three, round and round:
+//   0 Weed Grinder Shot: three grinders in a fan
+//   1 Meta-Grinder: a cluster that bursts into grinders flying every way when it lands (or soon after)
+//   2 Ultra-Grinder Storm: a big grinder in a whirlwind that drifts ahead, drags monsters in and grinds them
+inline constexpr const char* GRINDER_NAMES[3] = { "Grinder Shot", "Meta-Grinder", "Grinder Storm" };
+inline constexpr float GRINDER_SPEED = 380;
+inline constexpr float GRINDER_SPREAD = 0.22f;      // radians between the shot's grinders
+inline constexpr int   GRINDER_DAMAGE = 16;
+inline constexpr float META_SPEED = 300;
+inline constexpr int   META_DAMAGE = 20;            // the cluster itself
+inline constexpr int   META_SPLIT = 6;              // grinders it bursts into...
+inline constexpr int   META_SPLIT_DAMAGE = 12;      // ...each
+inline constexpr float META_FUSE = 0.8f;            // it bursts by itself after this long
+inline constexpr float STORM_SPEED = 110;
+inline constexpr float STORM_TIME = 3.0f;
+inline constexpr float STORM_RADIUS = 40;           // what it grinds...
+inline constexpr float STORM_PULL_RADIUS = 140;     // ...and how far off it drags monsters in
+inline constexpr float STORM_PULL = 75;             // px per second
+inline constexpr int   STORM_DAMAGE = 7;            // every tick
+inline constexpr float STORM_TICK = 0.3f;
+inline constexpr float THROW_POSE_TIME = 0.4f;      // his wind-up and throw (the storm: arms wide)
+inline constexpr float THROW_AT = 0.14f;            // when in it the grinders leave his hands
+
+// Krisa's Haymaker: a quick dash the way you aim, then a punch at the end of it.
+inline constexpr float HAYMAKER_DASH = 0.16f;       // seconds of dash (520 px/s)
+inline constexpr int   HAYMAKER_DAMAGE = 28;
+inline constexpr float HAYMAKER_REACH = 58;
+inline constexpr float HAYMAKER_KNOCK = 90;         // px the punch sends them
+inline constexpr float DAZE_TIME = 1.5f;            // seconds they stand seeing stars
+inline constexpr float PUNCH_POSE_TIME = 0.42f;

@@ -37,6 +37,9 @@ enum class ShotKind : unsigned char {
     Arrow,      // a Soldier's arrow
     Rock,       // the boulders the Bad Plasmodium throws
     Heart,      // Vanessa's blown kiss
+    Grinder,    // Filqcheto's grinders...
+    MetaGrinder,  // ...the cluster that bursts into them...
+    GrinderStorm, // ...and the big one in its whirlwind
 };
 
 struct Projectile {
@@ -54,6 +57,8 @@ struct Projectile {
     float    nextSpike = 0;       // ...where Tidelash raises its next spikes, or Stormbolt jags...
     int      trail = 0;           // ...which trail those spikes belong to...
     Vector2  lastJag{};           // ...and where Stormbolt's trail has reached
+    float    armAt = 0;           // flown this far before it can hit (grinders burst from a cluster)
+    float    tick = 0;            // the Grinder Storm: seconds to its next grind
 };
 
 struct Enemy {
@@ -82,6 +87,7 @@ struct Enemy {
     bool    elite = false;             // a floor's mini-boss: bigger, tougher, richer
     float   fleeT = 0;                 // Toshko: seconds spent running away
     float   charmT = 0;                // Vanessa's kiss: seconds left lovestruck (stands, can't attack)
+    float   dazeT = 0;                 // Krisa's punch: seconds left seeing stars (the same)
 
     // Boss bodies (bossForm >= 0) are moved and fired by the BossFight.
     int     bossForm = -1;             // 0 = the boss, 1 = a copy, 2 = a tiny copy
