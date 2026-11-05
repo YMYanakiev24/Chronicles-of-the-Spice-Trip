@@ -258,7 +258,8 @@ to lose and only take the damage. The numbers are under `KISS_` and
 
 Her walk sheet (`assets/walk/walk-vanessa.png`) is cut from her two character
 sheets: facing you and from behind are her portraits (a lower leg lifted in turn
-to walk), and from the side is the walk cycle on her sheet, mirrored. Her card
+to walk), and from the side are the strides from her sheet, the second with her
+legs swapped (the shoes turned back round) so they take turns. Her card
 art is `assets/vanessa.png`.
 
 ### Daniil
