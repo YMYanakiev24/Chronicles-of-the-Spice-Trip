@@ -122,6 +122,10 @@ void Game::updatePlay(float dt) {
     castleDoorCd = fmaxf(0, castleDoorCd - dt);
     vasilBowT = fmaxf(0, vasilBowT - dt);
     gymT = fmaxf(0, gymT - dt);
+    if (slingT > 0) {                                  // Daniil's slingshot: drawn, aimed, let fly
+        slingT = fmaxf(0, slingT - dt);
+        if (!slingFired && slingT <= SLING_TIME - SLING_DRAW) { slingFired = true; slingCoins(); }
+    }
     stubT = fmaxf(0, stubT - dt);
     if (cigT > 0) {                                    // Galin's smoke break: heal as he smokes
         cigT -= dt;
@@ -557,19 +561,12 @@ void Game::useSpecial(Vector2 mv) {
     case Special::BearJump:
         player.jumpT = 0.6f; player.invuln = fmaxf(player.invuln, 0.6f); play("ui");
         break;
-    case Special::CoinBarrage: {
-        if (player.charge < COIN_POWER_MAX) return;
+    case Special::Slingshot:                     // he draws it now; the coins fly a moment later (slingCoins)
+        if (player.charge < COIN_POWER_MAX || slingT > 0) return;
         player.charge = 0;
-        for (int i = 0; i < 16; ++i) {
-            Projectile p;
-            p.pos = player.pos; p.vel = Vector2Scale(fromAngle(i * 2 * PI / 16), 300);
-            p.damage = 10; p.r = 6; p.life = 1.2f; p.kind = ShotKind::Coin;
-            p.color = { 245, 215, 120, 255 }; p.glow = { 255, 240, 180, 255 };
-            shots.push_back(p);
-        }
-        play("coin");
+        slingT = SLING_TIME; slingFired = false;
+        play("charge");
         break;
-    }
     case Special::Koi: {
         float base = atan2f(player.facing.y, player.facing.x);
         for (int i = -1; i <= 1; ++i) {
@@ -626,6 +623,26 @@ void Game::useSpecial(Vector2 mv) {
     }
     }
     player.specialCd = c.cooldown;
+}
+
+// Daniil lets fly: a tight volley of coins from the slingshot toward the aim, a little
+// uneven in speed so they string out like a real handful.
+void Game::slingCoins() {
+    Vector2 dir = player.facing;
+    float base = atan2f(dir.y, dir.x);
+    Vector2 hand = { player.pos.x + dir.x * 22, player.pos.y - 14 + dir.y * 8 };
+    for (int i = 0; i < SLING_COINS; ++i) {
+        Projectile p;
+        p.pos = hand;
+        p.vel = Vector2Scale(fromAngle(base + (i - (SLING_COINS - 1) / 2.0f) * SLING_SPREAD + frand(-0.015f, 0.015f)), SLING_SPEED * frand(0.85f, 1.1f));
+        p.damage = SLING_DAMAGE; p.r = 6; p.life = 1.2f; p.kind = ShotKind::Coin;
+        p.color = { 245, 215, 120, 255 }; p.glow = { 255, 240, 180, 255 };
+        shots.push_back(p);
+    }
+    for (int k = 0; k < 8; ++k)                       // the band snaps
+        parts.push_back({ hand, Vector2Scale(fromAngle(base + frand(-0.5f, 0.5f)), frand(60, 140)), 0.25f, 0.25f, frand(1.2f, 2.4f), { 255, 230, 160, 255 }, 0, true });
+    shake = fmaxf(shake, 0.08f);
+    play("throw"); play("coin");
 }
 
 // The Gym Rat throws his arms out: a fan of C++ lasers toward the aim, each running on until
@@ -762,7 +779,7 @@ void Game::hitEnemy(Enemy& e, int damage, Color fx) {
     stats.damageDealt += damage;
     floaters.push_back({ { e.pos.x + frand(-6, 6), e.pos.y - e.r - 8 }, 0, damage, fx });
     burst(parts, e.pos, 5, 60, 0.4f, fx);
-    if (champ().kind == Special::CoinBarrage)
+    if (champ().kind == Special::Slingshot)
         player.charge = fminf(COIN_POWER_MAX, player.charge + COIN_POWER_PER_HIT);
 }
 
