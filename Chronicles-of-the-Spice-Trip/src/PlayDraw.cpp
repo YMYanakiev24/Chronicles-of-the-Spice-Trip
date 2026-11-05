@@ -368,7 +368,7 @@ void Game::drawActors() {
     }
     if (player.dashT > 0 || player.rollAtkT > 0)
         DrawCircleV(player.pos, PLAYER_R + 4, Fade(player.rollAtkT > 0 ? Color{ 110, 200, 80, 255 } : Color{ 245, 210, 110, 255 }, 0.35f));
-    // Galin strikes his own poses: smoking (the last frame stubs it out), and his dodge-roll
+    // Galin and Daniil strike their own poses (his smoke, the slingshot), and everyone their dodge-roll
     const Anim* pose = nullptr;
     int poseFrame = 0;
     bool poseFlip = player.facing.x < 0;
@@ -376,6 +376,11 @@ void Game::drawActors() {
         const Anim& sm = SPR.galinSmoke;
         if (sm.ok() && stubT > 0) { pose = &sm; poseFrame = sm.frames - 1; }
         else if (sm.ok() && cigT > 0) { pose = &sm; poseFrame = std::min(sm.frames - 2, (int)((1 - cigT / CIG_TIME) * (sm.frames - 1))); }
+    }
+    if (champ().kind == Special::Slingshot && slingT > 0 && SPR.daniilSling.ok()) {   // Daniil: draw, aim, let go
+        float into = SLING_TIME - slingT;
+        pose = &SPR.daniilSling;
+        poseFrame = into < SLING_DRAW * 0.45f ? 0 : into < SLING_DRAW ? 1 : 2;
     }
     if (!pose && player.roll > 0 && roll[player.champion].ok()) {   // their drawn dodge-roll
         pose = &roll[player.champion];
@@ -626,9 +631,9 @@ void Game::drawHud() {
                 { s.x + 4, s.y + 4, slot - 8, slot - 8 });
         }
         else DrawCircleV({ s.x + slot / 2, s.y + slot / 2 }, 16, Fade({ 150, 110, 230, 255 }, 0.6f));
-        bool metered = c.kind == Special::CoinBarrage || c.kind == Special::Blink;
-        float meter = c.kind == Special::CoinBarrage ? player.charge / COIN_POWER_MAX : player.charge / DUST_MAX;
-        bool ready = player.specialCd <= 0 && (c.kind != Special::CoinBarrage || player.charge >= COIN_POWER_MAX)
+        bool metered = c.kind == Special::Slingshot || c.kind == Special::Blink;
+        float meter = c.kind == Special::Slingshot ? player.charge / COIN_POWER_MAX : player.charge / DUST_MAX;
+        bool ready = player.specialCd <= 0 && (c.kind != Special::Slingshot || player.charge >= COIN_POWER_MAX)
             && (c.kind != Special::Blink || player.charge >= DUST_PER_BLINK);
         if (player.specialCd > 0)           // cooldown curtain
             DrawRectangle((int)s.x, (int)s.y, (int)slot, (int)(slot * player.specialCd / c.cooldown), { 0, 0, 0, 170 });

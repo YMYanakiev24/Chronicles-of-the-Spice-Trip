@@ -359,7 +359,7 @@ void Game::enterRoom() {
     parts.clear(); popups.clear(); coins.clear(); floaters.clear();
     fight.end();
     flashes.clear(); arcs.clear(); cracks.clear(); spikes.clear(); rubble.clear();
-    lasers.clear(); gymT = 0;
+    lasers.clear(); gymT = 0; slingT = 0;
     skyFlash = 0; finaleT = 0; slowMo = 0; rewardT = 0;
     chestOpenT = 99; chestLight = 0; chestLooting = false;
     castT = 0; hitStop = 0; challengeT = 0;

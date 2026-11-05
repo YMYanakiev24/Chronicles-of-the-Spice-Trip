@@ -1312,7 +1312,7 @@ void Autopilot::build() {
                 case Special::ArcaneSurge: g.player.mana = 10; break;
                 case Special::Drink:       g.player.hp = 50; break;
                 case Special::SmokeBreak:  g.player.hp = 50; g.player.invuln = 3; break;   // no spike trap spoils the heal
-                case Special::CoinBarrage: g.player.charge = COIN_POWER_MAX; break;
+                case Special::Slingshot: g.player.charge = COIN_POWER_MAX; break;
                 case Special::Scare:       g.enemies.front().speed = 70; g.enemies.front().dmg = 10; break;   // close enough to bite
                 case Special::BlownKiss:   g.enemies.front().speed = 70; g.enemies.front().dmg = 10; break;   // coming to bite
                 case Special::CreatineCpp: g.enemies.push_back(dummy({ ROOM_CENTER.x - 50, ROOM_CENTER.y })); break;   // one behind him too
@@ -1329,12 +1329,13 @@ void Autopilot::build() {
                 in::tap(g.settings.keys.special);
                 return false;
             }
-            float checkAt = c.kind == Special::CoinBarrage || c.kind == Special::Koi ? 0.05f : c.kind == Special::CreatineCpp ? 0.12f : c.kind == Special::SmokeBreak ? 1.05f : 0.8f;
-            if (c.kind == Special::BlownKiss && t >= 0.1f && t < 0.1f + 1 / 30.0f) shot(g, "vanessa-kiss");   // the hearts on their way
+            float checkAt = c.kind == Special::Koi ? 0.05f : c.kind == Special::CreatineCpp ? 0.12f : c.kind == Special::SmokeBreak ? 1.05f : 0.8f;
+            if (c.kind == Special::BlownKiss && t >= 0.1f && t < 0.1f + 1 / 30.0f) shot(g, "vanessa-kiss");
+            if (c.kind == Special::Slingshot && t >= 0.2f && t < 0.2f + 1 / 30.0f) shot(g, "daniil-aims");      // the slingshot drawn back   // the hearts on their way
             if (t < checkAt) return false;
             const Enemy* d = g.enemies.empty() ? nullptr : &g.enemies.front();
-            int coinShots = 0, koi = 0;
-            for (auto& p : g.shots) { coinShots += p.kind == ShotKind::Coin; koi += p.kind == ShotKind::Koi; }
+            int koi = 0;
+            for (auto& p : g.shots) koi += p.kind == ShotKind::Koi;
             bool ok = false;
             switch (c.kind) {
             case Special::ArcaneSurge: ok = g.player.mana >= 49; break;
@@ -1344,7 +1345,9 @@ void Autopilot::build() {
             case Special::MelonRoll:   ok = d && d->hp <= d->maxHp - 20; break;
             case Special::Drink:       ok = g.player.hp >= 69 && g.player.wobbleT > 0; break;
             case Special::BearJump:    ok = d && d->hp <= d->maxHp - 18; break;
-            case Special::CoinBarrage: ok = coinShots == 16; break;
+            case Special::Slingshot:                   // drawn, aimed, and the volley lands on the one ahead
+                ok = d && d->hp <= d->maxHp - 4 * SLING_DAMAGE && g.player.charge < COIN_POWER_MAX && g.slingT <= 0;
+                break;
             case Special::Koi:         ok = koi == 3; break;
             case Special::Blink:       ok = g.player.pos.x > markX + 100 && g.player.charge < DUST_MAX; break;
             case Special::Scare:       ok = g.scareT > 0 && d && d->pos.x > ROOM_CENTER.x + 40 && g.player.hp == g.player.maxHp; break;

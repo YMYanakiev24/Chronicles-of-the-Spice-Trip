@@ -53,12 +53,13 @@ const ChampionDef CHAMPIONS[CHAMPION_COUNT] = {
       .kind = Special::BearJump, .cooldown = 3, .speedMul = 1.1f,
       .quote = "Bears don't knock.", .winLine = "Hibernation can wait." },
 
-    { .name = "Daniil & Vasil", .art = "daniilandvasil.png", .walk = "walk-daniilvasil.png",
-      .crop = { 0.24f, 0.000f, 0.546f, 1.000f }, .cloak = { 90, 90, 140, 255 },
-      .perk = "Twin strike: +5 blade damage.",
-      .special = "Coin Barrage", .specialDesc = "Your hits charge it. When full, fire a ring of 16 coins.",
-      .kind = Special::CoinBarrage, .cooldown = 0.5f, .bladeBonus = 5,
-      .quote = "Two of us. One of you. Bad odds.", .winLine = "Twin strike, twin win." },
+    // Daniil and his slingshot: walk sheet and poses cut from his sheet (see README).
+    { .name = "Daniil", .art = "daniil.png", .walk = "walk-daniil.png",
+      .crop = { 0.028f, 0.033f, 0.320f, 0.177f }, .cloak = { 30, 30, 40, 255 },
+      .perk = "Street fighter: +5 blade damage.",
+      .special = "Coin Slingshot", .specialDesc = "Your hits charge it. When full, sling 8 coins at the aim, 12 damage each.",
+      .kind = Special::Slingshot, .cooldown = 0.5f, .bladeBonus = 5,
+      .quote = "Every coin finds its mark.", .winLine = "Paid in full." },
 
     { .name = "The Storyteller", .art = "thestoryteller.png", .walk = "walk-storyteller.png",
       .crop = { 0.14f, 0.150f, 0.66f, 0.495f }, .cloak = { 60, 120, 130, 255 },

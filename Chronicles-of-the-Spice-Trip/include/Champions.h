@@ -14,7 +14,7 @@ enum class Special {
     MelonRoll,     // Pupesh: roll through enemies, hurting each one
     Drink,         // Ristyo: heal, but aim wobbles for a while
     BearJump,      // Iliqn Puh: leap and slam down
-    CoinBarrage,   // Daniil & Vasil: charged by hits, a ring of coins
+    Slingshot,     // Daniil: charged by hits, a volley of coins from his slingshot at the aim
     Koi,           // the Storyteller: three homing koi
     Blink,         // the Fairy: teleport to the cursor, paid in fairy dust
     Scare,         // Momiche: every enemy runs from you and can't attack
@@ -71,6 +71,14 @@ extern const ChampionDef CHAMPIONS[CHAMPION_COUNT];
 // Coin Barrage and Blink run on a meter instead of only a cooldown.
 inline constexpr float COIN_POWER_MAX = 100;     // filled by hits
 inline constexpr float COIN_POWER_PER_HIT = 6;
+
+// Daniil's slingshot: he draws it, aims, and lets fly a volley of coins at the aim, then lowers it.
+inline constexpr int   SLING_COINS = 8;            // coins in the volley
+inline constexpr float SLING_SPREAD = 0.05f;       // radians between neighbouring coins
+inline constexpr float SLING_SPEED = 430;
+inline constexpr int   SLING_DAMAGE = 12;          // each
+inline constexpr float SLING_TIME = 0.55f;         // the whole pose...
+inline constexpr float SLING_DRAW = 0.25f;         // ...and when in it the coins fly
 inline constexpr float DUST_MAX = 50;            // refills over time
 inline constexpr float DUST_REGEN = 4;
 inline constexpr float DUST_PER_BLINK = 10;

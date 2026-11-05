@@ -59,10 +59,10 @@ Movement, run, roll, interact and the special can be rebound in **Settings**.
   spike traps, chests, and a start room with Vasil the Storyteller and the door to
   the castle, where the shops are (see below).
 - **Boss fights.** The last room of every floor holds a boss (see below).
-- **Champions.** Thirteen champions, each with a passive perk and a special on **Q**:
+- **Champions.** Fourteen champions, each with a passive perk and a special on **Q**:
   Arcane Surge, Aura of Calmness, Coin Dash, Mug-Shield, Melon Roll, Drink,
-  Bear Jump, Coin Barrage, Release the Koi, Blink, Scare, Creatine & C++ and
-  Blown Kiss. Each one walks as
+  Bear Jump, Coin Slingshot, Release the Koi, Blink, Scare, Creatine & C++,
+  Blown Kiss and Smoke Break. Each one walks as
   their own figure, seen from the front, the back and both sides, and the
   champion select shows every champion from all four sides.
 - **Boss Rush.** All six bosses back to back at level 5, timed. The best time
@@ -260,6 +260,20 @@ Her walk sheet (`assets/walk/walk-vanessa.png`) is cut from her two character
 sheets: facing you and from behind are her portraits (a lower leg lifted in turn
 to walk), and from the side is the walk cycle on her sheet, mirrored. Her card
 art is `assets/vanessa.png`.
+
+### Daniil
+
+Blond hair, a black jacket and a slingshot. His perk, **Street fighter**: +5 blade
+damage. His special, **Coin Slingshot** (Q): every hit he lands charges it, and
+when the meter is full he draws the slingshot, aims and lets fly a tight volley of
+8 coins at the aim, 12 damage each. The numbers are under `SLING_` in
+`include/Champions.h`.
+
+His walk sheet (`assets/walk/walk-daniil.png`) and his slingshot poses
+(`assets/dungeon/daniil_sling.png`: draw, aim, let go, 100 x 80 frames facing
+right) are cut from his character sheet (`assets/daniil.png`, also his card art).
+Facing you and from behind he walks with a lower leg lifted in turn; from the
+side he walks with the stride on his sheet.
 
 ### Galin
 

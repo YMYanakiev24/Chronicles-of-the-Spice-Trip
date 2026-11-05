@@ -157,6 +157,7 @@ struct Game {
     Vector2 aimDir() const;
     Vector2 castHand() const;           // where a spell gathers as it winds up
     void  creatineAndCpp(Vector2 dir);  // the Gym Rat's special
+    void  slingCoins();                 // Daniil's volley, as the slingshot lets go
     std::vector<std::string> vasilTale() const;   // this floor's story, line by line
     std::string vasilGreeting() const;            // what he calls out as you arrive
     float hurtMul() const;
@@ -220,6 +221,8 @@ struct Game {
     float gymT = 0;                     // the Gym Rat holds his arms-out pose this long...
     Vector2 gymDir{ 1, 0 };             // ...lasers this way, creatine the other
     float cigT = 0, stubT = 0;          // Galin: seconds of smoke left, then of the stub pose
+    float slingT = 0;                   // Daniil: seconds left of his slingshot pose...
+    bool  slingFired = false;           // ...and whether the coins have flown yet
     float finaleT = 0, slowMo = 0;      // a boss is falling: seconds left of it, and of the slow motion
     float rewardT = 0;                  // BOSS DEFEATED gets its moment before this overlay
     Overlay rewardOverlay = Overlay::None;

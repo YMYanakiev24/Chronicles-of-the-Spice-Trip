@@ -173,7 +173,7 @@ struct Player {
     int   champion = 0;
     float specialCd = 0;
     float auraT = 0, dashT = 0, shieldT = 0, rollAtkT = 0, wobbleT = 0, jumpT = 0;
-    float charge = 0;                 // coin power (Daniil & Vasil) or fairy dust (the Fairy)
+    float charge = 0;                 // coin power (Daniil) or fairy dust (the Fairy)
     int   rollId = 0;
     Vector2 dashDir{ 0, 1 };
 };
