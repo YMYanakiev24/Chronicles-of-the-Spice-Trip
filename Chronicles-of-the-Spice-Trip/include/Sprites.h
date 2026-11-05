@@ -44,6 +44,9 @@ struct Sprites {
     Anim vapes, spellIcons;                    // 32px icons: one frame per Vape / SPELLS entry
     Anim galinSmoke;                           // Galin's smoke, 3:4 frames facing right (the last frame stubs it out)
     Anim daniilSling;                          // Daniil's slingshot: draw, aim, let go (100 x 80 frames facing right)
+    Anim filThrow;                             // Filqcheto: wind-up, throw, arms wide for the storm (100 x 80, facing right)
+    Anim krisaPunch;                           // Krisa: the jab, the punch landing (100 x 80, facing right)
+    Anim grinder, grinderBig;                  // Filqcheto's grinders (one frame each)
     EnemyAnims enemy[12];                     // indexed by EnemyKind (skull slot unused)
 
     void load();

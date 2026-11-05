@@ -59,10 +59,10 @@ Movement, run, roll, interact and the special can be rebound in **Settings**.
   spike traps, chests, and a start room with Vasil the Storyteller and the door to
   the castle, where the shops are (see below).
 - **Boss fights.** The last room of every floor holds a boss (see below).
-- **Champions.** Fourteen champions, each with a passive perk and a special on **Q**:
+- **Champions.** Sixteen champions, each with a passive perk and a special on **Q**:
   Arcane Surge, Aura of Calmness, Coin Dash, Mug-Shield, Melon Roll, Drink,
   Bear Jump, Coin Slingshot, Release the Koi, Blink, Scare, Creatine & C++,
-  Blown Kiss and Smoke Break. Each one walks as
+  Blown Kiss, Smoke Break, Grinders and Haymaker. Each one walks as
   their own figure, seen from the front, the back and both sides, and the
   champion select shows every champion from all four sides.
 - **Boss Rush.** All six bosses back to back at level 5, timed. The best time
@@ -275,6 +275,38 @@ His walk sheet (`assets/walk/walk-daniil.png`) and his slingshot poses
 right) are cut from his character sheet (`assets/daniil.png`, also his card art).
 Facing you and from behind he walks with a lower leg lifted in turn; from the
 side he walks with the stride on his sheet.
+
+### Filqcheto
+
+Black hoodie, earbuds, and a pocket full of grinders. His perk, **Chilled out**:
+he takes 12% less damage. His special, **Grinders** (Q, 4 s cooldown), throws
+the next of three grinders, round and round (the slot under the special says
+which is next):
+
+1. **Weed Grinder Shot**: three grinders in a fan, 16 damage each.
+2. **Meta-Grinder**: a cluster of five that hits for 20 and bursts into six
+   grinders flying every way (12 each) where it lands, or after 0.8 s.
+3. **Ultra-Grinder Storm**: a big grinder in a green and violet whirlwind drifts
+   ahead for 3 s, dragging monsters in from 140 px away and grinding everything
+   it touches for 7 every 0.3 s. Bosses aren't dragged, only ground.
+
+He winds up and throws (arms out wide for the storm) with poses from his sheet.
+The numbers are under `GRINDER_`, `META_` and `STORM_` in `include/Champions.h`.
+
+### Krisa
+
+Grey cap, long hair, and a right hook. Her perk, **Quick hands**: she swings her
+weapon 25% faster. Her special, **Haymaker** (Q, 5 s cooldown): she dashes the way
+you aim and punches at the end of it. Everything just in front of her takes 28
+and flies back, seeing stars for 1.5 s (they can't move or attack); bosses only
+take the damage. The numbers are under `HAYMAKER_` and `DAZE_TIME`.
+
+Both walk sheets (`assets/walk/walk-filqcheto.png`, `walk-krisa.png`), their poses
+(`assets/dungeon/filqcheto_throw.png`, `krisa_punch.png`: 100 x 80 frames facing
+right) and his grinders (`grinder.png`, `grinder_big.png`) are cut from their
+character sheets (`assets/filqcheto.png`, `assets/krisa.png`, also their card
+art). Facing you and from behind they walk with a lower leg lifted in turn; from
+the side with the stride from their sheet, then the same with the legs swapped.
 
 ### Galin
 
