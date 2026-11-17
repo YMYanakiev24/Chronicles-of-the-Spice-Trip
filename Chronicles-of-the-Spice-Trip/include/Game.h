@@ -129,6 +129,8 @@ struct Game {
     float diffDmg() const;              // ...and damage
     void buy(int item);
     void buyWeapon(int weapon);         // buys it, or just equips it if it's owned
+    void sellWeapon(int weapon);        // back to Galin for everything it cost in gold
+    int  sellPrice(int weapon) const;   // its price, and the gold its upgrades cost
     void buyUpgrade(int upgrade);       // for the weapon in hand
     Camera2D camera() const;
     // the toilets after Triceps (Toilet.cpp)
@@ -167,6 +169,12 @@ struct Game {
     float hurtMul() const;
     int   spellCost(int spell) const;
     int   bladeDamage() const;          // the weapon, its upgrades, level, vape and perk
+    int   upgradeLevel(int u) const { return player.upgrades[player.weapon][u]; }
+    float bladeKnockback() const;
+    float critChance() const;           // percent
+    int   bladeLeech() const;           // health back per monster hit
+    int   killCoins() const;            // extra coins per kill from the weapon in hand
+    float swingArc() const;             // a swing hits what's within acos(this) of where you face
     float swingTime() const;
     float bladeReach() const;
 
@@ -222,6 +230,7 @@ struct Game {
     castle::Hall hall;                  // the castle corridor and its shops
     float castleDoorCd = 0;             // just came out: the door waits a moment before it opens again
     int   dripChampion = 0, dripHover = -1;   // Beray's: who you're dressing, the outfit pointed at
+    int   galinPick = -1;                     // Galin's: the weapon looked at (-1: the one in hand)
     float gymT = 0;                     // the Gym Rat holds his arms-out pose this long...
     Vector2 gymDir{ 1, 0 };             // ...lasers this way, creatine the other
     float cigT = 0, stubT = 0;          // Galin: seconds of smoke left, then of the stub pose
@@ -384,7 +393,14 @@ struct WeaponDef {
     float knockback;        // how far a hit shoves an enemy back
     const char* sfx;        // the sound of a hit landing
     bool  anal = false;     // its damage goes by another name
+    // What some swords do besides (the upgrades add to these):
+    int   crit = 0;         // percent chance a hit is critical: double damage
+    int   leech = 0;        // health back for every monster a swing hits
+    int   coins = 0;        // extra coins from every kill while it's in hand
+    int   fire = 0;         // fire damage added to every hit, which sets the monster alight
+    const char* note = nullptr;   // a line about it in Galin's shop
 };
+// New weapons go on the end: saves keep weapons by their place in this table.
 inline constexpr WeaponDef WEAPONS[WEAPON_COUNT] = {
     { "Rusty Sword",  "rusty-iron-sword/sprite-90x22.png",  0,   0,  0, 0.40f, 40,  8, "clang" },
     { "Iron Sword",   "iron-sword/sprite-128.png",         45,  50,  5, 0.40f, 40, 10, "clang" },
@@ -393,15 +409,37 @@ inline constexpr WeaponDef WEAPONS[WEAPON_COUNT] = {
     { "Pink Sword",   "pink-sword/sprite-128.png",         45, 190, 13, 0.40f, 50, 14, "clang", true },
     { "Frying Pan",   "frying-pan/sprite-128.png",         45, 110,  8, 0.45f, 38, 34, "bonk" },
     { "Toshko's Katana", "katana/sprite-128.png",          45, 240, 16, 0.32f, 54, 10, "clang" },
+    // The swords (art by tools/swords.py)
+    { .name = "Dobrich Machete", .art = "swords/machete.png", .slant = 45, .price = 70, .damage = 7, .swing = 0.34f,
+      .reach = 40, .knockback = 9, .sfx = "clang", .note = "Cheap, quick, and it came with the stock." },
+    { .name = "Gilded Rapier", .art = "swords/rapier.png", .slant = 45, .price = 170, .damage = 5, .swing = 0.26f,
+      .reach = 54, .knockback = 4, .sfx = "clang", .crit = 15, .coins = 2, .note = "15% critical hits, and 2 extra coins from every kill." },
+    { .name = "Claymore", .art = "swords/claymore.png", .slant = 45, .price = 220, .damage = 20, .swing = 0.62f,
+      .reach = 60, .knockback = 26, .sfx = "clang", .note = "Two hands, long reach, sends them flying." },
+    { .name = "Vampire Fang", .art = "swords/vampire.png", .slant = 45, .price = 280, .damage = 11, .swing = 0.36f,
+      .reach = 46, .knockback = 10, .sfx = "clang", .leech = 2, .note = "Every monster it cuts gives you 2 health." },
+    { .name = "Ember Blade", .art = "swords/ember.png", .slant = 45, .price = 320, .damage = 12, .swing = 0.40f,
+      .reach = 48, .knockback = 12, .sfx = "clang", .fire = 6, .note = "+6 fire damage, and they burn." },
+    { .name = "Cinder-Maw Fang", .art = "swords/cinder.png", .slant = 45, .price = 450, .damage = 22, .swing = 0.40f,
+      .reach = 56, .knockback = 16, .sfx = "clang", .crit = 10, .fire = 10, .note = "+10 fire damage and 10% critical hits." },
 };
 
 // An upgrade's price: one cigarette pack, and `gold` times the level it's going to.
 struct UpgradeDef { const char* name; const char* desc; int gold; };
 inline constexpr UpgradeDef UPGRADES[UPGRADE_COUNT] = {
-    { "Sharpen", "+3 blade damage",  25 },
-    { "Balance", "Swings 8% faster", 25 },
-    { "Extend",  "+4 reach",         20 },
+    { "Sharpen", "+3 blade damage",                 25 },
+    { "Balance", "Swings 8% faster",                25 },
+    { "Extend",  "+4 reach",                        20 },
+    { "Pommel",  "+8 knockback",                    15 },
+    { "Hone",    "+8% critical hits (double damage)", 30 },
+    { "Fuller",  "+1 health back per monster hit",  30 },
+    { "Arc",     "Swing reaches further round",     20 },
+    { "Gild",    "+1 coin from every kill",         35 },
 };
+inline constexpr float CRIT_PER_KEEN = 8;       // percent per level of Hone
+inline constexpr float ARC_DOT = 0.3f;          // a swing hits what's within acos(this) of where you face...
+inline constexpr float ARC_PER_LEVEL = 0.22f;   // ...and each level of Arc widens it
+inline constexpr float POMMEL_KNOCK = 8;
 
 // Every Gakev drops a cigarette pack. This is the chance (in percent) that a chest holds one too.
 inline constexpr int CHEST_PACK_PERCENT = 25;

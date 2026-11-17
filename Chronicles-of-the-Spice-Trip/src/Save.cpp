@@ -4,6 +4,7 @@
 #include "Save.h"
 #include "Platform.h"
 #include <cstdio>
+#include <cstddef>
 #include <cstring>
 #include <filesystem>
 #include <fstream>
@@ -13,7 +14,8 @@
 namespace save {
 
     namespace {
-        constexpr unsigned RUN_MAGIC = 0x53504337;       // "SPC7": difficulty, hardcore, special rooms, the belt, seven weapons
+        constexpr unsigned RUN_MAGIC = 0x53504338;       // "SPC8": room for 32 weapons with 12 upgrades each
+        constexpr unsigned RUN_MAGIC_7 = 0x53504337;     // "SPC7": seven weapons with three upgrades (still read)
         constexpr unsigned PROFILE_MAGIC = 0x53505031;   // "SPP1"
         constexpr unsigned SETTINGS_MAGIC = 0x53505331;  // "SPS1"
         constexpr unsigned TOUCH_MAGIC = 0x53505431;     // "SPT1"
@@ -66,7 +68,25 @@ namespace save {
         return writePod("savegame.dat", copy);
     }
 
-    bool readRun(RunSave& run) { return readPod("savegame.dat", run, RUN_MAGIC); }
+    bool readRun(RunSave& run) {
+        if (readPod("savegame.dat", run, RUN_MAGIC)) return true;
+        // A run saved before there was room for more weapons: the same, but for the upgrades' table.
+        using OldPlayer = PlayerT<7, 3>;
+        static RunSaveT<OldPlayer> old;     // a Dungeon is large; keep it off the stack
+        if (!readPod("savegame.dat", old, RUN_MAGIC_7)) return false;
+        constexpr size_t head = offsetof(Player, upgrades), tail = offsetof(Player, potions), oldTail = offsetof(OldPlayer, potions);
+        static_assert(head == offsetof(OldPlayer, upgrades) && sizeof(Player) - tail == sizeof(OldPlayer) - oldTail);
+        run = RunSave{};
+        memcpy((void*)&run.player, &old.player, head);
+        memcpy((char*)&run.player + tail, (const char*)&old.player + oldTail, sizeof(OldPlayer) - oldTail);
+        for (int w = 0; w < 7; ++w)
+            for (int u = 0; u < 3; ++u) run.player.upgrades[w][u] = old.player.upgrades[w][u];
+        run.dungeon = old.dungeon;
+        run.floor = old.floor; run.kills = old.kills; run.runTime = old.runTime;
+        run.difficulty = old.difficulty; run.hardcore = old.hardcore; run.stats = old.stats;
+        run.magic = RUN_MAGIC;
+        return true;
+    }
 
     bool deleteRun() {
         bool ok = std::remove(path("savegame.dat").c_str()) == 0;

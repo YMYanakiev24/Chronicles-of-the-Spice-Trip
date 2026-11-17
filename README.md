@@ -109,18 +109,36 @@ you back down to the dungeon.
   zero (x14).
 - **Beray's Drip Locker** sells outfits (see below).
 - **Galin's Weapon Shop** has two sections. **Weapons**: every run starts with the
-  Rusty Sword; better ones are bought here, and those you own swap for free.
-  **Upgrades** of the weapon in hand: Sharpen, Balance and Extend, three levels
-  each. Every level costs gold and one cigarette pack, and each weapon keeps its
-  own upgrades.
+  Rusty Sword; better ones are bought here, and those you own swap for free. Tap a
+  weapon to see it, then buy it, take it in hand, or **sell it back**: Galin pays
+  its full price and all the gold its upgrades cost (the packs stay smoked, and
+  the Rusty Sword isn't for sale). **Upgrades** of the weapon in hand, three
+  levels each: Sharpen (+3 damage), Balance (8% faster swings), Extend (+4 reach),
+  Pommel (+8 knockback), Hone (+8% critical hits, which do double damage), Fuller
+  (+1 health back for every monster a swing hits), Arc (the swing reaches further
+  round your sides) and Gild (+1 coin from every kill). Every level costs gold and
+  one cigarette pack, and each weapon keeps its own upgrades.
 - **Cigarette packs** drop from every **Gakev** the enemy, who turns up in about
   a third of combat rooms, and about one chest in four holds one too.
 
 The weapons are the `WEAPONS` table in `include/Game.h`: the Rusty Sword, then
 the Iron Sword, the quick but short Police Baton, the slow and heavy Baseball
-Bat, and the Pink Sword. Each has its own knockback (bosses stand their ground)
-and hit sound. To add one, raise `WEAPON_COUNT` and give it a line with its PNG
-from `assets/` and the angle its art rises from hilt to tip.
+Bat, the Pink Sword, the Frying Pan and Toshko's Katana, and the swords:
+
+| Sword | Price | What it does |
+| --- | --- | --- |
+| Dobrich Machete | 70 | Cheap and quick |
+| Gilded Rapier | 170 | The fastest; 15% critical hits and 2 extra coins from every kill |
+| Claymore | 220 | +20 damage, the longest reach and the biggest knockback, but slow |
+| Vampire Fang | 280 | Every monster it cuts gives you 2 health |
+| Ember Blade | 320 | +6 fire damage, and they burn |
+| Cinder-Maw Fang | 450 | +22 damage, +10 fire and 10% critical hits |
+
+Each has its own knockback (bosses stand their ground) and hit sound. To add
+one, raise `WEAPON_COUNT` and give it a line at the end of the table (saves keep
+weapons by their place in it) with its PNG from `assets/` and the angle its art
+rises from hilt to tip. The swords' art is drawn by `tools/swords.py`
+(`python3 tools/swords.py assets/swords`).
 
 ### The enemies
 
@@ -213,18 +231,27 @@ numbers (time, speeds, how far she smells and sees) in `include/Toilet.h`.
 
 ### Beray and his outfits
 
-Beray (`assets/castle/beray.png`) sells clothes for every champion: the Drip
-Puffer, the Midnight Tracksuit, Gold Rush, Camo Fatigues, Pink Velour and Ice
-Cold. Pick the champion along the top (the one you play is picked to start
-with), point at an outfit to see them in it from every side, and buy it with the
-run's gold. They put it on at once and walk the dungeon in it; an outfit bought
-is theirs for good (it's kept in `profile.dat`, not the run), so you can change
-back and forth for free, and their own clothes are always there.
+Beray (`assets/castle/beray.png`) has three outfits for every champion, each
+their own: Spellwoven's Starlit Robes, Ember Magus and Archmage of the Veil,
+Atanas's Black Belt, Saffron Robe and Zen Master, Momiche's Lumberjack plaid,
+Pumpkin Patch and Scream Queen, Galin's Tracksuit, Leather Jacket and The Don,
+Krisa's Boxing Champ, and so on for all sixteen. They cost 120, 180 and 280
+gold, and the last of each is the showiest (most have a glow). Pick the champion
+along the top (the one you play is picked to start with), point at an outfit to
+see them in it from every side, and buy it with the run's gold. They put it on at
+once and walk the dungeon in it; an outfit bought is theirs for good (it's kept
+in `profile.dat`, not the run), so you can change back and forth for free, and
+their own clothes are always there. A champion who had bought one of the old
+outfits that everyone shared gets the first of their own new ones for it.
 
-Each champion's figure in each outfit is a walk sheet in
-`assets/outfits/<outfit>/`, made from their own walk sheet by
-`tools/outfits.py` (run it after changing a figure). The outfits are the
-`OUTFITS` table in `include/Champions.h`.
+Each outfit is a walk sheet, `assets/outfits/<champion>/<outfit>.png`, made
+frame by frame from the champion's own walk sheet by `tools/outfits.py`: the
+clothes recoloured over the figure's own shading, with patterns (stars, plaid,
+hearts, flames, tie-dye...), robes and capes that move with the walk, trims,
+belts, badges, chains, ties, shades, caps, crowns and headbands, and a glow.
+Run it after changing a figure or an outfit
+(`python3 tools/outfits.py assets/walk assets/outfits`). The names, prices and
+descriptions are the `OUTFITS` table in `src/Champions.cpp`.
 
 ### Vasil the Storyteller
 
@@ -376,6 +403,7 @@ Chronicles-of-the-Spice-Trip/
                       assets/vasil/ Vasil the Storyteller and his listeners,
                       assets/castle/ the castle's rooms, assets/outfits/ the outfits
   tools/outfits.py    makes the champions' figures in Beray's outfits
+  tools/swords.py     draws the swords Galin sells
   vendor/raylib/      raylib headers and library
   vendor/pl_mpeg/     pl_mpeg, the MPEG-1 decoder (MIT, one header)
   android/            the Android app (Gradle; raylib is fetched when it builds)

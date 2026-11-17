@@ -111,6 +111,16 @@ void Game::init(bool windowed) {
     touch::setLayout(save::readTouchLayout());
     profile = save::readProfile();
     if (profile.champion < 0 || profile.champion >= CHAMPION_COUNT) profile.champion = 0;
+    if (profile.outfitsVersion < 2) {
+        // The six outfits everyone shared are gone. A champion who had any of them gets the first
+        // of their own new ones for it, and goes back into their own clothes until it's put on.
+        for (int i = 0; i < 32; ++i) {
+            profile.outfitsOwned[i] = (profile.outfitsOwned[i] & ~1u) ? 1u << 1 : 0;
+            profile.outfit[i] = 0;
+        }
+        profile.outfitsVersion = 2;
+        save::writeProfile(profile);
+    }
     player.champion = profile.champion;
     hasSave = save::hasRun();
     if (settings.fullscreen && !windowed) setFullscreen(true);
@@ -152,7 +162,7 @@ void Game::init(bool windowed) {
     berayTex = loadArt("castle/beray.png");
     for (int i = 0; i < CHAMPION_COUNT; ++i) {                // what each champion is wearing
         int k = profile.outfit[i];
-        if (k > 0 && k < OUTFIT_COUNT) dressed[i].load(CHAMPIONS[i].walk, TextFormat("outfits/%s/", OUTFITS[k].key));
+        if (k > 0 && k < OUTFIT_COUNT) dressed[i].load(TextFormat("%s.png", OUTFITS[i][k].key), outfitDir(i));
     }
     SPR.load();
     bossArt.load();

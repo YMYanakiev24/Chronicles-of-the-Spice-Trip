@@ -137,16 +137,26 @@ enum Vape {
 };
 
 // Weapons Galin sells (the table is in Game.h). Each one keeps its own upgrades.
-inline constexpr int WEAPON_COUNT = 7;
+inline constexpr int WEAPON_COUNT = 13;
 
 // A weapon's upgrades at Galin's stall. Each level takes a cigarette pack.
 enum Upgrade {
     UP_SHARPEN = 0, // +3 blade damage
     UP_BALANCE,     // swings 8% faster
     UP_EXTEND,      // +4 reach
+    UP_POMMEL,      // +8 knockback
+    UP_KEEN,        // +8% chance of a critical hit (double damage)
+    UP_GROOVE,      // +1 health back for every monster a swing hits
+    UP_ARC,         // the swing reaches further round your sides
+    UP_GILD,        // +1 coin from every kill
     UPGRADE_COUNT
 };
 inline constexpr int UPGRADE_MAX = 3;
+
+// Room in the save for more weapons and upgrades than there are, so adding one keeps old saves.
+inline constexpr int WEAPON_SLOTS = 32;     // weaponsOwned has a bit for each
+inline constexpr int UPGRADE_SLOTS = 12;
+static_assert(WEAPON_COUNT <= WEAPON_SLOTS && UPGRADE_COUNT <= UPGRADE_SLOTS);
 
 // What a run has been like, for the summary at its end.
 struct RunStats {
@@ -154,7 +164,10 @@ struct RunStats {
     char killer[40] = {};
 };
 
-struct Player {
+// W and U: room for weapons and their upgrades. Saves from before there was room for more
+// were written with PlayerT<7, 3> (Save.cpp reads those too).
+template <int W, int U>
+struct PlayerT {
     Vector2 pos{};
     Vector2 facing{ 0, 1 };
     int   level = 1, xp = 0, xpNext = 60;
@@ -167,7 +180,7 @@ struct Player {
     int   weapon = 0;                 // index into WEAPONS, in hand
     unsigned weaponsOwned = 1;        // a bit per weapon: everyone starts with the Rusty Sword
     bool  owns(int w) const { return (weaponsOwned >> w) & 1u; }
-    int   upgrades[WEAPON_COUNT][UPGRADE_COUNT] = {};   // levels, per weapon
+    int   upgrades[W][U] = {};        // levels, per weapon
     int   potions[2] = {};            // the belt: health and mana potions (POTION_MAX of each)
     int   bonusDamage = 0;            // won on the old level-up wheel (still counts in older saves)
     float speedBonus = 0;             // likewise (fraction)
@@ -183,3 +196,4 @@ struct Player {
     int   rollId = 0;
     Vector2 dashDir{ 0, 1 };
 };
+using Player = PlayerT<WEAPON_SLOTS, UPGRADE_SLOTS>;

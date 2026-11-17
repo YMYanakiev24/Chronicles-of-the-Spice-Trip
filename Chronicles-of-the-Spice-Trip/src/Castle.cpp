@@ -107,7 +107,7 @@ void Game::openKeeper(int p) {
     play("ui");
     switch (p) {
     case MARIN: overlay = Overlay::Shop; break;
-    case GALIN: overlay = Overlay::Galin; break;
+    case GALIN: galinPick = player.weapon; overlay = Overlay::Galin; break;
     case CASINO: {
         int bet = wheel.bet, pick = wheel.pick;     // remember the last stake and colour
         wheel = Wheel{}; wheel.casino = true; wheel.bet = bet; wheel.pick = pick;
@@ -281,7 +281,7 @@ const WalkSheet& Game::figure(int champion) const {
 const WalkSheet& Game::outfitLook(int champion, int outfit) {
     if (outfit <= 0 || outfit >= OUTFIT_COUNT) return walk[champion];
     WalkSheet& w = outfitLooks[champion * OUTFIT_COUNT + outfit];
-    if (!w.ok()) w.load(CHAMPIONS[champion].walk, TextFormat("outfits/%s/", OUTFITS[outfit].key));
+    if (!w.ok()) w.load(TextFormat("%s.png", OUTFITS[champion][outfit].key), outfitDir(champion));
     return w.ok() ? w : walk[champion];
 }
 
@@ -289,7 +289,7 @@ void Game::wearOutfit(int champion, int outfit) {
     profile.outfit[champion] = (signed char)outfit;
     rlDrawRenderBatchActive();                      // what's already drawn this frame with the old one goes out first
     dressed[champion].unload();
-    if (outfit > 0) dressed[champion].load(CHAMPIONS[champion].walk, TextFormat("outfits/%s/", OUTFITS[outfit].key));
+    if (outfit > 0) dressed[champion].load(TextFormat("%s.png", OUTFITS[champion][outfit].key), outfitDir(champion));
     saveProfile();
 }
 
@@ -298,7 +298,7 @@ bool Game::ownsOutfit(int champion, int outfit) const {
 }
 
 void Game::buyOutfit(int champion, int outfit) {
-    const OutfitDef& o = OUTFITS[outfit];
+    const OutfitDef& o = OUTFITS[champion][outfit];
     if (ownsOutfit(champion, outfit)) { wearOutfit(champion, outfit); play("ui"); return; }
     if (player.gold < o.price) { shopMsg = "Not enough gold. Beray doesn't do credit."; shopMsgT = 2.0f; play("hurt"); return; }
     player.gold -= o.price;
@@ -324,7 +324,7 @@ void Game::drawDrip() {
     DrawRectangleLinesEx(art, 2, { 34, 194, 180, 255 });
     float ly = art.y + art.height + 14;
     ui::text("Beray", panel.x + 18, ly, 30, { 160, 110, 240, 255 });
-    ui::textWrapped("Clothes and outfits for every champion. Buy one and they wear it at once; it's theirs for good.",
+    ui::textWrapped("Every champion has outfits of their own here. Buy one and they wear it at once; it's theirs for good.",
         panel.x + 18, ly + 40, lw - 24, 10, ui::MUTED);
     drawAnim(SPR.coin, animFrame(SPR.coin, clock, 8, true), { panel.x + 30, ly + 104 }, 2.0f);
     ui::text(TextFormat("%d", player.gold), panel.x + 50, ly + 94, 20, ui::ACCENT);
@@ -353,28 +353,35 @@ void Game::drawDrip() {
     DrawRectangleLinesEx(prev, 1, ui::EDGE);
     float turnW = (prevH - 16) * 3 / 4 * 4 + 12;
     drawTurnaround(outfitLook(c, shown), { prev.x + 14, prev.y + 8, turnW, prevH - 16 }, clock);
-    ui::text(OUTFITS[shown].name, prev.x + turnW + 34, prev.y + 18, 30, ui::TEXT);
-    ui::textWrapped(OUTFITS[shown].desc, prev.x + turnW + 34, prev.y + 58, rw - turnW - 50, 20, ui::MUTED);
+    const OutfitDef* rail = OUTFITS[c];
+    ui::text(rail[shown].name, prev.x + turnW + 34, prev.y + 18, 30, ui::TEXT);
+    ui::textWrapped(rail[shown].desc, prev.x + turnW + 34, prev.y + 58, rw - turnW - 50, 20, ui::MUTED);
 
-    // the rail: every outfit, bought per champion
+    // the rail: this champion's own outfits
     dripHover = -1;
-    float gy = py + prevH + 14, colW = (rw - 12) / 2, rowH = fminf(64.0f, (panel.y + ph - 50 - gy) / 4 - 8);
+    constexpr int RAIL_ROWS = (OUTFIT_COUNT + 1) / 2;
+    float gy = py + prevH + 14, colW = (rw - 12) / 2, rowH = fminf(150.0f, (panel.y + ph - 50 - gy) / RAIL_ROWS - 8);
     for (int k = 0; k < OUTFIT_COUNT; ++k) {
         Rectangle row = { rx + (k % 2) * (colW + 12), gy + (k / 2) * (rowH + 8), colW, rowH };
         bool owned = ownsOutfit(c, k), worn = profile.outfit[c] == k;
         if (ui::hovered(row)) dripHover = k;
         DrawRectangleRec(row, worn ? Color{ 30, 52, 50, 255 } : ui::PANEL_LIGHT);
         DrawRectangleLinesEx(row, 1, Fade(ui::EDGE, 0.8f));
-        DrawRectangle((int)row.x + 10, (int)(row.y + rowH / 2 - 14), 14, 28, OUTFITS[k].colors[0]);
-        DrawRectangle((int)row.x + 24, (int)(row.y + rowH / 2 - 14), 10, 28, OUTFITS[k].colors[1]);
-        DrawRectangleLines((int)row.x + 10, (int)(row.y + rowH / 2 - 14), 24, 28, Fade(BLACK, 0.6f));
-        ui::text(OUTFITS[k].name, row.x + 44, row.y + 8, 20, ui::TEXT);
-        ui::text(worn ? "Wearing it" : owned ? "In the wardrobe" : "On the rail", row.x + 44, row.y + rowH - 20, 10, worn ? ui::GOOD : ui::MUTED);
+        // them in it, small, on its own colours
+        float th = rowH - 8, tw = th * 3 / 4;
+        Rectangle swatch = { row.x + 6, row.y + 4, tw + 10, th };
+        DrawRectangleGradientV((int)swatch.x, (int)swatch.y, (int)swatch.width, (int)swatch.height,
+            Fade(rail[k].colors[0], 0.55f), Fade(rail[k].colors[1], 0.35f));
+        DrawRectangleLinesEx(swatch, 1, Fade(BLACK, 0.6f));
+        drawFigureIn(outfitLook(c, k), FACE_DOWN, 0, { swatch.x + 5, swatch.y + 2, tw, th - 4 });
+        float tx = swatch.x + swatch.width + 10;
+        ui::text(rail[k].name, tx, row.y + 8, 20, ui::TEXT);
+        ui::text(worn ? "Wearing it" : owned ? "In the wardrobe" : "On the rail", tx, row.y + rowH - 20, 10, worn ? ui::GOOD : ui::MUTED);
         Rectangle btn = { row.x + colW - 104, row.y + 10, 92, rowH - 20 };
         if (worn) continue;
         ui::track(TextFormat("outfit %d", k), btn);
         if (owned) { if (ui::button(btn, "Wear", ui::Style::Good, 20)) buyOutfit(c, k); }
-        else if (ui::button(btn, TextFormat("%d g", OUTFITS[k].price), player.gold >= OUTFITS[k].price ? ui::Style::Primary : ui::Style::Normal, 20))
+        else if (ui::button(btn, TextFormat("%d g", rail[k].price), player.gold >= rail[k].price ? ui::Style::Primary : ui::Style::Normal, 20))
             buyOutfit(c, k);
     }
     if (shopMsgT > 0) ui::textCentered(shopMsg.c_str(), rx + rw / 2, panel.y + ph - 34, 20, Fade(ui::ACCENT, fminf(1.0f, shopMsgT)));

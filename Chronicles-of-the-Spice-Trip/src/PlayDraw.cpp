@@ -861,62 +861,102 @@ void Game::drawGalin() {
     Rectangle panel = { (sw - pw) / 2, (sh - ph) / 2, pw, ph };
     ui::panel(panel);
 
-    // Galin on the left, the purse on the right
-    float artH = ph * 0.30f;
-    ui::drawContain(galinTex, { 0, 0, (float)galinTex.width, (float)galinTex.height }, { panel.x + 14, panel.y + 8, pw * 0.24f, artH });
-    ui::text("Galin", panel.x + pw * 0.28f, panel.y + artH - 62, 30, ui::ACCENT);
-    ui::text("\"Bring me a pack and I'll see what I can do.\"", panel.x + pw * 0.28f, panel.y + artH - 24, 20, ui::MUTED);
+    // Galin, and the purse on the right
+    float hdr = Clamp(ph * 0.2f, 100, 130);
+    ui::drawContain(galinTex, { 0, 0, (float)galinTex.width, (float)galinTex.height }, { panel.x + 14, panel.y + 8, hdr * 1.1f, hdr - 12 });
+    ui::text("Galin", panel.x + 30 + hdr * 1.1f, panel.y + hdr / 2 - 34, 30, ui::ACCENT);
+    ui::text("\"Bring me a pack and I'll see what I can do.\"", panel.x + 30 + hdr * 1.1f, panel.y + hdr / 2 + 4, 20, ui::MUTED);
     drawAnim(SPR.coin, animFrame(SPR.coin, clock, 8, true), { panel.x + pw - 110, panel.y + 34 }, 2.0f);
     ui::text(TextFormat("%d", player.gold), panel.x + pw - 90, panel.y + 24, 20, ui::ACCENT);
     ui::drawContain(packTex, { 0, 0, (float)packTex.width, (float)packTex.height }, { panel.x + pw - 212, panel.y + 18, 32, 32 });
     ui::text(TextFormat("%d", player.packs), panel.x + pw - 176, panel.y + 24, 20, ui::ACCENT);
     if (ui::button({ panel.x + pw - 46, panel.y + 12, 32, 32 }, "X", ui::Style::Normal, 20)) { play("ui"); overlay = Overlay::None; }
 
-    float gy = panel.y + artH + 18, colW = (pw - 72) / 2, rightX = panel.x + 24 + colW + 24;
-    float rowH = fminf(52.0f, (panel.y + ph - 50 - (gy + 30)) / WEAPON_COUNT - 8);
-    auto rowAt = [&](float x, int i) { return Rectangle{ x, gy + 30 + i * (rowH + 8), colW, rowH }; };
-    auto rowBack = [&](Rectangle row) {
-        DrawRectangleRec(row, ui::PANEL_LIGHT);
-        DrawRectangleLinesEx(row, 1, Fade(ui::EDGE, 0.8f));
+    float top = panel.y + hdr + 6, bottom = panel.y + ph - 44;
+    float leftX = panel.x + 24, leftW = (pw - 72) * 0.54f, rightX = leftX + leftW + 24, rightW = pw - 72 - leftW;
+    auto rowBack = [&](Rectangle row, bool lit) {
+        DrawRectangleRec(row, lit ? Color{ 52, 40, 78, 255 } : ui::PANEL_LIGHT);
+        DrawRectangleLinesEx(row, lit ? 2.0f : 1.0f, lit ? ui::ACCENT : Fade(ui::EDGE, 0.8f));
     };
 
-    // --- weapons ---
-    ui::text("Weapons", panel.x + 24, gy, 20, ui::ACCENT);
-    for (int i = 0; i < WEAPON_COUNT; ++i) {
+    // --- weapons: a tile each, cheapest first ---
+    int order[WEAPON_COUNT];
+    for (int i = 0; i < WEAPON_COUNT; ++i) order[i] = i;
+    std::stable_sort(order, order + WEAPON_COUNT, [](int a, int b) { return WEAPONS[a].price < WEAPONS[b].price; });
+    if (galinPick < 0 || galinPick >= WEAPON_COUNT) galinPick = player.weapon;
+    ui::text("Weapons", leftX, top, 20, ui::ACCENT);
+    constexpr int COLS = 4;
+    int rows = (WEAPON_COUNT + COLS - 1) / COLS;
+    float detailH = 108, gridTop = top + 28;
+    float tileW = (leftW - (COLS - 1) * 8) / COLS, tileH = fminf(84.0f, (bottom - gridTop - detailH - 10) / rows - 8);
+    for (int n = 0; n < WEAPON_COUNT; ++n) {
+        int i = order[n];
         const WeaponDef& w = WEAPONS[i];
-        Rectangle row = rowAt(panel.x + 24, i);
-        rowBack(row);
-        drawWeapon(i, { row.x + 8, row.y + 4, 64, rowH - 8 });
-        ui::text(w.name, row.x + 80, row.y + 6, 20, ui::TEXT);
-        ui::text(TextFormat("+%d %s  %.2fs swing  %d reach  %d knockback", w.damage, w.anal ? "Anal damage" : "damage", w.swing, (int)w.reach, (int)w.knockback), row.x + 80, row.y + rowH - 16, 10, ui::MUTED);
-        Rectangle btn = { row.x + colW - 96, row.y + 11, 84, rowH - 22 };
-        if (i == player.weapon) ui::textCentered("In hand", btn.x + btn.width / 2, btn.y + 10, 10, ui::GOOD);
-        else if (player.owns(i)) { if (ui::button(btn, "Equip", ui::Style::Good, 20)) buyWeapon(i); }
-        else if (ui::button(btn, TextFormat("%d g", w.price), player.gold >= w.price ? ui::Style::Primary : ui::Style::Normal, 20)) buyWeapon(i);
+        Rectangle t = { leftX + (n % COLS) * (tileW + 8), gridTop + (n / COLS) * (tileH + 8), tileW, tileH };
+        bool over = ui::hovered(t);
+        rowBack(t, i == galinPick);
+        if (over && i != galinPick) DrawRectangleLinesEx(t, 1, ui::EDGE_LIGHT);
+        drawWeapon(i, { t.x + 6, t.y + 4, t.width - 12, tileH - 26 });
+        ui::text(w.name, t.x + 6, t.y + tileH - 18, 10, ui::TEXT);
+        const char* tag = i == player.weapon ? "In hand" : player.owns(i) ? "Yours" : TextFormat("%d g", w.price);
+        Color tagC = i == player.weapon ? ui::GOOD : player.owns(i) ? ui::MUTED : player.gold >= w.price ? ui::ACCENT : ui::BAD;
+        ui::textRight(tag, t.x + t.width - 6, t.y + 4, 10, tagC);
+        ui::track(TextFormat("weapon %s", w.name), t);
+        if (over) { ui::handCursor(); if (in::mousePressed(MOUSE_BUTTON_LEFT) && galinPick != i) { galinPick = i; play("ui"); } }
+    }
+
+    // --- the weapon looked at: what it does, and buy, take in hand or sell ---
+    {
+        int i = galinPick;
+        const WeaponDef& w = WEAPONS[i];
+        Rectangle d = { leftX, bottom - detailH, leftW, detailH };
+        DrawRectangleRec(d, Fade(ui::INK, 0.6f));
+        DrawRectangleLinesEx(d, 1, ui::EDGE);
+        drawWeapon(i, { d.x + 8, d.y + 8, 96, d.height - 16 });
+        float tx = d.x + 114;
+        ui::text(w.name, tx, d.y + 10, 20, ui::TEXT);
+        ui::text(TextFormat("+%d %s   %.2fs swing   %d reach   %d knockback", w.damage, w.anal ? "Anal damage" : "damage", w.swing, (int)w.reach, (int)w.knockback),
+            tx, d.y + 36, 10, ui::MUTED);
+        if (w.note) ui::textWrapped(w.note, tx, d.y + 52, d.width - 114 - 150, 10, ui::ACCENT);
+        Rectangle b1 = { d.x + d.width - 150, d.y + 10, 140, 40 }, b2 = { d.x + d.width - 150, d.y + 58, 140, 40 };
+        if (i == player.weapon) ui::textCentered("In hand", b1.x + b1.width / 2, b1.y + 14, 10, ui::GOOD);
+        else if (player.owns(i)) { if (ui::button(b1, "Equip", ui::Style::Good, 20)) buyWeapon(i); }
+        else if (ui::button(b1, TextFormat("Buy: %d g", w.price), player.gold >= w.price ? ui::Style::Primary : ui::Style::Normal, 20)) buyWeapon(i);
+        if (i > 0 && player.owns(i)) { if (ui::button(b2, TextFormat("Sell: +%d g", sellPrice(i)), ui::Style::Danger, 10)) sellWeapon(i); }
+        else if (i == 0) ui::textCentered("Galin won't take it", b2.x + b2.width / 2, b2.y + 14, 10, ui::MUTED);
+        else ui::textCentered("Sells back at full price", b2.x + b2.width / 2, b2.y + 14, 10, ui::MUTED);
     }
 
     // --- upgrades of the weapon in hand ---
-    ui::text(TextFormat("Upgrades: %s", WEAPONS[player.weapon].name), rightX, gy, 20, ui::ACCENT);
+    ui::text(TextFormat("Upgrades: %s", WEAPONS[player.weapon].name), rightX, top, 20, ui::ACCENT);
+    float upTop = top + 28, rowH = fminf(46.0f, (bottom - upTop - 22) / UPGRADE_COUNT - 6);
     for (int u = 0; u < UPGRADE_COUNT; ++u) {
         const UpgradeDef& up = UPGRADES[u];
         int level = player.upgrades[player.weapon][u], price = up.gold * (level + 1);
-        Rectangle row = rowAt(rightX, u);
-        rowBack(row);
-        ui::text(up.name, row.x + 12, row.y + 8, 20, ui::TEXT);
-        ui::text(u == UP_SHARPEN && WEAPONS[player.weapon].anal ? "+3 Anal damage" : up.desc, row.x + 12, row.y + 32, 10, ui::MUTED);
+        Rectangle row = { rightX, upTop + u * (rowH + 6), rightW, rowH };
+        rowBack(row, false);
+        ui::text(up.name, row.x + 10, row.y + (rowH - 30) / 2 - 1, 20, ui::TEXT);
+        ui::text(u == UP_SHARPEN && WEAPONS[player.weapon].anal ? "+3 Anal damage" : up.desc, row.x + 10, row.y + rowH - 14, 10, ui::MUTED);
         for (int k = 0; k < UPGRADE_MAX; ++k)     // a pip per level
-            DrawRectangleRec({ row.x + 130 + k * 16, row.y + 20, 12, 12 }, k < level ? ui::ACCENT : Color{ 16, 12, 24, 255 });
-        Rectangle btn = { row.x + colW - 196, row.y + 11, 184, rowH - 22 };
-        if (level >= UPGRADE_MAX) ui::textCentered("Maxed", btn.x + btn.width / 2, btn.y + 10, 10, ui::GOOD);
+            DrawRectangleRec({ row.x + 104 + k * 14, row.y + (rowH - 30) / 2 + 3, 10, 10 }, k < level ? ui::ACCENT : Color{ 16, 12, 24, 255 });
+        Rectangle btn = { row.x + rightW - 160, row.y + 6, 152, rowH - 12 };
+        if (level >= UPGRADE_MAX) ui::textCentered("Maxed", btn.x + btn.width / 2, btn.y + (btn.height - 10) / 2, 10, ui::GOOD);
         else if (ui::button(btn, TextFormat("%s: 1 pack, %d g", up.name, price),
             player.packs > 0 && player.gold >= price ? ui::Style::Primary : ui::Style::Normal, 10)) buyUpgrade(u);
     }
-    ui::textWrapped("Every upgrade burns a cigarette pack. Every Gakev carries one, and chests sometimes hold one.",
-        rightX, rowAt(rightX, UPGRADE_COUNT).y + 8, colW, 10, ui::MUTED);
+    ui::textWrapped("Every upgrade burns a cigarette pack: every Gakev carries one, and chests sometimes do.",
+        rightX, bottom - 14, rightW, 10, ui::MUTED);
 
-    if (shopMsgT > 0) ui::textCentered(shopMsg.c_str(), panel.x + pw / 2, panel.y + ph - 36, 20, Fade(ui::ACCENT, fminf(1.0f, shopMsgT)));
-    ui::text(TextFormat("%s %d   Swing %.2fs   Reach %d", WEAPONS[player.weapon].anal ? "Anal damage" : "Damage", bladeDamage(), swingTime(), (int)bladeReach()),
-        panel.x + 24, panel.y + ph - 32, 10, ui::MUTED);
+    if (shopMsgT > 0) ui::textCentered(shopMsg.c_str(), panel.x + pw / 2, panel.y + ph - 34, 20, Fade(ui::ACCENT, fminf(1.0f, shopMsgT)));
+    else {
+        std::string extra;
+        if (critChance() > 0) extra += TextFormat("   Crit %d%%", (int)critChance());
+        if (bladeLeech() > 0) extra += TextFormat("   +%d health a hit", bladeLeech());
+        if (killCoins() > 0) extra += TextFormat("   +%d coins a kill", killCoins());
+        if (WEAPONS[player.weapon].fire > 0) extra += TextFormat("   +%d fire", WEAPONS[player.weapon].fire);
+        ui::text(TextFormat("In hand: %s %d   Swing %.2fs   Reach %d   Knockback %d%s", WEAPONS[player.weapon].anal ? "Anal damage" : "Damage",
+            bladeDamage(), swingTime(), (int)bladeReach(), (int)bladeKnockback(), extra.c_str()), panel.x + 24, panel.y + ph - 30, 10, ui::MUTED);
+    }
 }
 
 void Game::drawPause() {

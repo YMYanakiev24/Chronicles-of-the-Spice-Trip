@@ -31,3 +31,6 @@ android/app/build/
 android/app/.cxx/
 android/local.properties
 touch.dat
+
+# Python caches from the tools
+__pycache__/
