@@ -102,7 +102,12 @@ void Game::menuScreen() {
 
     // --- the left column: champion, records, buttons ---
     float bw = 260, bh = 46, gap = 10, x = 44;
-    int count = hasSave ? 6 : 5;
+#ifdef PLATFORM_WEB
+    constexpr bool canExit = false;                 // a browser tab is closed by the browser
+#else
+    constexpr bool canExit = true;
+#endif
+    int count = (hasSave ? 6 : 5) - (canExit ? 0 : 1);
     float y = sh - 36 - count * (bh + gap);
 
     Rectangle chip = { x, y - 132, bw, 112 };
@@ -125,7 +130,7 @@ void Game::menuScreen() {
     if (ui::button(next(), "Boss Rush")) { play("ui"); startBossRush(); return; }
     if (ui::button(next(), "Champions")) { play("ui"); screen = Screen::Champions; t = 0; return; }
     if (ui::button(next(), "Settings")) { play("ui"); screen = Screen::Settings; rebinding = -1; t = 0; return; }
-    if (ui::button(next(), "Exit", ui::Style::Danger)) { play("ui"); quit = true; return; }
+    if (canExit && ui::button(next(), "Exit", ui::Style::Danger)) { play("ui"); quit = true; return; }
 
     if (!touch::enabled()) ui::textRight("F11 fullscreen", sw - 20.0f, sh - 24.0f, 10, Fade(ui::TEXT, 0.5f));
 }
@@ -232,6 +237,12 @@ void Game::settingsScreen() {
         setFullscreen(true);
         settings.fullscreen = true; play("ui");
     }
+#ifdef PLATFORM_WEB
+    if (ui::button({ x + 236, y + 32, 220, 40 }, "In the page", !full ? ui::Style::Good : ui::Style::Normal)) {
+        setFullscreen(false);
+        settings.fullscreen = false; play("ui");
+    }
+#else
     if (ui::button({ x + 236, y + 32, 220, 40 }, "Window 1280x720", !full ? ui::Style::Good : ui::Style::Normal)) {
         setFullscreen(false);
         SetWindowSize(1280, 720);
@@ -239,6 +250,7 @@ void Game::settingsScreen() {
         SetWindowPosition((GetMonitorWidth(mon) - 1280) / 2, (GetMonitorHeight(mon) - 720) / 2);
         settings.fullscreen = false; play("ui");
     }
+#endif
 
     // --- keybinds, in two columns ---
     y += 96;

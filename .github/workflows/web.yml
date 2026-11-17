@@ -1,0 +1,59 @@
+# Builds the browser version (iPhone, Android phones and computers) for every push to main and
+# publishes it on GitHub Pages, from the gh-pages branch. Pull requests only check that it builds.
+# The build is Chronicles-of-the-Spice-Trip/web/ (see its CMakeLists.txt).
+name: Web
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: web-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  site:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      # Ubuntu's Emscripten (3.1.6): the same one the build is tested with.
+      - name: Install Emscripten
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y -q --no-install-recommends emscripten ninja-build
+
+      - name: Build
+        working-directory: Chronicles-of-the-Spice-Trip
+        run: |
+          set -o pipefail
+          emcmake cmake -S web -B build/web -G Ninja -DCMAKE_BUILD_TYPE=Release 2>&1 | tail -3
+          cmake --build build/web 2>&1 | tee build.log
+          site=build/web/site
+          test -s $site/index.wasm && test -s $site/index.data
+          # Name this build in the page, so phones fetch its files together (see web/shell.html).
+          v="${GITHUB_SHA::8}"
+          sed -i "s/var build = 'dev';/var build = '$v';/; s/src=\"index.js\"/src=\"index.js?v=$v\"/" $site/index.html
+          grep -q "index.js?v=$v" $site/index.html
+          touch $site/.nojekyll
+          ls -la $site
+
+      - name: Show build errors
+        if: failure()
+        run: grep -E "error|FAILED" -A2 Chronicles-of-the-Spice-Trip/build.log | head -40 | sed 's/^/::error::/'
+
+      - name: Publish
+        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: Chronicles-of-the-Spice-Trip/build/web/site
+          force_orphan: true          # only the latest build: the branch doesn't grow with every push
+          user_name: github-actions[bot]
+          user_email: 41898282+github-actions[bot]@users.noreply.github.com
+          commit_message: Web build of ${{ github.sha }}

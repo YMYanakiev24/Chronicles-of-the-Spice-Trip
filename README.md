@@ -370,6 +370,7 @@ Chronicles-of-the-Spice-Trip/
   src/Video.cpp       plays the intro video and the cutscene (MPEG-1) with their sound
   src/Toilet.cpp      the toilets after Triceps: hiding from The Sergeant
   src/Castle.cpp      the castle corridor, the shopkeepers' rooms and Beray's outfits
+  src/PlatformAndroid.cpp, src/PlatformWeb.cpp   what phones and browsers do differently
   assets/             art; assets/arenas/ holds the bosses' painted arenas,
                       assets/walk/ the champions' and Triceps' walk sheets,
                       assets/vasil/ Vasil the Storyteller and his listeners,
@@ -377,6 +378,8 @@ Chronicles-of-the-Spice-Trip/
   tools/outfits.py    makes the champions' figures in Beray's outfits
   vendor/raylib/      raylib headers and library
   vendor/pl_mpeg/     pl_mpeg, the MPEG-1 decoder (MIT, one header)
+  android/            the Android app (Gradle; raylib is fetched when it builds)
+  web/                the browser build (Emscripten), its page and icons
 ```
 
 ## Automated play-through
@@ -400,7 +403,35 @@ build\x64\Release\ChroniclesOfTheSpiceTrip.exe --autopilot autopilot
 It uses its own save folder (`<folder>/save`, emptied first), so your saves are
 never touched. `--savedir <folder>` moves the normal saves too.
 
-## Android
+## Play in a browser (iPhone, Android, computers)
+
+**https://ymyanakiev24.github.io/Chronicles-of-the-Spice-Trip/**
+
+Every push to `main` builds the browser version (.github/workflows/web.yml) and publishes it
+there with GitHub Pages, so it is always the latest game. On a phone it shows the touch
+controls; on a computer it plays with keyboard and mouse. Turn the phone sideways and tap
+**Tap to play**; the first visit downloads about 75 MB, after that the browser has it.
+
+- **iPhone:** open the link in Safari, tap **Share → Add to Home Screen**, then start it from
+  the new icon: it runs fullscreen, like an app. Saves are kept by Safari for that icon.
+- **Android:** the link works in Chrome (it goes fullscreen when you tap Play), or install the APK
+  (below).
+
+Saves and settings are kept in the browser's storage. Add `?touch=1` to the address to try the
+touch controls on a computer (the mouse plays the finger), or `?touch=0` to turn them off.
+
+The browser build is the same C++ compiled to WebAssembly with Emscripten; it lives in
+`Chronicles-of-the-Spice-Trip/web` (the page is `shell.html`) and `src/PlatformWeb.cpp`. To
+build it yourself on Linux (Ubuntu's `emscripten` package):
+
+```
+cd Chronicles-of-the-Spice-Trip
+emcmake cmake -S web -B build/web -DCMAKE_BUILD_TYPE=Release
+cmake --build build/web
+python3 -m http.server -d build/web/site 8080      # then open http://localhost:8080
+```
+
+## Android app
 
 Pushing a tag like `v0.2.0` makes GitHub Actions build the APK (.github/workflows/android.yml) and publish it as a release. The Android project is in `Chronicles-of-the-Spice-Trip/android`. Run the desktop build with `--touch` to try the phone controls with the mouse.
 
