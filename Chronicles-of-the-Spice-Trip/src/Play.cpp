@@ -63,6 +63,7 @@ Camera2D Game::camera() const {
 }
 
 Vector2 Game::mouseWorld() const {
+    if (in::remote()) return in::remote()->mouse;  // co-op: a joiner sends where they aim, in the world
     if (!touch::enabled()) return GetScreenToWorld2D(in::mouse(), camera());
     // No pointer on a phone: aim at the nearest enemy, or wherever you're heading.
     const Enemy* best = nullptr;
@@ -105,28 +106,45 @@ static void burst(std::vector<Particle>& parts, Vector2 at, int n, float speed, 
 }
 
 // ------------------------------------------------------------------ the frame
+// Alone, a frame of play is the one hero, then the world. (In co-op the host does every hero
+// first: coopStep in Coop.cpp.)
 void Game::updatePlay(float dt) {
+    dt = updateWorldTimers(dt);
+    updateHero(dt);
+    if (screen != Screen::Play || hall.active || hunt.active) return;   // through the castle door, or off to the menu
+    updateWorld(dt);
+}
+
+float Game::updateWorldTimers(float dt) {
     if (hitStop > 0) { hitStop -= dt; dt = 0; }       // a solid hit: everything holds its breath
     finaleT = fmaxf(0, finaleT - dt);
     if (slowMo > 0) { slowMo -= dt; dt *= 0.3f; }     // a boss's last moments
+    if (banner > 0) banner -= dt;
+    if (mode == Mode::Run) runTime += dt;
+    else if (fight.active()) rushTime += dt;
+    scareT = fmaxf(0, scareT - dt);
+    vasilGreetT = fmaxf(0, vasilGreetT - dt);
+    vasilBowT = fmaxf(0, vasilBowT - dt);
+    for (auto& l : lasers) l.t += dt;
+    std::erase_if(lasers, [](const Laser& l) { return l.t >= GYM_POSE_TIME; });
+    if (mode == Mode::Run && !inFight && !coop.active() && (autosaveT += dt) > 20) autosave();     // every so often in a safe room
+    trapClock += dt;
+    return dt;
+}
+
+// The hero in the fields: their timers, the hotbar, moving, traps, keys, chests, doors and attacks.
+void Game::updateHero(float dt) {
     Room& room = dungeon.cur();
     const ChampionDef& c = champ();
     Keybinds& K = settings.keys;
     bool talking = !dialogue.empty();
-    float slow = player.auraT > 0 ? 0.5f : 1.0f;      // Atanas' aura
 
     // --- timers ---
-    if (banner > 0) banner -= dt;
-    if (mode == Mode::Run) runTime += dt;
-    else if (fight.active()) rushTime += dt;
     for (float* timer : { &player.castCd, &player.meleeCd, &player.rollCd, &player.invuln, &player.hitFlash,
                           &player.specialCd, &player.auraT, &player.shieldT, &player.wobbleT })
         *timer = fmaxf(0, *timer - dt);
     player.meleeAnim = fmaxf(0, player.meleeAnim - dt * 4);
-    scareT = fmaxf(0, scareT - dt);
-    vasilGreetT = fmaxf(0, vasilGreetT - dt);
     castleDoorCd = fmaxf(0, castleDoorCd - dt);
-    vasilBowT = fmaxf(0, vasilBowT - dt);
     gymT = fmaxf(0, gymT - dt);
     if (throwT > 0) {                                  // Filqcheto: wind up, let go
         throwT = fmaxf(0, throwT - dt);
@@ -149,16 +167,12 @@ void Game::updatePlay(float dt) {
                 0.9f, 0.9f, frand(2, 4), { 200, 200, 206, 255 } });
         if (cigT <= 0) stubOut();
     }
-    for (auto& l : lasers) l.t += dt;
-    std::erase_if(lasers, [](const Laser& l) { return l.t >= GYM_POSE_TIME; });
     player.mana = fminf(player.maxMana, player.mana + 9.0f * (player.has(VP_GRAPE) ? 1.5f : 1.0f) * dt);
-    if (mode == Mode::Run && !inFight && (autosaveT += dt) > 20) autosave();     // every so often in a safe room
     if (c.kind == Special::Blink) player.charge = fminf(DUST_MAX, player.charge + DUST_REGEN * dt);
     for (int v = 0; v < VP_COUNT; ++v)
         if (player.has((Vape)v) && frand(0, 1) < dt * 0.5f)   // the odd lazy puff drifting up off the player
             parts.push_back({ { player.pos.x + frand(-6, 6), player.pos.y - 18 }, { frand(-12, 12), frand(-40, -20) },
                 1.0f, 1.0f, frand(2, 4), VAPE_COLOR[v] });
-    trapClock += dt;
 
     // --- hotbar ---
     for (int i = 0; i < SPELL_COUNT; ++i)
@@ -287,10 +301,21 @@ void Game::updatePlay(float dt) {
         castT -= dt;
         if (castT <= 0) releaseSpell(castingSpell);
     }
+}
+
+// Everything the heroes share: shots, monsters, the boss, loot, the room's doors and stairs.
+void Game::updateWorld(float dt) {
+    Room& room = dungeon.cur();
+    float slow = 1.0f;                                // Atanas' aura (anyone's, in co-op)
+    for (int h = 0; h < heroCount; ++h)
+        if ((h == curHero ? player.auraT : heroes[h].player.auraT) > 0) slow = 0.5f;
+    int me = curHero;
 
     updateShots(dt);
     fight.scared = scareT > 0;
-    fight.update(dt, player.pos, enemies, enemyShots, room, slow);
+    int target = coop.active() ? nearestHero(fight.active() && !enemies.empty() ? enemies.front().pos : ROOM_CENTER) : curHero;
+    Vector2 targetPos = target < 0 || target == curHero ? player.pos : heroes[target].player.pos;
+    fight.update(dt, targetPos, enemies, enemyShots, room, slow);
     if (fight.quake > 0) { shake = fmaxf(shake, fight.quake); fight.quake = 0; }
     if (fight.headline) { showBanner(fight.headline, fight.subline, 1.8f); fight.headline = nullptr; }
     if (fight.arenaBroke) {                        // stone flying up out of the floor
@@ -302,16 +327,21 @@ void Game::updatePlay(float dt) {
     updateEnemies(dt, slow);
     updateEnemyShots(dt, slow);
     // Triceps: her gravity wells drag you in, and blasts, live wires and the staff hurt
-    Vector2 pull = fight.gravityPull(player.pos);
-    if ((pull.x || pull.y) && !airborne)
-        player.pos = moveInRoom(player.pos, Vector2Scale(pull, dt * slow), PLAYER_R, room, room.cleared);
-    if (player.invuln <= 0 && !airborne)
-        if (int dmg = fight.hazardHit(player.pos, PLAYER_R)) { hurtPlayer((float)dmg, 0.5f); shake = fmaxf(shake, 0.25f); }
-    if (fight.busHits(player.pos, PLAYER_R) && player.invuln <= 0 && !airborne) {
-        fight.bus.hit = true;
-        hurtPlayer((float)fight.busDamage(), 0.8f);
-        shake = 0.5f;
+    for (int h = 0; h < heroCount; ++h) {
+        if (coop.active()) { if (!heroIn(h)) continue; useHero(h); }
+        bool airborne = player.jumpT > 0;
+        Vector2 pull = fight.gravityPull(player.pos);
+        if ((pull.x || pull.y) && !airborne)
+            player.pos = moveInRoom(player.pos, Vector2Scale(pull, dt * slow), PLAYER_R, room, room.cleared);
+        if (player.invuln <= 0 && !airborne)
+            if (int dmg = fight.hazardHit(player.pos, PLAYER_R)) { hurtPlayer((float)dmg, 0.5f); shake = fmaxf(shake, 0.25f); }
+        if (fight.busHits(player.pos, PLAYER_R) && player.invuln <= 0 && !airborne) {
+            fight.bus.hit = true;
+            hurtPlayer((float)fight.busDamage(), 0.8f);
+            shake = 0.5f;
+        }
     }
+    useHero(me);
 
     // --- deaths: corpses, loot, and the Plasmodia multiplying ---
     for (auto& e : enemies) if (e.alive && e.hp <= 0) killEnemy(e);
@@ -327,18 +357,38 @@ void Game::updatePlay(float dt) {
         room.cleared = true; inFight = false;
         if (room.isBoss) bossDefeated();
         else { showBanner("Room cleared", "", 1.4f); play("quest"); }
+        if (coop.active()) coopReviveDowned(0.4f);     // anyone knocked out gets back up
     }
     if (rewardT > 0 && (rewardT -= dt) <= 0) {
-        overlay = rewardOverlay;
-        if (overlay == Overlay::Cutscene && !cutscene.open(BAD_PLASMODIUM_CUTSCENE)) overlay = Overlay::None;   // no video: carry on
+        if (coop.active()) {                       // co-op: the cutscene plays for everyone; the run goes on
+            if (rewardOverlay == Overlay::Cutscene) {
+                coop.cutscenes++;
+                if (overlay == Overlay::None && cutscene.open(BAD_PLASMODIUM_CUTSCENE)) overlay = Overlay::Cutscene;
+            }
+            else if (rewardOverlay == Overlay::RunComplete) coopRunOver();
+        }
+        else {
+            overlay = rewardOverlay;
+            if (overlay == Overlay::Cutscene && !cutscene.open(BAD_PLASMODIUM_CUTSCENE)) overlay = Overlay::None;   // no video: carry on
+        }
     }
-    if (overlay != Overlay::None) return;
+    if (overlay != Overlay::None && !coop.active()) return;
+    if (screen != Screen::Play) return;            // co-op: the run is over
 
     // --- leave through an open door, or take the stairs down ---
-    checkRoomExits();
     bool lootTaken = coins.empty() && corpses.empty();
-    if (mode == Mode::Run && room.isBoss && room.cleared && lootTaken && rewardT <= 0 && Vector2Distance(player.pos, ROOM_CENTER) < 18) {
-        if (currentBoss().kind == BossKind::Physics) startToilet();   // after Triceps: the toilets, then on down
+    bool onStairs = false;
+    for (int h = 0; h < heroCount; ++h) {
+        if (coop.active()) { if (!heroIn(h)) continue; useHero(h); }
+        int cx = dungeon.cx, cy = dungeon.cy;
+        checkRoomExits();
+        if (dungeon.cx != cx || dungeon.cy != cy) { if (coop.active()) coopPartyMoved(h); break; }
+        onStairs |= Vector2Distance(player.pos, ROOM_CENTER) < 18;
+    }
+    useHero(me);
+    Room& here = dungeon.cur();
+    if (mode == Mode::Run && here.isBoss && here.cleared && lootTaken && rewardT <= 0 && onStairs) {
+        if (currentBoss().kind == BossKind::Physics && !coop.active()) startToilet();   // after Triceps: the toilets, then on down
         else descend();
         return;
     }
@@ -350,13 +400,13 @@ void Game::updatePlay(float dt) {
             player.hp = fminf(player.maxHp, player.hp + player.maxHp * 0.35f);
             player.mana = player.maxMana;
             player.pos = { ROOM_CENTER.x, ROOM_PX_H - TILE * 2.0f };
-            room.cleared = false;
+            here.cleared = false;
             enterRoom();
         }
     }
 
     // --- falling ---
-    if (player.hp <= 0) playerDied();
+    if (!coop.active() && player.hp <= 0) playerDied();
 }
 
 void Game::playerDied() {
@@ -434,6 +484,7 @@ void Game::openMimic() {
 // ---------------------------------------------------------------- the wheel
 void Game::spinWheel() {
     if (wheel.spinning) return;
+    if (coop.joined()) { sendCommand(Cmd::Spin, wheel.bet, wheel.pick); return; }
     if (wheel.casino) {
         if (player.gold < wheel.bet) { wheel.message = "Not enough gold"; play("hurt"); return; }
         player.gold -= wheel.bet;
@@ -921,6 +972,7 @@ void Game::hitEnemy(Enemy& e, int damage, Color fx) {
         if (boss && before > fight.gate(e)) e.hp = fmaxf(e.hp, fight.gate(e));    // every stage gets its turn
     }
     e.hitFlash = 0.12f;
+    e.lastHit = curHero;
     stats.damageDealt += damage;
     floaters.push_back({ { e.pos.x + frand(-6, 6), e.pos.y - e.r - 8 }, 0, damage, fx });
     burst(parts, e.pos, 5, 60, 0.4f, fx);
@@ -950,8 +1002,15 @@ void Game::hurtPlayer(float damage, float invuln) {
 
 void Game::updateShots(float dt) {
     Room& room = dungeon.cur();
+    int me = curHero;
     for (auto& p : shots) {
         if (!p.alive) continue;
+        if (coop.active() && p.owner >= 0 && p.owner < heroCount && heroes[p.owner].present) useHero(p.owner);   // its hits count for whoever let it go
+        size_t burstFrom = newShots.size();
+        struct Owned {                  // grinders it bursts into are theirs too
+            std::vector<Projectile>& shots; size_t from; int owner;
+            ~Owned() { for (size_t i = from; i < shots.size(); ++i) if (shots[i].owner < 0) shots[i].owner = owner; }
+        } owned{ newShots, burstFrom, p.owner };
         if (p.kind == ShotKind::GrinderStorm) { updateStorm(p, dt); continue; }
         if (p.homing > 0) {           // curve toward the nearest enemy in reach
             const Enemy* target = nullptr; float best = 300;
@@ -1005,6 +1064,7 @@ void Game::updateShots(float dt) {
             break;
         }
     }
+    useHero(me);
     shots.erase(std::remove_if(shots.begin(), shots.end(), [](const Projectile& p) { return !p.alive; }), shots.end());
     shots.insert(shots.end(), newShots.begin(), newShots.end());   // grinders a Meta-Grinder burst into
     newShots.clear();
@@ -1112,17 +1172,31 @@ static Vector2 wallAvoid(const Room& room, Vector2 pos, float r, bool doorsOpen)
 }
 
 void Game::updateEnemies(float dt, float slow) {
-    static FlowField flow;          // path distances to the player, rebuilt each frame
+    static FlowField flows[MAX_HEROES];     // path distances to each hero, rebuilt each frame
     Room& room = dungeon.cur();
     bool doorsOpen = room.cleared;
-    bool untouchable = player.invuln > 0 || player.jumpT > 0;
     bool scared = scareT > 0;               // Momiche's scare: everyone runs, nobody bites
-    // One flow field per frame: every monster reads its next step from it, so
-    // they path around pillars and (while it's cheaper) around spike traps.
-    buildFlowField(room, player.pos, true, flow);
+    // One flow field per hero per frame: every monster reads its next step from its target's,
+    // so they path around pillars and (while it's cheaper) around spike traps.
+    // Alone, the hero is the target; in co-op each monster goes for the nearest hero on their feet.
+    int me = curHero;
+    bool untouchables[MAX_HEROES] = {};
+    for (int h = 0; h < heroCount; ++h) {
+        if (coop.active()) { if (!heroIn(h)) continue; useHero(h); }
+        buildFlowField(room, player.pos, true, flows[h]);
+        untouchables[h] = player.invuln > 0 || player.jumpT > 0;
+    }
+    useHero(me);
 
     for (auto& e : enemies) {
         if (!e.alive) continue;
+        int target = coop.active() ? nearestHero(e.pos) : curHero;
+        bool nobody = target < 0;               // everyone is down or in the castle: they just mill about
+        if (nobody) target = curHero;
+        if (coop.active()) useHero(target);
+        FlowField& flow = flows[target];
+        bool stayAway = true;                   // (nobody to go for: nobody to hit)
+        bool& untouchable = nobody ? stayAway : untouchables[target];
         float edt = dt * slow;
         e.hitFlash = fmaxf(0, e.hitFlash - dt);
         if (e.burnT > 0) {
@@ -1303,6 +1377,7 @@ void Game::updateEnemies(float dt, float slow) {
             untouchable = true;
         }
     }
+    useHero(me);
 }
 
 void Game::updateEnemyShots(float dt, float slow) {
@@ -1315,23 +1390,30 @@ void Game::updateEnemyShots(float dt, float slow) {
         if (p.life <= 0 || roomWallSolid(room, (int)floorf(p.pos.x / TILE), (int)floorf(p.pos.y / TILE), false)) {
             p.alive = false; continue;
         }
-        if (Vector2Distance(p.pos, player.pos) >= p.r + PLAYER_R) continue;
-        if (player.shieldT > 0) {          // Nikolay's mug-shield
-            p.alive = false; play("shield");
-            burst(parts, p.pos, 6, 70, 0.3f, { 220, 200, 160, 255 });
-            continue;
+        // it hits whichever hero it reaches (alone: the one)
+        int me = curHero;
+        for (int h = 0; h < heroCount && p.alive; ++h) {
+            if (coop.active()) { if (!heroIn(h)) continue; useHero(h); }
+            if (Vector2Distance(p.pos, player.pos) >= p.r + PLAYER_R) continue;
+            if (player.shieldT > 0) {          // Nikolay's mug-shield
+                p.alive = false; play("shield");
+                burst(parts, p.pos, 6, 70, 0.3f, { 220, 200, 160, 255 });
+                break;
+            }
+            if (player.invuln > 0 || player.jumpT > 0) continue;
+            p.alive = false;
+            hurtPlayer((float)p.damage, 0.5f);
         }
-        if (player.invuln > 0 || player.jumpT > 0) continue;
-        p.alive = false;
-        hurtPlayer((float)p.damage, 0.5f);
+        useHero(me);
     }
     enemyShots.erase(std::remove_if(enemyShots.begin(), enemyShots.end(), [](const Projectile& p) { return !p.alive; }), enemyShots.end());
 }
 
 void Game::killEnemy(Enemy& e) {
+    int me = curHero;
+    if (coop.active() && e.lastHit >= 0 && e.lastHit < heroCount && heroes[e.lastHit].present) useHero(e.lastHit);   // the kill is theirs
     e.alive = false;
     kills++;
-    player.xp += e.xp;
     play("pickup");
     Enemy corpse = e;
     corpse.dying = true; corpse.deathT = 0; corpse.hitFlash = 0; corpse.atkAnim = 0; corpse.burnT = 0;
@@ -1374,14 +1456,21 @@ void Game::killEnemy(Enemy& e) {
         if (!left && finaleT <= 0) finalBlow(e);
     }
 
-    while (player.xp >= player.xpNext) {
-        player.xp -= player.xpNext; player.level++;
-        player.xpNext = (int)(60 * powf((float)player.level, 1.5f));
-        player.maxHp += 18; player.hp = player.maxHp;
-        player.maxMana += 10; player.mana = player.maxMana;
-        showBanner("The Unmarked grows stronger", TextFormat("Level %d", player.level), 2.5f);
-        play("levelup");
+    // experience: everyone in the run shares it (alone, that's you)
+    for (int h = 0; h < heroCount; ++h) {
+        if (coop.active()) { if (!heroes[h].present && h != curHero) continue; useHero(h); }
+        player.xp += e.xp;
+        while (player.xp >= player.xpNext) {
+            player.xp -= player.xpNext; player.level++;
+            player.xpNext = (int)(60 * powf((float)player.level, 1.5f));
+            player.maxHp += 18; if (player.hp > 0 || !coop.active()) player.hp = player.maxHp;   // (knocked out: up when the room's won)
+            player.maxMana += 10; player.mana = player.maxMana;
+            showBanner(coop.active() ? TextFormat("%s grows stronger", heroName.c_str()) : "The Unmarked grows stronger",
+                TextFormat("Level %d", player.level), 2.5f);
+            play("levelup");
+        }
     }
+    useHero(me);
 }
 
 void Game::finalBlow(const Enemy& e) {
@@ -1489,14 +1578,24 @@ void Game::updateLoot(float dt) {
             c.vel.y += 360 * dt;
             c.pos = Vector2Add(c.pos, Vector2Scale(c.vel, dt));
         }
-        else {                                     // then get pulled to the player
-            Vector2 to = Vector2Subtract(player.pos, c.pos);
+        else {                                     // then get pulled to the player (the nearest, in co-op)
+            int h = coop.active() ? nearestHero(c.pos) : curHero;
+            if (h < 0) continue;
+            Vector2 heroPos = h == curHero ? player.pos : heroes[h].player.pos;
+            Vector2 to = Vector2Subtract(heroPos, c.pos);
             float spd = 160 + 600 * (c.t - 0.45f);
             c.pos = Vector2Add(c.pos, Vector2Scale(Vector2Normalize(to), fminf(spd * dt, Vector2Length(to))));
         }
     }
+    int me = curHero;
     coins.erase(std::remove_if(coins.begin(), coins.end(), [&](const Coin& c) {
-        if (c.t <= 0.45f || Vector2Distance(c.pos, player.pos) >= 8) return false;
+        if (c.t <= 0.45f) return false;
+        if (coop.active()) {                       // whoever it reached
+            int h = nearestHero(c.pos);
+            if (h < 0) return false;
+            useHero(h);
+        }
+        if (Vector2Distance(c.pos, player.pos) >= 8) return false;
         if (c.pack) {
             player.packs++; play("quest");
             showBanner("Cigarette pack", "Galin can upgrade your weapon with this", 2.2f);
@@ -1506,6 +1605,7 @@ void Game::updateLoot(float dt) {
         player.gold += worth; stats.goldEarned += worth;
         play("coin");
         return true; }), coins.end());
+    useHero(me);
 }
 
 // --------------------------------------------------------------------- doors
@@ -1545,6 +1645,7 @@ void Game::checkRoomExits() {
 
 // --------------------------------------------------------------------- shops
 void Game::buy(int i) {
+    if (coop.joined()) { sendCommand(Cmd::Buy, i); return; }      // co-op: the host does it, for this hero
     const ShopItem& it = SHOP_ITEMS[i];
     if (it.vape >= 0 && player.has((Vape)it.vape)) return;
     if (it.vape < 0 && player.potions[i] >= POTION_MAX) { shopMsgT = 1.5f; shopMsg = "Your belt is full"; play("hurt"); return; }
@@ -1559,6 +1660,7 @@ void Game::buy(int i) {
 }
 
 void Game::buyWeapon(int i) {
+    if (coop.joined()) { sendCommand(Cmd::BuyWeapon, i); return; }
     const WeaponDef& w = WEAPONS[i];
     if (i == player.weapon) return;
     if (!player.owns(i)) {
@@ -1583,6 +1685,7 @@ int Game::sellPrice(int i) const {
 }
 
 void Game::sellWeapon(int i) {
+    if (coop.joined()) { sendCommand(Cmd::SellWeapon, i); return; }
     if (i <= 0 || i >= WEAPON_COUNT || !player.owns(i)) return;     // the Rusty Sword stays with you
     int gold = sellPrice(i);
     player.gold += gold;
@@ -1594,6 +1697,7 @@ void Game::sellWeapon(int i) {
 }
 
 void Game::buyUpgrade(int u) {
+    if (coop.joined()) { sendCommand(Cmd::BuyUpgrade, u); return; }
     int& level = player.upgrades[player.weapon][u];
     if (level >= UPGRADE_MAX) return;
     int price = UPGRADES[u].gold * (level + 1);

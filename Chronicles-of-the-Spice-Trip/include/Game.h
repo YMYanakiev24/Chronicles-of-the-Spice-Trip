@@ -21,13 +21,13 @@
 #include "Video.h"
 #include "Toilet.h"
 #include "Castle.h"
+#include "Coop.h"
 #include <map>
 #include <string>
 #include <vector>
 
-enum class Screen { Video, Menu, Setup, Champions, Settings, Controls, Intro, Play };
+enum class Screen { Video, Menu, Setup, Champions, Settings, Controls, Intro, Play, Coop };
 enum class Mode { Run, BossRush };
-enum class Overlay { None, Pause, Controls, Shop, Galin, RunComplete, RushOver, Casino, Summary, Drip, Cutscene };
 
 struct Popup { const Anim* anim; Vector2 pos; float t; };        // a flask rising from a chest
 struct Coin { Vector2 pos, vel; float t; bool pack = false; };    // loot that flies to you (gold, or a cigarette pack)
@@ -39,16 +39,6 @@ struct Laser { Vector2 a, b; float t; };                         // one of the G
 struct VasilArt {
     static constexpr int CROWD = 10;    // listeners in crowd.png, side by side
     Texture2D seated{}, story[2]{}, sign{}, stool{}, portrait{}, crowd{};
-};
-
-// Toshko's roulette wheel, in Todor's casino.
-struct Wheel {
-    bool  casino = false;
-    bool  spinning = false, done = false;
-    float angle = 0, speed = 0;         // degrees, and degrees a second
-    int   result = -1;                  // the wedge under the pointer when it stopped
-    int   bet = 10, pick = 0;           // the casino: the stake, and 0 red / 1 black / 2 Toshko's zero
-    std::string message;
 };
 
 // Share-friendly borderless fullscreen (see Game.cpp).
@@ -87,6 +77,7 @@ struct Game {
     void controlsScreen();
     void introScreen();
     void playScreen();
+    void playFrame(float dt);           // the dungeon (or castle, or toilets) on screen, and alone, its update
 
     // --------------------------------------------------------------- play logic
     void updatePlay(float dt);
@@ -292,6 +283,56 @@ struct Game {
     // the autopilot asks for screenshots by name
     std::string pendingShot;
 
+    // ------------------------------------------------------- co-op (Coop.cpp, CoopSync.cpp)
+    CoopSession coop;
+    Hero  heroes[MAX_HEROES];           // heroes[curHero] is stale: its hero is in the fields above
+    int   heroCount = 1;                // seats (1: playing alone; MAX_HEROES in co-op, some of them empty)
+    int   curHero = 0;                  // the hero in `player` and the fields around it
+    int   localHero = 0;                // this device's hero
+    void  useHero(int i);               // swap hero i into the fields
+    void  syncHeroes();                 // bring heroes[curHero] up to date
+    void  saveHeroTo(Hero& h) const;
+    void  loadHeroFrom(const Hero& h);
+    bool  heroIn(int i) const;          // in the dungeon room, on their feet
+    int   nearestHero(Vector2 p) const; // the one monsters there go for (-1: nobody to go for)
+    int   heroOutfit = -1;              // the hero in the fields: their outfit (-1: this device's profile says)
+    std::string heroName;
+    float heroDownT = 0;                // knocked out this long (0: on their feet)
+    // the session
+    void  coopHost();                   // start hosting: the lobby
+    void  coopJoin(const std::string& address);
+    void  coopLeave(const char* why = nullptr);   // back to the co-op screen (with why), or the menu
+    void  coopNetwork();                // once a frame: links, lobby, inputs, commands, snapshots in
+    void  coopSendLobby();
+    void  coopDropSeat(int seat, const char* why);
+    void  coopScreen();                 // the lobby
+    // the host
+    void  coopStartRun();               // everyone's run begins
+    void  coopStep(float dt);           // every hero, then the world, then the snapshots out
+    void  coopRemoteKeys(int seat);     // a joiner's NetInput, as the host's keys (coop.remote)
+    void  coopSendSnapshots();
+    void  coopCommand(int seat, const std::vector<uint8_t>& data);
+    void  coopRunOver();
+    void  coopReviveDowned(float hpShare);
+    void  coopPartyMoved(int leader);   // everyone in the dungeon follows the one who took a door
+    void  coopPartyFell();              // everyone in the dungeon is down: back to the entrance
+    void  writeSnapshot(std::vector<uint8_t>& out);
+    // a joiner
+    void  coopJoinerFrame();            // send input, apply the newest snapshot
+    void  applySnapshot(const std::vector<uint8_t>& data);
+    void  applyDungeon(const std::vector<uint8_t>& data);
+    void  sendCommand(Cmd c, int a = 0, int b = 0);
+    void  coopOverlayChanged(Overlay before);   // the joiner's own windows: Pause is theirs, shops are the host's
+    Overlay hostOverlay = Overlay::None, localOverlay = Overlay::None;   // a joiner: theirs on the host, and Pause on top
+    // drawing
+    void  drawHeroes();                 // the other heroes, with their names
+    void  drawTeam();                   // their health, by the HUD
+    void  drawHero();                   // the hero in the fields (their champion, pose and effects)
+    // a frame of play, in parts (alone: updatePlay; the co-op host: coopStep)
+    void  updateHero(float dt);         // the hero in the fields: timers, moving, keys, chests, attacks
+    float updateWorldTimers(float dt);  // returns dt as the world feels it (hit stop, slow motion)
+    void  updateWorld(float dt);        // shots, monsters, bosses, loot, doors
+
     // ------------------------------------------------------------------ assets
     std::map<std::string, Sound> sounds;
     au::Music music;
@@ -312,6 +353,9 @@ struct Game {
     std::map<int, WalkSheet> outfitLooks;   // any champion in any outfit, for Beray's mirror
     BossArt bossArt;
 };
+
+// A champion at the start of a run (or of Boss Rush, at a higher level).
+Player freshPlayer(int champion, int level);
 
 inline constexpr const char* INTRO_VIDEO = "intro/marin-trip.mpg";   // plays once as the game starts
 inline constexpr const char* BAD_PLASMODIUM_CUTSCENE = "cutscenes/red-eyes.mpg";   // plays when the Bad Plasmodium falls (in a run)

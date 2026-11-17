@@ -12,6 +12,28 @@
 // --------------------------------------------------------------- the screen
 void Game::playScreen() {
     float dt = fminf(GetFrameTime(), 0.05f);
+    if (coop.joined()) {                            // co-op, joined: the world comes from the host
+        coopJoinerFrame();
+        if (screen != Screen::Play || !coop.joined()) return;
+        if (!coop.haveWorld) {
+            ui::textCentered("Waiting for the host...", GetScreenWidth() / 2.0f, GetScreenHeight() / 2.0f - 10, 20, ui::MUTED);
+            if (in::pressed(KEY_ESCAPE)) coopLeave();
+            return;
+        }
+        Overlay before = overlay;
+        playFrame(dt);
+        if (screen == Screen::Play && coop.joined()) coopOverlayChanged(before);
+        return;
+    }
+    if (coop.hosting() && coop.started) {           // co-op, hosting: every hero and the world, whatever's open here
+        coopStep(dt);
+        if (screen != Screen::Play) return;
+    }
+    playFrame(dt);
+}
+
+void Game::playFrame(float dt) {
+    bool alone = !coop.active();                    // (in co-op the world moves on above, whatever window is open)
     if (in::pressed(KEY_ESCAPE)) {
         if (overlay == Overlay::Controls) { save::writeTouchLayout(touch::layout()); overlay = Overlay::Pause; }
         else if (overlay == Overlay::Shop || overlay == Overlay::Galin || overlay == Overlay::Drip || overlay == Overlay::Pause) overlay = Overlay::None;
@@ -20,7 +42,7 @@ void Game::playScreen() {
         play("ui");
     }
     if (hall.active) {                              // the castle: its own rooms, shopkeepers and HUD
-        if (overlay == Overlay::None) updateCastle(dt);
+        if (alone && overlay == Overlay::None) updateCastle(dt);
         if (screen != Screen::Play) return;
         if (hall.active) {
             drawCastle();
@@ -38,7 +60,7 @@ void Game::playScreen() {
         }
     }
     if (hunt.active) {                              // the toilets: their own map, rules and HUD
-        if (overlay == Overlay::None) updateToilet(dt);
+        if (alone && overlay == Overlay::None) updateToilet(dt);
         if (screen != Screen::Play) return;
         drawToilet();
         drawToiletHud();
@@ -46,7 +68,7 @@ void Game::playScreen() {
         else if (overlay == Overlay::Controls) drawControlsEditor();
         return;
     }
-    if (overlay == Overlay::None) updatePlay(dt);
+    if (alone && overlay == Overlay::None) updatePlay(dt);
     if (screen != Screen::Play) return;            // left for the menu this frame
     if (hall.active) { drawCastle(); drawCastleHud(); return; }     // just went through the castle door
     if (hunt.active) { drawToilet(); drawToiletHud(); return; }     // or down Triceps' stairs
@@ -370,6 +392,55 @@ void Game::drawActors() {
             float r = (30 + 300 * k) / 2;
             if (k > 0 && k < 1) DrawRing(player.pos, r - 2, r, 0, 360, 48, Fade({ 166, 191, 255, 255 }, 0.7f * (1 - k)));
         }
+    drawHeroes();                           // the others (co-op)
+    drawHero();
+    drawRocks(fight, player.pos.y, false);
+
+    for (auto& p : shots) drawProjectile(p, clock);
+    for (auto& p : enemyShots) drawProjectile(p, clock);
+    for (auto& l : lasers) {                // the Gym Rat's C++: green lasers, bits racing along them
+        float k = 1 - l.t / GYM_POSE_TIME, len = Vector2Distance(l.a, l.b);
+        Vector2 d = Vector2Scale(Vector2Subtract(l.b, l.a), 1 / fmaxf(len, 1));
+        BeginBlendMode(BLEND_ADDITIVE);
+        DrawLineEx(l.a, l.b, 8 * k, Fade({ 40, 255, 90, 255 }, 0.22f * k));
+        DrawLineEx(l.a, l.b, 3, Fade({ 80, 255, 120, 255 }, 0.75f * k));
+        DrawLineEx(l.a, l.b, 1.2f, Fade({ 225, 255, 225, 255 }, k));
+        for (float s2 = fmodf(l.t * 420, 22); s2 < len; s2 += 22) {
+            Vector2 p = Vector2Add(l.a, Vector2Scale(d, s2));
+            DrawRectangleV({ p.x - 1.5f, p.y - 1.5f }, { 3, 3 }, Fade({ 190, 255, 200, 255 }, k));
+        }
+        EndBlendMode();
+    }
+    drawBus(fight.bus, clock);
+    drawLabAir(fight, clock);
+    drawArenaAir(fight, clock);
+
+    for (auto& pt : parts) {
+        float left = pt.life / pt.maxLife;
+        Color c = pt.color; c.a = (unsigned char)(255 * left);
+        if (pt.star) drawStar(pt.pos, pt.size, pt.life * 5, c);
+        else DrawCircleV(pt.pos, pt.shrink ? pt.size * left : pt.size, c);
+    }
+    for (auto& a : arcs) drawArc(a, clock);
+    for (auto& f : flashes) drawFlash(f);
+    for (auto& pu : popups)
+        drawAnim(*pu.anim, animFrame(*pu.anim, pu.t, 8, true), pu.pos, 2.0f, false, Fade(WHITE, fminf(1.0f, 1.4f - pu.t)));
+}
+
+// The hero in the fields: their champion's figure (or pose), and what they have going.
+void Game::drawHero() {
+    if (coop.active() && player.hp <= 0) {          // co-op: knocked out, lying where they fell
+        const WalkSheet& w = figure(player.champion);
+        drawShadow({ player.pos.x, player.pos.y + 6 }, 15);
+        Rectangle dst = { player.pos.x - 17, player.pos.y - 26, 34, 45 };
+        if (w.ok()) w.draw(FACE_DOWN, 0, dst, { 150, 150, 170, 235 }, false, 90);
+        else ::drawHero(player.pos, { 1, 0 }, 0, false, Fade(champ().cloak, 0.5f));
+        for (int i = 0; i < 3; ++i) {                // stars round their head
+            float a = clock * 4 + i * 2 * PI / 3;
+            DrawPoly({ player.pos.x + 14 + cosf(a) * 9, player.pos.y - 14 + sinf(a) * 3 }, 4, 2.6f, a * 40, { 255, 225, 90, 255 });
+        }
+        return;
+    }
     float lift = player.jumpT > 0 ? sinf((1 - player.jumpT / 0.6f) * PI) * 22 : 0;
     if (player.auraT > 0) {
         float pulse = 34 + sinf(clock * 6) * 3;
@@ -419,37 +490,6 @@ void Game::drawActors() {
         DrawCircleLinesV({ player.pos.x, player.pos.y - 6 }, 22, Fade({ 250, 220, 150, 255 }, 0.9f));
     }
     if (castT > 0) drawSpellCharge(castingSpell, castHand(), 1 - castT / SPELLS[castingSpell].charge, clock);
-    drawRocks(fight, player.pos.y, false);
-
-    for (auto& p : shots) drawProjectile(p, clock);
-    for (auto& p : enemyShots) drawProjectile(p, clock);
-    for (auto& l : lasers) {                // the Gym Rat's C++: green lasers, bits racing along them
-        float k = 1 - l.t / GYM_POSE_TIME, len = Vector2Distance(l.a, l.b);
-        Vector2 d = Vector2Scale(Vector2Subtract(l.b, l.a), 1 / fmaxf(len, 1));
-        BeginBlendMode(BLEND_ADDITIVE);
-        DrawLineEx(l.a, l.b, 8 * k, Fade({ 40, 255, 90, 255 }, 0.22f * k));
-        DrawLineEx(l.a, l.b, 3, Fade({ 80, 255, 120, 255 }, 0.75f * k));
-        DrawLineEx(l.a, l.b, 1.2f, Fade({ 225, 255, 225, 255 }, k));
-        for (float s2 = fmodf(l.t * 420, 22); s2 < len; s2 += 22) {
-            Vector2 p = Vector2Add(l.a, Vector2Scale(d, s2));
-            DrawRectangleV({ p.x - 1.5f, p.y - 1.5f }, { 3, 3 }, Fade({ 190, 255, 200, 255 }, k));
-        }
-        EndBlendMode();
-    }
-    drawBus(fight.bus, clock);
-    drawLabAir(fight, clock);
-    drawArenaAir(fight, clock);
-
-    for (auto& pt : parts) {
-        float left = pt.life / pt.maxLife;
-        Color c = pt.color; c.a = (unsigned char)(255 * left);
-        if (pt.star) drawStar(pt.pos, pt.size, pt.life * 5, c);
-        else DrawCircleV(pt.pos, pt.shrink ? pt.size * left : pt.size, c);
-    }
-    for (auto& a : arcs) drawArc(a, clock);
-    for (auto& f : flashes) drawFlash(f);
-    for (auto& pu : popups)
-        drawAnim(*pu.anim, animFrame(*pu.anim, pu.t, 8, true), pu.pos, 2.0f, false, Fade(WHITE, fminf(1.0f, 1.4f - pu.t)));
 }
 
 // Vasil on his stool by his sign, a few listeners round him (a different few every floor).
@@ -607,6 +647,8 @@ void Game::drawHud() {
     effect(player.auraT, "Calm", { 150, 210, 255, 255 });
     effect(player.shieldT, "Mug-Shield", { 240, 200, 130, 255 });
     effect(player.wobbleT, "Tipsy", { 230, 150, 150, 255 });
+
+    drawTeam();                             // co-op: the others' health, under yours
 
     // --- hotbar: the potion belt, three powers and the special (on a phone, wherever it was put) ---
     float slot = 60, barX = sw / 2.0f, barY = sh - 64.0f;
@@ -967,12 +1009,15 @@ void Game::drawPause() {
 
     float bw = 260, bh = 52, gap = 14, bx = sw / 2.0f - bw - 30, by = sh / 2.0f - 120;
     if (ui::button({ bx, by, bw, bh }, "Resume", ui::Style::Primary)) { play("ui"); overlay = Overlay::None; }
-    if (ui::button({ bx, by + (bh + gap), bw, bh }, "Save", ui::Style::Normal, 20, mode == Mode::Run)) {
+    if (ui::button({ bx, by + (bh + gap), bw, bh }, "Save", ui::Style::Normal, 20, mode == Mode::Run && !coop.active())) {
         bool ok = saveRun();
         saveMsgT = 2.0f; saveMsg = ok ? "Game saved" : "Save failed";
         play(ok ? "quest" : "hurt");
     }
-    if (ui::button({ bx, by + 2 * (bh + gap), bw, bh }, "Main Menu", ui::Style::Danger)) { play("ui"); toMenu(); return; }
+    if (ui::button({ bx, by + 2 * (bh + gap), bw, bh }, coop.active() ? "Leave the game" : "Main Menu", ui::Style::Danger)) { play("ui"); toMenu(); return; }
+    if (coop.active())
+        ui::textCentered(coop.hosting() ? "Co-op: the game goes on while you're paused. Leaving ends it for everyone."
+                                        : "Co-op: the game goes on while you're paused.", sw / 2.0f, sh / 2.0f - 150, 10, ui::MUTED);
     float msgY = by + 3 * (bh + gap);
     if (touch::enabled()) {
         if (ui::button({ bx, msgY, bw, bh }, "Touch Controls")) { play("ui"); overlay = Overlay::Controls; }
@@ -1020,6 +1065,11 @@ void Game::drawRunComplete() {
     ui::text(TextFormat("Damage dealt %d   taken %d   Deaths %d   %s%s", stats.damageDealt, stats.damageTaken,
         stats.deaths, DIFFICULTIES[difficulty].name, hardcore ? ", hardcore" : ""), p.x + 28, y + 150, 10, ui::MUTED);
     float bw = 240, by = p.y + ph - 76;
+    if (coop.active()) {                       // the stairs are there for everyone: anyone on them takes the party down
+        if (ui::button({ p.x + pw / 2 - bw - 10, by, bw, 50 }, "Keep going", ui::Style::Primary)) { play("ui"); overlay = Overlay::None; }
+        if (ui::button({ p.x + pw / 2 + 10, by, bw, 50 }, "Leave the game", ui::Style::Normal)) { play("ui"); toMenu(); }
+        return;
+    }
     if (ui::button({ p.x + pw / 2 - bw - 10, by, bw, 50 }, "Descend deeper", ui::Style::Primary)) { play("ui"); descend(); }
     if (ui::button({ p.x + pw / 2 + 10, by, bw, 50 }, "Main menu", ui::Style::Normal)) { play("ui"); toMenu(); }
 }
@@ -1067,7 +1117,7 @@ void Game::drawWheel(Vector2 c, float R) {
 
 void Game::drawCasino() {
     int sw = GetScreenWidth(), sh = GetScreenHeight();
-    updateWheel(GetFrameTime());
+    if (!coop.joined()) updateWheel(GetFrameTime());    // (a joiner's wheel turns on the host)
     ui::veil(0.72f);
     float pw = fminf(980.0f, sw - 40.0f), ph = fminf(600.0f, sh - 40.0f);
     Rectangle p = { (sw - pw) / 2, (sh - ph) / 2, pw, ph };

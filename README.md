@@ -45,6 +45,37 @@ the first time it runs.
 
 Movement, run, roll, interact and the special can be rebound in **Settings**.
 
+## Co-op on the same Wi-Fi
+
+Up to four players can go through one run together: the same rooms, monsters and bosses, each
+with their own champion. It works between the **Windows** and **Android** apps, in any mix, on the
+same Wi-Fi; no internet is needed. (The browser version can't take part.)
+
+1. Everyone opens **Co-op** from the main menu.
+2. One player taps **Host a game**. Their screen shows the address others can join by.
+3. The others see the game under **Games on this network** and tap **Join**. If it doesn't show
+   up, type the host's address on the keypad and tap **Join**.
+4. In the lobby everyone picks their champion with the arrows; the host picks the difficulty and
+   taps **Begin the run**.
+
+How a co-op run plays:
+
+- Monsters go for whoever is nearest. Experience is shared, coins fly to the nearest hero, and
+  a champion's kill perks (Vanessa's healing, the extra coins) count for whoever landed it.
+- A hero who runs out of health is **knocked out**, not dead: they get back up with 40% of
+  their health once the room is clear. If everyone in the dungeon is down, the party falls
+  back to the entrance and Toshko goes through every pocket.
+- Anyone walking through a door brings the whole party along, and anyone on the stairs after a
+  boss takes everyone down. The castle is each player's own: shop while the others fight.
+- Each player keeps their own outfits, settings and touch layout. Co-op runs aren't saved, and
+  have no hardcore or Boss Rush.
+- The host runs the game and sends it to everyone else, so the host's device should be the
+  strongest one. If the host leaves, the run ends for everyone.
+
+On Windows, allow the game through the firewall the first time it asks (private networks), or
+nobody can join. Some routers (guest networks, "AP isolation") keep devices from seeing each
+other; then co-op can't work on that network.
+
 ## What's in the game
 
 - **Marin's video.** Every time the game starts, Marin's video plays once
@@ -397,6 +428,9 @@ Chronicles-of-the-Spice-Trip/
   src/Video.cpp       plays the intro video and the cutscene (MPEG-1) with their sound
   src/Toilet.cpp      the toilets after Triceps: hiding from The Sergeant
   src/Castle.cpp      the castle corridor, the shopkeepers' rooms and Beray's outfits
+  src/Coop.cpp        co-op: several heroes in one game, the lobby, the host's frame
+  src/CoopSync.cpp    co-op over the wire: the host's snapshots, a joiner playing from them
+  src/Net.cpp         the local network (TCP for the game, UDP to find hosts)
   src/PlatformAndroid.cpp, src/PlatformWeb.cpp   what phones and browsers do differently
   assets/             art; assets/arenas/ holds the bosses' painted arenas,
                       assets/walk/ the champions' and Triceps' walk sheets,
@@ -420,7 +454,7 @@ hides from The Sergeant in the toilets (smoke, the pee and its puddle, a stall,
 being found, a minute survived), completes a run, saves and continues, wins a
 Boss Rush, checks Vasil has each floor's tale, and tries every
 champion's special, Momiche's scare on a boss, Gakev's coins and casting with
-Enter. It writes a PASS/FAIL line for each check (217) to
+Enter. It writes a PASS/FAIL line for each check (254) to
 `<folder>/autopilot.log`, saves screenshots next to it, and exits with the
 number of failures:
 
@@ -430,6 +464,15 @@ build\x64\Release\ChroniclesOfTheSpiceTrip.exe --autopilot autopilot
 
 It uses its own save folder (`<folder>/save`, emptied first), so your saves are
 never touched. `--savedir <folder>` moves the normal saves too.
+
+Co-op has a play-through of its own, for two copies of the game started together on one
+computer: one hosts and one joins over the network, they find each other, play a run (a fight,
+a knockout, shopping, a door) and each checks what it sees.
+
+```
+start build\x64\Release\ChroniclesOfTheSpiceTrip.exe --autopilot coop-host --coop host
+build\x64\Release\ChroniclesOfTheSpiceTrip.exe --autopilot coop-join --coop join --address 127.0.0.1
+```
 
 ## Play in a browser (iPhone, Android, computers)
 

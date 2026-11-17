@@ -107,7 +107,8 @@ void Game::menuScreen() {
 #else
     constexpr bool canExit = true;
 #endif
-    int count = (hasSave ? 6 : 5) - (canExit ? 0 : 1);
+    bool canCoop = net::available();                // the apps on the same Wi-Fi (not a browser)
+    int count = (hasSave ? 6 : 5) - (canExit ? 0 : 1) + (canCoop ? 1 : 0);
     float y = sh - 36 - count * (bh + gap);
 
     Rectangle chip = { x, y - 132, bw, 112 };
@@ -127,6 +128,7 @@ void Game::menuScreen() {
         return;
     }
     if (ui::button(next(), "New Run", ui::Style::Primary)) { play("ui"); screen = Screen::Setup; t = 0; return; }
+    if (canCoop && ui::button(next(), "Co-op")) { play("ui"); coop.status.clear(); screen = Screen::Coop; t = 0; return; }
     if (ui::button(next(), "Boss Rush")) { play("ui"); startBossRush(); return; }
     if (ui::button(next(), "Champions")) { play("ui"); screen = Screen::Champions; t = 0; return; }
     if (ui::button(next(), "Settings")) { play("ui"); screen = Screen::Settings; rebinding = -1; t = 0; return; }

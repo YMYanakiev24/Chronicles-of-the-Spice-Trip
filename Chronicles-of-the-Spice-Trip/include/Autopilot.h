@@ -15,7 +15,9 @@ struct Game;
 
 class Autopilot {
 public:
-    void start(Game& g, const std::string& dir);
+    // coop: "" for the whole game alone; "host", or "join" with the host's address, for one side of a
+    // co-op game (run a host and a joiner at once: they play a run together and check each other).
+    void start(Game& g, const std::string& dir, const std::string& coop = "", const std::string& address = "");
     void step(Game& g);                 // call before each frame
     int  failures() const { return fails; }
 
@@ -36,6 +38,8 @@ private:
     FILE*  log = nullptr;
 
     void build();
+    void buildCoopHost();
+    void buildCoopJoin(const std::string& address);
     void check(const char* what, bool ok);
     void shot(Game& g, const char* name);
     void finish(Game& g);

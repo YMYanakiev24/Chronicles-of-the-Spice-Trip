@@ -62,4 +62,43 @@ namespace platform {
     }
 
 } // namespace platform
+
+// Co-op finds games with broadcasts on the Wi-Fi, which Android drops unless the app holds a
+// multicast lock (WifiManager.createMulticastLock). Counted: the Server and the Finder each ask.
+#include "Net.h"
+void net::holdMulticastLock(bool on) {
+    static int holders = 0;
+    static jobject lock = nullptr;
+    static bool failed = false;
+    holders = on ? holders + 1 : (holders > 0 ? holders - 1 : 0);
+    if (failed) return;
+    ANativeActivity* act = GetAndroidApp()->activity;
+    JNIEnv* env = nullptr;
+    if (act->vm->GetEnv((void**)&env, JNI_VERSION_1_6) != JNI_OK && act->vm->AttachCurrentThread(&env, nullptr) != JNI_OK) {
+        failed = true;
+        return;
+    }
+    if (!lock) {
+        jclass activity = env->GetObjectClass(act->clazz);
+        jmethodID get = env->GetMethodID(activity, "getSystemService", "(Ljava/lang/String;)Ljava/lang/Object;");
+        jstring wifi = env->NewStringUTF("wifi");
+        jobject manager = get ? env->CallObjectMethod(act->clazz, get, wifi) : nullptr;
+        jclass managerClass = env->FindClass("android/net/wifi/WifiManager");
+        jmethodID create = managerClass ? env->GetMethodID(managerClass, "createMulticastLock",
+            "(Ljava/lang/String;)Landroid/net/wifi/WifiManager$MulticastLock;") : nullptr;
+        jstring tag = env->NewStringUTF("spicetrip");
+        jobject made = manager && create ? env->CallObjectMethod(manager, create, tag) : nullptr;
+        if (env->ExceptionCheck()) { env->ExceptionClear(); made = nullptr; }
+        if (!made) { failed = true; return; }
+        lock = env->NewGlobalRef(made);
+        jclass lockClass = env->GetObjectClass(lock);
+        jmethodID counted = env->GetMethodID(lockClass, "setReferenceCounted", "(Z)V");
+        if (counted) env->CallVoidMethod(lock, counted, JNI_FALSE);
+        if (env->ExceptionCheck()) env->ExceptionClear();
+    }
+    jclass lockClass = env->GetObjectClass(lock);
+    jmethodID call = env->GetMethodID(lockClass, holders > 0 ? "acquire" : "release", "()V");
+    if (call) env->CallVoidMethod(lock, call);
+    if (env->ExceptionCheck()) env->ExceptionClear();     // (no permission: joining by address still works)
+}
 #endif
