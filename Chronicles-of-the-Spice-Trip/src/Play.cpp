@@ -93,6 +93,12 @@ float Game::bladeReach() const {
     return WEAPONS[player.weapon].reach + 4.0f * player.upgrades[player.weapon][UP_EXTEND];
 }
 
+float Game::bladeKnockback() const { return WEAPONS[player.weapon].knockback + POMMEL_KNOCK * upgradeLevel(UP_POMMEL); }
+float Game::critChance() const { return WEAPONS[player.weapon].crit + CRIT_PER_KEEN * upgradeLevel(UP_KEEN); }
+int Game::bladeLeech() const { return WEAPONS[player.weapon].leech + upgradeLevel(UP_GROOVE); }
+int Game::killCoins() const { return WEAPONS[player.weapon].coins + upgradeLevel(UP_GILD); }
+float Game::swingArc() const { return ARC_DOT - ARC_PER_LEVEL * upgradeLevel(UP_ARC); }
+
 static void burst(std::vector<Particle>& parts, Vector2 at, int n, float speed, float life, Color c) {
     for (int k = 0; k < n; ++k)
         parts.push_back({ at, { frand(-speed, speed), frand(-speed, speed) }, life, life, frand(2, 4), c });
@@ -877,25 +883,33 @@ void Game::swingBlade() {
     play("slash");
     const WeaponDef& w = WEAPONS[player.weapon];
     int damage = bladeDamage();
-    float reach = bladeReach();
-    bool hitAny = false;
+    float reach = bladeReach(), arc = swingArc(), crit = critChance(), knock = bladeKnockback();
+    int leech = bladeLeech();
+    bool hitAny = false, critAny = false;
     for (auto& e : enemies) {
         if (!e.alive) continue;
         Vector2 to = Vector2Subtract(e.pos, player.pos);
         float d = Vector2Length(to);
-        if (d >= reach + e.r || Vector2DotProduct(Vector2Normalize(to), player.facing) <= 0.3f) continue;
-        hitEnemy(e, damage, { 234, 255, 255, 255 });
-        hitAny = true;
+        if (d >= reach + e.r || Vector2DotProduct(Vector2Normalize(to), player.facing) <= arc) continue;
+        bool critical = crit > 0 && frand(0, 100) < crit;
+        int dealt = (critical ? damage * 2 : damage) + w.fire;
+        hitEnemy(e, dealt, critical ? Color{ 255, 214, 70, 255 } : w.fire ? Color{ 255, 160, 70, 255 } : Color{ 234, 255, 255, 255 });
+        if (w.fire) {                                // the edge sets them alight
+            e.burnT = BURN_TIME;
+            burst(parts, e.pos, 6, 70, 0.4f, { 255, 140, 40, 255 });
+        }
+        if (leech > 0 && player.hp > 0) player.hp = fminf(player.maxHp, player.hp + leech);
+        hitAny = true; critAny |= critical;
         Vector2 dir = Vector2Normalize(to);
         float ang = atan2f(dir.y, dir.x);
-        if (e.bossForm < 0) e.knock = Vector2Scale(dir, w.knockback * KNOCK_DECAY);   // bosses stand their ground
+        if (e.bossForm < 0) e.knock = Vector2Scale(dir, knock * KNOCK_DECAY);   // bosses stand their ground
         Vector2 at = Vector2Subtract(e.pos, Vector2Scale(dir, e.r * 0.6f));
         flashes.push_back({ at, 0, 0.14f, 28, ang + 0.6f, WHITE, false });
         for (int k = 0; k < 9; ++k)                // sparks thrown on through the target
             parts.push_back({ at, Vector2Scale(fromAngle(ang + frand(-0.7f, 0.7f)), frand(110, 280)), 0.28f, 0.28f,
                 frand(1.2f, 2.6f), k % 3 ? Color{ 255, 244, 200, 255 } : Color{ 255, 190, 90, 255 }, 0, true });
     }
-    if (hitAny) { play(w.sfx); shake = fmaxf(shake, 0.14f); hitStop = HIT_FREEZE; }
+    if (hitAny) { play(w.sfx); shake = fmaxf(shake, critAny ? 0.22f : 0.14f); hitStop = critAny ? HIT_FREEZE * 1.6f : HIT_FREEZE; }
 }
 
 void Game::hitEnemy(Enemy& e, int damage, Color fx) {
@@ -1323,7 +1337,7 @@ void Game::killEnemy(Enemy& e) {
     corpse.dying = true; corpse.deathT = 0; corpse.hitFlash = 0; corpse.atkAnim = 0; corpse.burnT = 0;
     corpses.push_back(corpse);
     int n = e.bossForm == 0 ? 12 + 2 * floor : e.bossForm > 0 ? 1 : 1 + GetRandomValue(0, 2);
-    n += champ().extraCoins;
+    n += champ().extraCoins + killCoins();
     if (champ().killHeal > 0 && player.hp < player.maxHp) {   // Vanessa: a kill gives her a little back
         player.hp = fminf(player.maxHp, player.hp + champ().killHeal);
         for (int k = 0; k < 3; ++k)
@@ -1557,6 +1571,26 @@ void Game::buyWeapon(int i) {
     else { shopMsg = std::string("Equipped ") + w.name; play("ui"); }
     player.weapon = i;
     shopMsgT = 1.5f;
+}
+
+int Game::sellPrice(int i) const {
+    int gold = WEAPONS[i].price;
+    for (int u = 0; u < UPGRADE_COUNT; ++u) {
+        int level = player.upgrades[i][u];
+        gold += UPGRADES[u].gold * level * (level + 1) / 2;     // each level cost gold x the level it went to
+    }
+    return gold;
+}
+
+void Game::sellWeapon(int i) {
+    if (i <= 0 || i >= WEAPON_COUNT || !player.owns(i)) return;     // the Rusty Sword stays with you
+    int gold = sellPrice(i);
+    player.gold += gold;
+    player.weaponsOwned &= ~(1u << i);
+    for (int& level : player.upgrades[i]) level = 0;    // the packs smoked on it stay smoked
+    if (player.weapon == i) player.weapon = 0;
+    shopMsg = TextFormat("Sold %s for %d g", WEAPONS[i].name, gold); shopMsgT = 1.8f;
+    play("coin");
 }
 
 void Game::buyUpgrade(int u) {

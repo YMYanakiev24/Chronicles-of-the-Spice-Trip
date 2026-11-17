@@ -23,6 +23,12 @@ namespace {
         return false;
     }
 
+    // Is something with this label on screen (drawn last frame)?
+    bool clickable(const char* label) {
+        for (auto& h : ui::hits()) if (h.label == label) return true;
+        return false;
+    }
+
     void aimAt(Game& g, Vector2 world) { in::moveMouse(GetWorldToScreen2D(world, g.camera())); }
 
     // Walk into the first room that matches, as if through its door.
@@ -748,32 +754,70 @@ void Autopilot::build() {
         for (auto& tx : g.weaponTex) armed = armed && tx.id;
         check("every weapon has its own art", armed);
         shot(g, "galin");
-        return clickLabel("50 g");              // the Iron Sword
+        bool tiles = true;
+        for (auto& w : WEAPONS) tiles = tiles && clickable(TextFormat("weapon %s", w.name));
+        check(TextFormat("Galin shows all %d weapons", WEAPON_COUNT), tiles);
+        return clickLabel("weapon Iron Sword");
+    });
+    add("iron sword picked", 3, [this](Game& g, float t) {
+        if (t < 0.2f) return false;
+        check("tapping a weapon shows it", g.galinPick == 1);
+        return clickLabel("Buy: 50 g");
     });
     add("weapon bought", 3, [this](Game& g, float t) {
         if (t < 0.2f) return false;
         check("buying the Iron Sword puts it in hand", g.player.weapon == 1 && g.player.owns(1) && g.player.gold == 150);
         markF = (float)g.bladeDamage();
+        bool rows = true;
+        for (auto& u : UPGRADES) rows = rows && clickable(TextFormat("%s: 1 pack, %d g", u.name, u.gold));
+        check(TextFormat("every upgrade (%d) can be bought for the weapon in hand", UPGRADE_COUNT), rows);
         return clickLabel("Sharpen: 1 pack, 25 g");
     });
     add("no pack", 3, [this](Game& g, float t) {
         if (t < 0.2f) return false;
         check("no cigarette pack, no upgrade", g.player.upgrades[1][UP_SHARPEN] == 0 && g.player.gold == 150);
-        g.player.packs = 2;
+        g.player.packs = 3;
         return clickLabel("Sharpen: 1 pack, 25 g");
     });
     add("upgraded", 3, [this](Game& g, float t) {
         if (t < 0.2f) return false;
         check("an upgrade burns a pack and gold, and the weapon hits harder",
-            g.player.upgrades[1][UP_SHARPEN] == 1 && g.player.packs == 1 && g.player.gold == 125 && g.bladeDamage() == (int)markF + 3);
+            g.player.upgrades[1][UP_SHARPEN] == 1 && g.player.packs == 2 && g.player.gold == 125 && g.bladeDamage() == (int)markF + 3);
         shot(g, "galin-upgraded");
-        return clickLabel("Equip");             // back to the Rusty Sword
+        return clickLabel("weapon Dobrich Machete");
+    });
+    // selling: everything it cost in gold comes back
+    add("machete picked", 3, [this](Game& g, float t) {
+        if (t < 0.2f) return false;
+        return clickLabel("Buy: 70 g");
+    });
+    add("machete bought", 3, [this](Game& g, float t) {
+        if (t < 0.2f) return false;
+        check("a new sword: the Dobrich Machete", g.player.weapon == 7 && g.player.owns(7) && g.player.gold == 55);
+        return clickLabel("Hone: 1 pack, 30 g");
+    });
+    add("machete honed", 3, [this](Game& g, float t) {
+        if (t < 0.2f) return false;
+        check("Hone gives critical hits", g.player.upgrades[7][UP_KEEN] == 1 && g.critChance() == CRIT_PER_KEEN && g.player.gold == 25);
+        shot(g, "galin-sell");
+        return clickLabel("Sell: +100 g");
+    });
+    add("machete sold", 3, [this](Game& g, float t) {
+        if (t < 0.2f) return false;
+        check("selling gives back its price and its upgrades' gold, and the Rusty Sword comes back to hand",
+            g.player.gold == 125 && !g.player.owns(7) && g.player.weapon == 0 && g.player.upgrades[7][UP_KEEN] == 0 && g.player.packs == 1);
+        check("the Rusty Sword can't be sold", !clickable(TextFormat("Sell: +%d g", g.sellPrice(0))));
+        return clickLabel("weapon Iron Sword");
+    });
+    add("iron sword again", 3, [this](Game& g, float t) {
+        if (t < 0.2f) return false;
+        return clickLabel("Equip");
     });
     add("swap back", 3, [this](Game& g, float t) {
         if (t < 0.2f) return false;
         check("owned weapons swap for free, each with its own upgrades",
-            g.player.weapon == 0 && g.player.gold == 125 && g.player.upgrades[0][UP_SHARPEN] == 0 && g.player.upgrades[1][UP_SHARPEN] == 1);
-        return clickLabel("Equip");             // and the Iron Sword again
+            g.player.weapon == 1 && g.player.gold == 125 && g.player.upgrades[0][UP_SHARPEN] == 0 && g.player.upgrades[1][UP_SHARPEN] == 1);
+        return true;
     });
     add("leave galin", 3, [this](Game& g, float t) {
         if (t < 0.2f) return false;
@@ -812,15 +856,16 @@ void Autopilot::build() {
                 const WalkSheet& w = g.outfitLook(i, k);
                 sheets = sheets && &w != &g.walk[i] && w.frames == g.walk[i].frames && w.fw == g.walk[i].fw;
             }
-        check(TextFormat("every champion has every outfit (%d x %d)", CHAMPION_COUNT, OUTFIT_COUNT - 1), sheets);
+        check(TextFormat("every champion has outfits of their own (%d x %d)", CHAMPION_COUNT, OUTFIT_COUNT - 1), sheets);
         g.player.gold = 300;
         shot(g, "drip");
-        return clickLabel("outfit 1");          // the Drip Puffer, 150 g
+        return clickLabel("outfit 1");          // their first outfit
     });
     add("outfit bought", 3, [this](Game& g, float t) {
         if (t < 0.3f) return false;
         int c = g.player.champion;
-        check("buying the Drip Puffer takes 150 gold, and they put it on", g.player.gold == 150 && g.ownsOutfit(c, 1) && g.profile.outfit[c] == 1);
+        check(TextFormat("buying the %s takes %d gold, and they put it on", OUTFITS[c][1].name, OUTFITS[c][1].price),
+            g.player.gold == 300 - OUTFITS[c][1].price && g.ownsOutfit(c, 1) && g.profile.outfit[c] == 1);
         check("they walk in it now", &g.figure(c) == &g.dressed[c] && g.dressed[c].ok());
         shot(g, "drip-bought");
         return clickLabel("dress Momiche");
@@ -828,13 +873,14 @@ void Autopilot::build() {
     add("dress another", 3, [this](Game& g, float t) {
         if (t < 0.3f) return false;
         check("Beray dresses any champion", TextIsEqual(CHAMPIONS[g.dripChampion].name, "Momiche"));
-        return clickLabel("outfit 6");          // Ice Cold, 140 g
+        markF = (float)g.player.gold;
+        return clickLabel("outfit 2");          // her Pumpkin Patch
     });
     add("dressed another", 3, [this](Game& g, float t) {
         if (t < 0.3f) return false;
         int m = g.dripChampion;
         check("each champion's outfits are their own, and kept between runs",
-            g.player.gold == 10 && g.ownsOutfit(m, 6) && !g.ownsOutfit(m, 1) && save::readProfile().outfit[m] == 6);
+            g.player.gold == (int)markF - OUTFITS[m][2].price && g.ownsOutfit(m, 2) && !g.ownsOutfit(m, 1) && save::readProfile().outfit[m] == 2);
         shot(g, "drip-momiche");
         return clickLabel("outfit 0");          // back into her own clothes
     });
@@ -862,6 +908,42 @@ void Autopilot::build() {
             return true;
         });
     add("iron sword again", 1, [](Game& g, float) { g.player.weapon = 1; return true; });
+
+    // ===== what the swords and upgrades do in a swing =====
+    add("sword traits", 2, [this](Game& g, float t) {
+        if (t < 0.1f) return false;
+        Player keep = g.player;
+        auto swingAt = [&](int weapon, std::initializer_list<Vector2> at) {
+            g.enemies.clear();
+            for (Vector2 p : at) g.enemies.push_back(dummy({ ROOM_CENTER.x + p.x, ROOM_CENTER.y + p.y }));
+            g.player.pos = ROOM_CENTER; g.player.facing = { 1, 0 };
+            g.player.weapon = weapon; g.player.meleeCd = 0;
+            g.swingBlade();
+        };
+        auto lost = [&](int i) { return (int)(g.enemies[i].maxHp - g.enemies[i].hp); };
+        const int EMBER = 11, VAMPIRE = 10;
+        swingAt(EMBER, { { 30, 0 } });
+        check("the Ember Blade adds fire damage and sets them alight",
+            lost(0) >= g.bladeDamage() + WEAPONS[EMBER].fire && g.enemies[0].burnT > 0);
+        g.player.hp = 50;
+        swingAt(VAMPIRE, { { 30, -10 }, { 30, 10 } });
+        check("the Vampire Fang gives health back for every monster it cuts", g.player.hp == 50 + 2 * WEAPONS[VAMPIRE].leech);
+        g.player.upgrades[1][UP_ARC] = 0;
+        swingAt(1, { { 0, 30 } });
+        bool missed = lost(0) == 0;
+        g.player.upgrades[1][UP_ARC] = UPGRADE_MAX;
+        swingAt(1, { { 0, 30 } });
+        check("Arc reaches round your side", missed && lost(0) > 0);
+        g.player.upgrades[1][UP_POMMEL] = 2; g.player.upgrades[1][UP_GROOVE] = 1; g.player.hp = 50;
+        swingAt(1, { { 30, 0 } });
+        check("Pommel shoves harder and Fuller gives health back",
+            fabsf(Vector2Length(g.enemies[0].knock) - (WEAPONS[1].knockback + 2 * POMMEL_KNOCK) * KNOCK_DECAY) < 1 && g.player.hp == 51);
+        g.player.upgrades[1][UP_GILD] = 2;
+        check("Gild and the Gilded Rapier bring extra coins", g.killCoins() == 2 && (g.player.weapon = 8, g.killCoins() == WEAPONS[8].coins));
+        g.player = keep;
+        g.enemies.clear();
+        return true;
+    });
 
     // ===== the six floor bosses =====
     auto enterBoss = [this, add](int index) {

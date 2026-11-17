@@ -11,9 +11,11 @@
 #include <string>
 
 // Everything needed to resume a run. All members are trivially copyable.
-struct RunSave {
+// (P is the player as it was saved: Save.cpp still reads saves made before Player grew.)
+template <class P>
+struct RunSaveT {
     unsigned magic = 0;
-    Player   player;
+    P        player;
     Dungeon  dungeon;
     int      floor = 1, kills = 0;
     float    runTime = 0;
@@ -21,6 +23,7 @@ struct RunSave {
     bool     hardcore = false;
     RunStats stats;
 };
+using RunSave = RunSaveT<Player>;
 
 // Records kept between runs.
 struct Profile {
@@ -32,8 +35,9 @@ struct Profile {
     float    bestRush = 0;          // best Boss Rush time, 0 = none yet
     int      bestHardcore = 0;      // deepest floor reached in a hardcore run
     // Beray's outfits, per champion (room for more champions than there are)
-    unsigned outfitsOwned[32] = {};   // a bit per OUTFITS entry
+    unsigned outfitsOwned[32] = {};   // a bit per entry in the champion's OUTFITS row
     signed char outfit[32] = {};      // the one each champion wears
+    int      outfitsVersion = 0;      // 2: every champion has outfits of their own (before that, all wore the same six)
 };
 
 namespace save {
