@@ -3,6 +3,7 @@
 // ============================================================================
 #include "Touch.h"
 #include "Input.h"
+#include "Platform.h"
 #include "Ui.h"
 #include "raymath.h"
 #include <vector>
@@ -53,6 +54,12 @@ namespace touch {
         }
 
         void readPoints(std::vector<Vector2>& pos, std::vector<int>& ids) {
+#ifdef PLATFORM_WEB
+            platform::touches(pos, ids);                     // the browser's own list of fingers
+            if (pos.empty() && !platform::sawFinger() && IsMouseButtonDown(MOUSE_BUTTON_LEFT))
+                { pos.push_back(GetMousePosition()); ids.push_back(0); }     // ?touch=1 on a computer
+            return;
+#endif
             int n = GetTouchPointCount();
             for (int i = 0; i < n; ++i) { pos.push_back(GetTouchPosition(i)); ids.push_back(GetTouchPointId(i)); }
 #ifndef PLATFORM_ANDROID

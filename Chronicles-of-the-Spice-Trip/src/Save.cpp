@@ -2,6 +2,7 @@
 //  Save.cpp — binary save files.
 // ============================================================================
 #include "Save.h"
+#include "Platform.h"
 #include <cstdio>
 #include <cstring>
 #include <filesystem>
@@ -22,9 +23,14 @@ namespace save {
         template <typename T>
         bool writePod(const char* file, const T& value) {
             static_assert(std::is_trivially_copyable_v<T>);
-            std::ofstream out(path(file), std::ios::binary);
-            out.write((const char*)&value, sizeof value);
-            return out.good();
+            bool ok;
+            {
+                std::ofstream out(path(file), std::ios::binary);
+                out.write((const char*)&value, sizeof value);
+                ok = out.good();
+            }
+            platform::persist();             // a browser keeps it only once it's copied to its storage
+            return ok;
         }
 
         template <typename T>
@@ -62,7 +68,11 @@ namespace save {
 
     bool readRun(RunSave& run) { return readPod("savegame.dat", run, RUN_MAGIC); }
 
-    bool deleteRun() { return std::remove(path("savegame.dat").c_str()) == 0; }
+    bool deleteRun() {
+        bool ok = std::remove(path("savegame.dat").c_str()) == 0;
+        platform::persist();
+        return ok;
+    }
 
     bool hasRun() {
         static RunSave probe;

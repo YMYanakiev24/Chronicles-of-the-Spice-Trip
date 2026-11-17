@@ -73,6 +73,11 @@ static Texture2D loadCutout(const char* file, int minHole = 0) {
     return t;
 }
 
+#ifdef PLATFORM_WEB
+// In a browser it's the page that goes fullscreen; the canvas follows it (platform::fitWindow).
+bool isFullscreen() { return platform::browserFullscreen(); }
+void setFullscreen(bool on) { if (!touch::enabled() && on != isFullscreen()) platform::setBrowserFullscreen(on); }
+#else
 // Fullscreen is a borderless window one pixel taller than the monitor. A window that
 // exactly covers the monitor gets Windows' fullscreen fast path, and screen shares
 // (Discord, OBS window capture) then freeze on the last frame they saw.
@@ -99,6 +104,7 @@ void setFullscreen(bool on) {
     }
     g_fullscreen = on;
 }
+#endif
 
 void Game::init(bool windowed) {
     settings = save::readSettings();
@@ -203,11 +209,13 @@ void Game::frame() {
     float dt = fminf(GetFrameTime(), 0.05f);
     t += dt; clock += dt;
 
-    if (in::pressed(KEY_F11)) {
+#ifndef PLATFORM_WEB
+    if (in::pressed(KEY_F11)) {                     // a browser does its own F11
         setFullscreen(!isFullscreen());
         settings.fullscreen = isFullscreen();
         save::writeSettings(settings);
     }
+#endif
     bool video = screen == Screen::Video || (screen == Screen::Play && overlay == Overlay::Cutscene);
     music.vol = video ? 0.0f : 0.5f * settings.musicVol;   // a video has its own sound
     music.update();
