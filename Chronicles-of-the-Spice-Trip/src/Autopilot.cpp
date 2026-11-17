@@ -10,6 +10,7 @@
 #include "Touch.h"
 #include "Ui.h"
 #include <cmath>
+#include <cstdlib>
 
 namespace {
     // Click the button or card drawn last frame with this label.
@@ -79,12 +80,16 @@ namespace {
     }
 }
 
-void Autopilot::start(Game& g, const std::string& d) {
+void Autopilot::start(Game& g, const std::string& d, const std::string& coop, const std::string& address) {
     dir = d;
     log = fopen((dir + "/autopilot.log").c_str(), "w");
     in::setScripted(true);
     g.testMode = true;
-    build();
+    if (coop == "host") buildCoopHost();
+    else if (coop == "join") buildCoopJoin(address.empty() ? "127.0.0.1" : address);
+    else build();
+    if (const char* only = getenv("SPICE_AUTOPILOT_ONLY"))
+        std::erase_if(steps, [&](const Step& s) { return s.name.find(only) == std::string::npos; });
 }
 
 void Autopilot::check(const char* what, bool ok) {
@@ -140,6 +145,19 @@ void Autopilot::build() {
         if (t < 1.5f) return false;
         check("a click skips the video to the main menu", g.screen == Screen::Menu && !g.introVideo.playing());
         shot(g, "menu");
+        return true;
+    });
+    add("open co-op", 3, [](Game&, float t) { return t > 0.1f && clickLabel("Co-op"); });
+    add("co-op screen", 3, [this](Game& g, float t) {
+        if (t < 1.0f) return false;
+        check("the menu's Co-op opens the co-op screen: host, or find a game", g.screen == Screen::Coop && !g.coop.active()
+            && g.coop.finder.listening());
+        shot(g, "coop-screen");
+        return clickLabel("X");
+    });
+    add("back from co-op", 3, [this](Game& g, float t) {
+        if (t < 0.3f) return false;
+        check("and back to the menu", g.screen == Screen::Menu && !g.coop.finder.listening());
         return true;
     });
     add("open champions", 3, [](Game&, float t) { return t > 0.1f && clickLabel("Champions"); });
@@ -1949,6 +1967,278 @@ void Autopilot::build() {
         check("a hardcore death ends the run with a summary and deletes the save", g.overlay == Overlay::Summary && !save::hasRun());
         shot(g, "summary");
         g.hardcore = false;
+        return true;
+    });
+}
+
+// ================================================================== co-op
+// Two copies of the game, started together: one hosts, one joins. The host
+// sets the scene and checks the world; the joiner plays from what it's sent,
+// presses its own keys, and checks what it sees.
+static constexpr int COOP_JOINER_CHAMPION = 3;
+
+void Autopilot::buildCoopHost() {
+    auto add = [&](const char* name, float timeout, std::function<bool(Game&, float)> run) {
+        steps.push_back({ name, timeout, std::move(run) });
+    };
+    add("host", 2, [this](Game& g, float) {
+        g.introVideo.close();
+        g.profile.champion = 0;
+        g.screen = Screen::Coop; g.t = 0;
+        g.coopHost();
+        check("co-op: this device hosts a game", g.coop.hosting() && g.coop.server.running());
+        return true;
+    });
+    add("a joiner arrives", 40, [this](Game& g, float t) {
+        if (!g.heroes[1].present || t < 0.2f) return false;
+        check("co-op: a joiner takes the second seat", g.coop.welcomed[1] && g.heroes[1].name == "P2");
+        return true;
+    });
+    add("lobby", 6, [this](Game& g, float t) {
+        if (t < 1.5f) return false;
+        check("co-op: the joiner's champion shows in the lobby", g.heroes[1].player.champion == COOP_JOINER_CHAMPION);
+        shot(g, "coop-lobby");
+        return clickLabel("Begin the run");
+    });
+    add("the run begins", 4, [this](Game& g, float t) {
+        if (t < 1.0f) return false;
+        check("co-op: Begin the run starts it for both", g.screen == Screen::Play && g.coop.started && g.heroes[1].present
+            && g.heroes[1].player.champion == COOP_JOINER_CHAMPION && g.heroes[1].player.hp > 0);
+        shot(g, "coop-host-start");
+        markX = g.heroes[1].player.pos.x;
+        return true;
+    });
+    add("the joiner walks", 10, [this](Game& g, float t) {
+        if (g.heroes[1].player.pos.x > markX - 40) return false;
+        check("co-op: the joiner's keys move their hero on the host", t < 10);
+        return true;
+    });
+    add("a fight", 14, [this](Game& g, float t) {
+        keepAlive = true;
+        Hero& j = g.heroes[1];
+        if (t == 0) {
+            goToRoom(g, isCombatRoom);                 // the party, into a fight
+            g.enemies.clear();
+            g.player.pos = { ROOM_CENTER.x - 220, ROOM_CENTER.y };
+            j.player.pos = { ROOM_CENTER.x + 120, ROOM_CENTER.y };
+            j.player.hp = j.player.maxHp; j.player.invuln = 0;
+            Enemy e = dummy({ ROOM_CENTER.x + 175, ROOM_CENTER.y });   // close to the joiner, far from the host
+            e.speed = 50; e.dmg = 6; e.hp = e.maxHp = 2000; e.xp = 10;   // (too tough to fall before it bites)
+            g.enemies.push_back(e);
+            g.inFight = true;
+            markF = (float)j.player.gold;
+            markB = markC = false;
+            return false;
+        }
+        if (t > 1.0f && !markB) { shot(g, "coop-host-fight"); markB = true; }
+        if (!markC) {
+            if (j.player.hp >= j.player.maxHp && t < 6) return false;
+            check("co-op: a monster goes for the nearest hero (the joiner)", j.player.hp < j.player.maxHp);
+            for (auto& e : g.enemies) e.hp = fminf(e.hp, 5);   // now one blow finishes it
+            markC = true;
+            return false;
+        }
+        if (!g.enemies.empty() && t < 12) return false;
+        check("co-op: the joiner's blade kills it on the host", g.enemies.empty() && g.kills > 0);
+        return true;
+    });
+    add("loot to the joiner", 4, [this](Game& g, float t) {
+        if (t < 2.5f) return false;
+        check("co-op: the coins fly to the joiner, who's nearest", g.heroes[1].player.gold > (int)markF);
+        check("co-op: everyone shares the experience", g.player.xp > 0 && g.heroes[1].player.xp == g.player.xp);
+        return true;
+    });
+    add("knocked out", 6, [this](Game& g, float t) {
+        keepAlive = false;
+        if (t == 0) {
+            Enemy e = dummy({ ROOM_CENTER.x - 300, ROOM_CENTER.y - 100 });   // keeps the room from being won
+            g.enemies.push_back(e);
+            g.inFight = true;
+            g.heroes[1].player.hp = 0;
+            return false;
+        }
+        if (t < 1.0f) return false;
+        check("co-op: a hero at no health is knocked out, not dead", g.heroes[1].downT > 0 && g.heroes[1].present && g.screen == Screen::Play);
+        check("co-op: monsters leave a knocked-out hero alone", g.nearestHero({ ROOM_CENTER.x + 120, ROOM_CENTER.y }) == 0);
+        shot(g, "coop-host-down");
+        return true;
+    });
+    add("back up", 4, [this](Game& g, float t) {
+        if (t == 0) { g.enemies.front().hp = 0; return false; }   // the room is won...
+        if (g.heroes[1].player.hp <= 0 && t < 3.5f) return false;
+        check("co-op: ...and they get back up", g.heroes[1].player.hp > 0 && g.heroes[1].downT == 0);
+        return true;
+    });
+    add("the joiner shops", 10, [this](Game& g, float t) {
+        Hero& j = g.heroes[1];
+        if (t == 0) {
+            j.hall.active = true; j.hall.place = castle::MARIN; j.hall.pos = { 1100, 520 };
+            j.overlay = Overlay::Shop;
+            j.player.gold = 100; j.player.potions[0] = 0;
+            return false;
+        }
+        if (j.player.potions[0] == 0 || j.overlay != Overlay::None) return false;
+        check("co-op: what a joiner buys is bought on the host", j.player.potions[0] == 1 && j.player.gold == 100 - SHOP_ITEMS[0].price);
+        check("co-op: closing the shop on the joiner closes it on the host", j.overlay == Overlay::None);
+        return true;
+    });
+    add("out of the castle", 3, [this](Game& g, float t) {
+        if (t == 0) { g.useHero(1); g.leaveCastle(); g.useHero(0); return false; }
+        if (t < 0.5f) return false;
+        check("co-op: out of the castle, the joiner stands beside the party", !g.heroes[1].hall.active
+            && Vector2Distance(g.heroes[1].player.pos, g.player.pos) < 40);
+        return true;
+    });
+    add("through a door", 6, [this](Game& g, float t) {
+        static int fromX, fromY;
+        if (t == 0) {
+            Room& r = g.dungeon.cur();
+            fromX = g.dungeon.cx; fromY = g.dungeon.cy;
+            float dcx = (ROOM_TW / 2) * TILE + TILE * 0.5f, dcy = (ROOM_TH / 2) * TILE + TILE * 0.5f;
+            Vector2 at = (r.doors & DIR_E) ? Vector2{ (ROOM_TW - 1) * TILE - 4.0f, dcy } : (r.doors & DIR_W) ? Vector2{ TILE + 4.0f, dcy }
+                       : (r.doors & DIR_N) ? Vector2{ dcx, TILE + 4.0f } : Vector2{ dcx, (ROOM_TH - 1) * TILE - 4.0f };
+            g.dungeon.keyFound = g.dungeon.silverFound = true;   // no locked door in the way
+            g.player.pos = at;
+            return false;
+        }
+        if (g.dungeon.cx == fromX && g.dungeon.cy == fromY) return false;
+        if (t < 0.6f) return false;
+        check("co-op: through a door, the whole party goes", Vector2Distance(g.heroes[1].player.pos, g.player.pos) < 40);
+        shot(g, "coop-host-next-room");
+        return true;
+    });
+    add("the joiner leaves", 25, [this](Game& g, float t) {
+        if (g.heroes[1].present) return false;
+        check("co-op: a joiner leaving frees their seat, and the host plays on", !g.coop.welcomed[1] && g.screen == Screen::Play
+            && g.coop.hosting());
+        (void)t;
+        return true;
+    });
+    add("a boss fight on the wire", 8, [this](Game& g, float t) {
+        static size_t most, total; static int frames, mostParts;
+        keepAlive = true;
+        if (t == 0) {
+            most = total = 0; frames = mostParts = 0;
+            for (int s = 0; s < 3; ++s) g.dungeon.generate();   // a floor whose boss throws plenty about
+            g.floor = 2;
+            goToRoom(g, [](const Room& r) { return r.isBoss; });
+            return false;
+        }
+        std::vector<uint8_t> snap;
+        g.writeSnapshot(snap);
+        most = std::max(most, snap.size()); total += snap.size(); frames++;
+        mostParts = std::max(mostParts, (int)g.parts.size());
+        if (t < 5) return false;
+        // and the worst a room could get: a crowd, spells everywhere, the air thick with sparks
+        for (int i = 0; i < 30; ++i) g.spawnMonster(i % 10, 1.0f);
+        for (int i = 0; i < 60; ++i) { Projectile p; p.pos = { 300.0f + i, 200 }; p.vel = { 100, 0 }; p.school = "Fire"; g.shots.push_back(p); }
+        for (int i = 0; i < 800; ++i) g.parts.push_back({ { 100.0f + i % 400, 100.0f + i / 4 }, { 0, 0 }, 1, 1, 3, WHITE });
+        std::vector<uint8_t> crowd;
+        g.writeSnapshot(crowd);
+        if (log) { fprintf(log, "note  boss fight snapshots: %d bytes on average, %d at most (%d particles at most); a packed room: %d bytes\n",
+            (int)(total / std::max(1, frames)), (int)most, mostParts, (int)crowd.size()); fflush(log); }
+        check("co-op: a boss fight's snapshots are small enough for 60 a second over Wi-Fi", most < 16 * 1024 && g.fight.active());
+        check("co-op: even a packed room's snapshot stays small", crowd.size() < 48 * 1024);
+        keepAlive = false;
+        return true;
+    });
+    add("leave", 2, [this](Game& g, float t) {
+        if (t < 0.3f) return false;
+        g.toMenu();
+        check("co-op: leaving the game goes back to the menu, alone", g.screen == Screen::Menu && !g.coop.active() && g.heroCount == 1);
+        return true;
+    });
+}
+
+void Autopilot::buildCoopJoin(const std::string& address) {
+    auto add = [&](const char* name, float timeout, std::function<bool(Game&, float)> run) {
+        steps.push_back({ name, timeout, std::move(run) });
+    };
+    add("look for a game", 12, [this](Game& g, float t) {
+        if (t == 0) { g.introVideo.close(); g.profile.champion = COOP_JOINER_CHAMPION; g.screen = Screen::Coop; g.t = 0; return false; }
+        const auto& games = g.coop.finder.games();     // the co-op screen listens for hosts
+        if (games.empty() && t < 10) return false;
+        check("co-op: the host's game shows up on the network", !games.empty());
+        shot(g, "coop-find");
+        return true;
+    });
+    add("join it", 2, [this, address](Game& g, float t) {
+        if (t < 0.2f) return false;
+        const auto& games = g.coop.finder.games();
+        if (!games.empty()) return clickLabel("Join");   // its Join button, as a player would
+        g.coopJoin(address);
+        return true;
+    });
+    add("seated", 30, [this, address](Game& g, float t) {
+        if (!g.coop.active() && fmodf(t, 1.0f) < 0.05f) g.coopJoin(address);   // the host may still be starting
+        if (!g.coop.seated) return false;
+        check("co-op: the host takes us in", g.coop.mySeat == 1 && g.screen == Screen::Coop);
+        return true;
+    });
+    add("joiner lobby", 4, [this](Game& g, float t) {
+        if (t < 1.0f) return false;
+        check("co-op: the lobby shows the host", g.heroes[0].present && g.heroes[0].player.champion == 0 && g.heroes[1].present);
+        shot(g, "coop-lobby-joiner");
+        return true;
+    });
+    add("the run arrives", 40, [this](Game& g, float t) {
+        if (g.screen != Screen::Play || !g.coop.haveWorld || t < 0.5f) return false;
+        check("co-op: the world comes from the host", g.coop.started && g.dungeon.cur().isStart && g.heroes[0].present
+            && g.player.champion == COOP_JOINER_CHAMPION && g.curHero == 1);
+        shot(g, "coop-joiner-start");
+        return true;
+    });
+    add("walk left", 3, [this](Game& g, float t) {
+        in::hold(g.settings.keys.left, t < 1.5f);
+        return t > 2.0f;
+    });
+    // From here the host sets each scene; the joiner plays it and looks.
+    add("play along", 90, [this](Game& g, float t) {
+        static bool sawFight, sawDown, upAgain, bought, closed, shopShot, followed;
+        static int fightX, fightY;
+        static float followedT;
+        if (t == 0) { sawFight = sawDown = upAgain = bought = closed = shopShot = followed = false; fightX = fightY = -1; followedT = 0; }
+        // swing at whatever's nearest
+        if (!g.enemies.empty() && g.overlay == Overlay::None && g.player.hp > 0) {
+            const Enemy* best = nullptr; float bd = 1e9f;
+            for (auto& e : g.enemies) if (e.alive && Vector2Distance(e.pos, g.player.pos) < bd) { bd = Vector2Distance(e.pos, g.player.pos); best = &e; }
+            if (best && bd < 90) { aimAt(g, best->pos); in::click(MOUSE_BUTTON_LEFT); }
+        }
+        if (!sawFight && g.enemies.size() == 1 && !g.dungeon.cur().isStart) {
+            sawFight = true; fightX = g.dungeon.cx; fightY = g.dungeon.cy; markF = t;
+            check("co-op: the joiner sees the host's monsters", g.enemies.front().alive);
+        }
+        if (sawFight && markF > 0 && t > markF + 1.0f) { shot(g, "coop-joiner-fight"); markF = -1; }
+        if (!sawDown && g.player.hp <= 0) {
+            sawDown = true;
+            shot(g, "coop-joiner-down");
+            check("co-op: the joiner sees themselves knocked out", g.heroDownT > 0);
+        }
+        if (sawDown && !upAgain && g.player.hp > 0) { upAgain = true; check("co-op: the joiner gets back up", true); }
+        if (g.overlay == Overlay::Shop && !bought) {   // the host opened Marin's for us: buy a potion
+            if (!shopShot) { shot(g, "coop-joiner-shop"); shopShot = true; }
+            check("co-op: the joiner is in the castle on its own", g.hall.active && g.hall.place == castle::MARIN && !g.heroes[0].hall.active);
+            g.buy(0);
+            bought = true;
+        }
+        if (bought && !closed && g.player.potions[0] == 1) {
+            check("co-op: the potion bought shows in the joiner's belt", true);
+            in::tap(KEY_ESCAPE);                        // and out of the shop
+            closed = true;
+        }
+        if (closed && fightX >= 0 && !followed && (g.dungeon.cx != fightX || g.dungeon.cy != fightY)) { followed = true; followedT = t; }
+        if (followed && t > followedT + 1.0f) {
+            check("co-op: the joiner follows the party into the next room", !g.hall.active
+                && Vector2Distance(g.player.pos, g.heroes[0].player.pos) < 40);
+            shot(g, "coop-joiner-next-room");
+            return true;
+        }
+        return false;
+    });
+    add("the joiner leaves", 3, [this](Game& g, float t) {
+        if (t < 0.3f) return false;
+        g.toMenu();
+        check("co-op: leaving puts the joiner back on the menu, alone", g.screen == Screen::Menu && !g.coop.active() && g.heroCount == 1);
         return true;
     });
 }

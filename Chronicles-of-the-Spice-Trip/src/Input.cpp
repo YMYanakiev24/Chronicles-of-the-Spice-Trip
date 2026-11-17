@@ -15,17 +15,20 @@ namespace in {
         bool g_vHeld[KEYS] = {}, g_vTapped[KEYS] = {}, g_vMouse[BUTTONS] = {};
         bool g_captured = false;
         std::deque<int> g_queue;
+        const Remote* g_remote = nullptr;   // co-op: a joiner's hero is being moved
 
         bool validKey(int k) { return k > 0 && k < KEYS; }
         bool validButton(int b) { return b >= 0 && b < BUTTONS; }
     }
 
     bool down(int key) {
+        if (g_remote) return validKey(key) && (g_remote->held[key] || g_remote->tapped[key]);
         if (!g_scripted) return IsKeyDown(key) || (validKey(key) && g_vHeld[key]);
         return validKey(key) && (g_held[key] || g_tapped[key]);
     }
 
     bool pressed(int key) {
+        if (g_remote) return validKey(key) && g_remote->tapped[key];
         if (!g_scripted) {
             if (key == KEY_ESCAPE && IsKeyPressed(KEY_BACK)) return true;      // Android's back gesture
             return IsKeyPressed(key) || (validKey(key) && g_vTapped[key]);
@@ -34,6 +37,7 @@ namespace in {
     }
 
     int nextKey() {
+        if (g_remote) return 0;
         if (!g_scripted) return GetKeyPressed();
         if (g_queue.empty()) return 0;
         int k = g_queue.front(); g_queue.pop_front();
@@ -41,6 +45,7 @@ namespace in {
     }
 
     bool mouseDown(int button) {
+        if (g_remote) return validButton(button) && (g_remote->mouseHeld[button] || g_remote->mouseTapped[button]);
         if (!g_scripted) {
             if (g_captured) return validButton(button) && g_vMouse[button];
             return IsMouseButtonDown(button);
@@ -49,6 +54,7 @@ namespace in {
     }
 
     bool mousePressed(int button) {
+        if (g_remote) return validButton(button) && g_remote->mouseTapped[button];
         if (!g_scripted) {
             if (g_captured) return validButton(button) && g_vMouse[button];    // holding keeps swinging
             return IsMouseButtonPressed(button);
@@ -56,7 +62,10 @@ namespace in {
         return validButton(button) && g_mouseTapped[button];
     }
 
-    Vector2 mouse() { return g_scripted ? g_mouse : GetMousePosition(); }
+    Vector2 mouse() { return g_remote ? g_remote->mouse : g_scripted ? g_mouse : GetMousePosition(); }
+
+    void setRemote(const Remote* r) { g_remote = r; }
+    const Remote* remote() { return g_remote; }
 
     void clearVirtual() {
         for (auto& k : g_vHeld) k = false;

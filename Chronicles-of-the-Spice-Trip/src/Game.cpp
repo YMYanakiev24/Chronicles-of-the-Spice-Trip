@@ -10,6 +10,7 @@
 #include "rlgl.h"
 #include <algorithm>
 #include <cmath>
+#include <cstring>
 
 // ---------------------------------------------------------------- lifetime
 static Texture2D loadArt(const char* file) {
@@ -195,6 +196,9 @@ void Game::shutdown() {
 void Game::play(const char* sfx) {
     auto it = sounds.find(sfx);
     if (it == sounds.end()) return;
+    if (coop.hosting() && coop.started && strcmp(sfx, "ui") != 0 && coop.sounds.size() < 24
+        && std::find(coop.sounds.begin(), coop.sounds.end(), sfx) == coop.sounds.end())
+        coop.sounds.push_back(sfx);                 // co-op: the joiners hear it too
     SetSoundVolume(it->second, settings.sfxVol);
     PlaySound(it->second);
 }
@@ -230,6 +234,7 @@ void Game::frame() {
     music.vol = video ? 0.0f : 0.5f * settings.musicVol;   // a video has its own sound
     music.update();
 
+    if (coop.active()) coopNetwork();               // co-op: what came in, and the lobby
     touch::update(screen == Screen::Play && overlay == Overlay::None, settings.keys);
     ui::beginFrame();
     BeginDrawing();
@@ -243,6 +248,7 @@ void Game::frame() {
     case Screen::Controls:  controlsScreen(); break;
     case Screen::Intro:     introScreen(); break;
     case Screen::Play:      playScreen(); break;
+    case Screen::Coop:      coopScreen(); break;
     }
     if (touch::enabled()) touch::draw(settings.keys);
     else if (!video) drawCursor();
@@ -259,7 +265,7 @@ void Game::frame() {
 }
 
 // -------------------------------------------------------------------- runs
-static Player freshPlayer(int champion, int level) {
+Player freshPlayer(int champion, int level) {
     Player p;
     p.champion = champion;
     for (int l = 1; l < level; ++l) { p.maxHp += 18; p.maxMana += 10; }
@@ -333,6 +339,7 @@ bool Game::saveRun() {
 }
 
 void Game::toMenu() {
+    if (coop.active()) coopLeave();                 // co-op: leaving the game (the host's leaving ends it)
     cutscene.close();
     hall = castle::Hall{};
     hunt = toilet::Level{};
@@ -346,6 +353,7 @@ void Game::toMenu() {
 void Game::saveProfile() { save::writeProfile(profile); }
 
 void Game::showBanner(const std::string& text, const std::string& sub, float seconds) {
+    if (coop.active() && hall.active) return;       // co-op: the castle is one hero's; the banner is everyone's
     bannerText = text; bannerSub = sub; banner = seconds;
 }
 
@@ -363,10 +371,12 @@ float Game::diffDmg() const { return mode == Mode::Run ? DIFFICULTIES[difficulty
 
 void Game::autosave() {
     autosaveT = 0;
+    if (coop.active()) return;                      // a co-op run isn't saved
     if (mode == Mode::Run && screen == Screen::Play && player.hp > 0) saveRun();
 }
 
 void Game::hapticBuzz(int ms) {
+    if (coop.active() && curHero != localHero) return;   // someone else's hero: their phone buzzes
     if (settings.vibrate && touch::enabled()) platform::vibrate(ms);
 }
 
@@ -377,11 +387,17 @@ void Game::enterRoom() {
     parts.clear(); popups.clear(); coins.clear(); floaters.clear();
     fight.end();
     flashes.clear(); arcs.clear(); cracks.clear(); spikes.clear(); rubble.clear();
-    lasers.clear(); gymT = 0; slingT = 0; throwT = 0; punchT = 0; newShots.clear();
+    lasers.clear(); newShots.clear();
     skyFlash = 0; finaleT = 0; slowMo = 0; rewardT = 0;
     chestOpenT = 99; chestLight = 0; chestLooting = false;
-    castT = 0; hitStop = 0; challengeT = 0;
-    if (overlay == Overlay::Shop || overlay == Overlay::Galin || overlay == Overlay::Casino || overlay == Overlay::Drip) overlay = Overlay::None;
+    hitStop = 0; challengeT = 0;
+    int me = curHero;
+    for (int h = 0; h < heroCount; ++h) {          // whatever they were in the middle of stops at the door
+        if (coop.active()) { if (h != curHero && (!heroes[h].present || heroes[h].hall.active)) continue; useHero(h); }
+        gymT = 0; slingT = 0; throwT = 0; punchT = 0; castT = 0;
+        if (overlay == Overlay::Shop || overlay == Overlay::Galin || overlay == Overlay::Casino || overlay == Overlay::Drip) overlay = Overlay::None;
+    }
+    useHero(me);
 
     Room& r = dungeon.cur();
     if (r.isTreasure && !r.visited) showBanner("Treasure room", "Press E to open the hoard", 2.0f);
@@ -484,10 +500,18 @@ void Game::descend() {
     profile.deepestFloor = std::max(profile.deepestFloor, floor);
     saveProfile();
     dungeon.generate();
-    player.hp = fminf(player.maxHp, player.hp + 30);    // a breather between floors
-    player.pos = ROOM_CENTER;
-    overlay = Overlay::None;
-    dialogue.clear(); vasilGreetT = 9; vasilBowT = 0;
+    int me = curHero;
+    for (int h = 0; h < heroCount; ++h) {          // everyone comes down (from the castle too)
+        if (coop.active()) { if (!heroes[h].present && h != curHero) continue; useHero(h); }
+        player.hp = player.hp > 0 ? fminf(player.maxHp, player.hp + 30) : player.maxHp * 0.5f;    // a breather between floors
+        player.pos = coop.active() ? Vector2{ ROOM_CENTER.x + (h % 2 ? 28.0f : -28.0f) * (h > 0), ROOM_CENTER.y + (h > 1 ? 28.0f : 0.0f) } : ROOM_CENTER;
+        overlay = Overlay::None;
+        hall.active = false;
+        dialogue.clear();
+        heroDownT = 0;
+    }
+    useHero(me);
+    vasilGreetT = 9; vasilBowT = 0;
     enterRoom();
     showBanner(THEMES[theme()].name, TextFormat("Floor %d  -  %s waits at the bottom", floor, currentBoss().name), 2.8f);
     play("ultimate");

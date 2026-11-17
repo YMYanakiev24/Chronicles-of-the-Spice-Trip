@@ -88,6 +88,12 @@ void Game::leaveCastle() {
     overlay = Overlay::None;
     castleDoorCd = 0.5f;                            // the E that brought you out doesn't take you straight back in
     player.pos = CASTLE_DOOR_FRONT; player.facing = { 0, 1 }; heroMoveDir = { 0, 1 };
+    if (coop.active() && !dungeon.cur().isStart)    // co-op: the party has moved on; come out beside them
+        for (int h = 0; h < heroCount; ++h)
+            if (h != curHero && heroes[h].present && !heroes[h].hall.active) {
+                player.pos = moveInRoom(heroes[h].player.pos, { 0, 18 }, PLAYER_R, dungeon.cur(), true);
+                break;
+            }
     play("lid");
     autosave();                                     // what you bought is kept
 }
@@ -107,14 +113,14 @@ void Game::openKeeper(int p) {
     play("ui");
     switch (p) {
     case MARIN: overlay = Overlay::Shop; break;
-    case GALIN: galinPick = player.weapon; overlay = Overlay::Galin; break;
+    case GALIN: if (curHero == localHero) galinPick = player.weapon; overlay = Overlay::Galin; break;
     case CASINO: {
         int bet = wheel.bet, pick = wheel.pick;     // remember the last stake and colour
         wheel = Wheel{}; wheel.casino = true; wheel.bet = bet; wheel.pick = pick;
         overlay = Overlay::Casino;
         break;
     }
-    case DRIP: dripChampion = player.champion; dripHover = -1; overlay = Overlay::Drip; break;
+    case DRIP: if (curHero == localHero) { dripChampion = player.champion; dripHover = -1; } overlay = Overlay::Drip; break;
     default: break;
     }
 }
@@ -123,7 +129,7 @@ void Game::updateCastle(float dt) {
     Hall& H = hall;
     const PlaceDef& P = place(H.place);
     Keybinds& K = settings.keys;
-    if (banner > 0) banner -= dt;
+    if (!coop.active() && banner > 0) banner -= dt;     // (in co-op the world's clock runs it down)
     H.shown += dt;
 
     Vector2 mv{ 0, 0 };
@@ -197,7 +203,7 @@ void Game::drawCastle() {
     float fw = 24 * 1.4f * P.figure, fh = 32 * 1.4f * P.figure;
     drawShadow({ H.pos.x, H.pos.y - 6 * P.figure / 2 }, 11 * P.figure);
     if (w.ok()) w.draw(facingOf(H.face), w.frameAt(H.moving, clock), { H.pos.x - fw / 2, H.pos.y - fh, fw, fh });
-    else drawHero({ H.pos.x, H.pos.y - fh / 2 }, H.face, 0, false, champ().cloak);
+    else ::drawHero({ H.pos.x, H.pos.y - fh / 2 }, H.face, 0, false, champ().cloak);
 
     if (H.place == DRIP) {                                  // a glint off Beray's chain now and then
         float k = fmodf(clock, 2.6f);
@@ -273,6 +279,11 @@ void Game::drawCastleHud() {
 
 // ------------------------------------------------------------------ Beray's outfits
 const WalkSheet& Game::figure(int champion) const {
+    if (coop.active() && heroOutfit >= 0 && champion == player.champion) {   // co-op: in what that player wears
+        if (heroOutfit == 0 || heroOutfit >= OUTFIT_COUNT) return walk[champion];
+        const WalkSheet& w = const_cast<Game*>(this)->outfitLook(champion, heroOutfit);
+        return w.ok() ? w : walk[champion];
+    }
     int k = profile.outfit[champion];
     if (k > 0 && k < OUTFIT_COUNT && dressed[champion].ok()) return dressed[champion];
     return walk[champion];
@@ -299,6 +310,16 @@ bool Game::ownsOutfit(int champion, int outfit) const {
 
 void Game::buyOutfit(int champion, int outfit) {
     const OutfitDef& o = OUTFITS[champion][outfit];
+    if (coop.joined()) {                            // co-op: the wardrobe is this device's, the gold is on the host
+        if (ownsOutfit(champion, outfit)) {
+            wearOutfit(champion, outfit); play("ui");
+            if (champion == player.champion) sendCommand(Cmd::Wear, champion, outfit);
+            return;
+        }
+        if (player.gold >= o.price) { profile.outfitsOwned[champion] |= 1u << outfit; wearOutfit(champion, outfit); }
+        sendCommand(Cmd::BuyOutfit, champion, outfit);
+        return;
+    }
     if (ownsOutfit(champion, outfit)) { wearOutfit(champion, outfit); play("ui"); return; }
     if (player.gold < o.price) { shopMsg = "Not enough gold. Beray doesn't do credit."; shopMsgT = 2.0f; play("hurt"); return; }
     player.gold -= o.price;

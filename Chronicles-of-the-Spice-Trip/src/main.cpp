@@ -7,6 +7,8 @@
 //                        screenshots and a PASS/FAIL log in <dir>, then quit
 //    --savedir <dir>     keep saves somewhere other than the working directory
 //    --touch             show the phone controls (the mouse plays the fingers)
+//    --coop host|join    with --autopilot: one side of a co-op game instead. Start
+//    --address <ip>      a host and a joiner together; they play a run and check it
 //
 //  In a browser (PLATFORM_WEB) the page runs the frames: see web/ and PlatformWeb.cpp.
 // ============================================================================
@@ -30,10 +32,12 @@ static void webFrame() {
 #endif
 
 static int run(int argc, char** argv) {
-    std::string autopilotDir, saveDir;
+    std::string autopilotDir, saveDir, coopSide, coopAddress;
     for (int i = 1; i + 1 < argc; ++i) {
         if (!strcmp(argv[i], "--autopilot")) autopilotDir = argv[++i];
         else if (!strcmp(argv[i], "--savedir")) saveDir = argv[++i];
+        else if (!strcmp(argv[i], "--coop")) coopSide = argv[++i];          // with --autopilot: "host" or "join"
+        else if (!strcmp(argv[i], "--address")) coopAddress = argv[++i];    // the host a "join" autopilot joins
     }
     for (int i = 1; i < argc; ++i) if (!strcmp(argv[i], "--touch")) touch::setEnabled(true);
 #ifdef PLATFORM_ANDROID
@@ -85,7 +89,7 @@ static int run(int argc, char** argv) {
     Game game;
     game.init(autopilot);
     Autopilot pilot;
-    if (autopilot) pilot.start(game, autopilotDir);
+    if (autopilot) pilot.start(game, autopilotDir, coopSide, coopAddress);
 
     while (!WindowShouldClose() && !game.quit) {
         if (autopilot) pilot.step(game);                // this frame's scripted input

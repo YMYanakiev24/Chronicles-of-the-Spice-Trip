@@ -59,6 +59,7 @@ struct Projectile {
     Vector2  lastJag{};           // ...and where Stormbolt's trail has reached
     float    armAt = 0;           // flown this far before it can hit (grinders burst from a cluster)
     float    tick = 0;            // the Grinder Storm: seconds to its next grind
+    int      owner = -1;          // co-op: the hero who let it go (Game::heroes)
 };
 
 struct Enemy {
@@ -100,6 +101,7 @@ struct Enemy {
     bool    chaser = false;            // tiny copies just chase
     Vector2 look{ 0, 1 };              // Triceps: the way she faces as she walks
     int     pose = -1;                 // Triceps: the attack pose she strikes (-1: walking)
+    int     lastHit = -1;              // co-op: the hero who hit it last (the kill is theirs)
 };
 
 struct Particle {

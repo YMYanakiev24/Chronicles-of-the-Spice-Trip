@@ -34,4 +34,14 @@ namespace in {
     void releaseAll();
     void endFrame();                    // clears this frame's taps
 
+    // --- another player's input (co-op: the host runs a joiner's hero with what they press) ---
+    struct Remote {
+        static constexpr int KEYS = 512, BUTTONS = 8;
+        bool held[KEYS] = {}, tapped[KEYS] = {};
+        bool mouseHeld[BUTTONS] = {}, mouseTapped[BUTTONS] = {};
+        Vector2 mouse{};                // where they aim, in the world
+    };
+    void setRemote(const Remote* r);    // until set back to nullptr, every read above reads this
+    const Remote* remote();
+
 } // namespace in

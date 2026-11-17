@@ -103,6 +103,9 @@
     <ClCompile Include="src\Video.cpp" />
     <ClCompile Include="src\Toilet.cpp" />
     <ClCompile Include="src\Castle.cpp" />
+    <ClCompile Include="src\Net.cpp" />
+    <ClCompile Include="src\Coop.cpp" />
+    <ClCompile Include="src\CoopSync.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="include\Common.h" />
@@ -122,6 +125,9 @@
     <ClInclude Include="include\Video.h" />
     <ClInclude Include="include\Toilet.h" />
     <ClInclude Include="include\Castle.h" />
+    <ClInclude Include="include\Net.h" />
+    <ClInclude Include="include\Coop.h" />
+    <ClInclude Include="include\Wire.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
