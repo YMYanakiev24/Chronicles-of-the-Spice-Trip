@@ -1,10 +1,16 @@
-# Builds the Android APK. Pushing a tag like v0.1.0 also publishes it as a GitHub release.
+# Builds the Android APK. Pushing a tag like v0.1.0 also publishes it as a GitHub release,
+# and so does running it by hand (Actions > Android > Run workflow) with a version filled in.
 name: Android
 
 on:
   push:
     tags: ['v*']
   workflow_dispatch:
+    inputs:
+      version:
+        description: 'Publish as a release with this version (like v0.4.0). Leave empty to only build.'
+        required: false
+        default: ''
 
 permissions:
   contents: write
@@ -14,7 +20,16 @@ jobs:
     runs-on: ubuntu-latest
     env:
       PROJECT: Chronicles-of-the-Spice-Trip/android
+      # the release's tag: the one pushed, or the version asked for by hand (empty: no release)
+      RELEASE_TAG: ${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || inputs.version }}
     steps:
+      - name: Check the version
+        if: env.RELEASE_TAG != ''
+        run: |
+          if [[ ! "$RELEASE_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::The version should look like v0.4.0 (got '$RELEASE_TAG')"; exit 1
+          fi
+
       - uses: actions/checkout@v4
 
       - uses: actions/setup-java@v4
@@ -38,6 +53,7 @@ jobs:
             echo "$KEYSTORE_B64" | base64 -d > "$file"
             password="$KEYSTORE_PW"
           else
+            echo "::notice::Signed with a throwaway key: uninstall the old version before installing this one"
             password="$(openssl rand -hex 16)"
             keytool -genkeypair -keystore "$file" -storepass "$password" -keypass "$password" \
               -alias spicetrip -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Spice Trip"
@@ -50,7 +66,7 @@ jobs:
       - name: Build
         run: |
           export VERSION_CODE="$GITHUB_RUN_NUMBER"
-          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then export VERSION_NAME="${GITHUB_REF_NAME#v}"; fi
+          if [ -n "$RELEASE_TAG" ]; then export VERSION_NAME="${RELEASE_TAG#v}"; fi
           set -o pipefail
           gradle -p "$PROJECT" assembleRelease --console=plain --no-daemon 2>&1 | tee build.log
 
@@ -67,9 +83,11 @@ jobs:
           path: ChroniclesOfTheSpiceTrip.apk
 
       - name: Publish release
-        if: startsWith(github.ref, 'refs/tags/v')
+        if: env.RELEASE_TAG != ''
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ env.RELEASE_TAG }}
+          target_commitish: ${{ github.sha }}
           files: ChroniclesOfTheSpiceTrip.apk
           generate_release_notes: true
           body: |
@@ -78,3 +96,6 @@ jobs:
 
             Move with the left side of the screen. Blade, Cast, Roll and E are on the right, and
             tap a spell on the bar to select it.
+
+            Co-op: on the same Wi-Fi, play one run together with other phones or Windows PCs
+            (up to four players). Open Co-op from the main menu: one player hosts, the others join.

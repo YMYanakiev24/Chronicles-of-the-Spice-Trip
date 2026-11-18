@@ -504,7 +504,7 @@ python3 -m http.server -d build/web/site 8080      # then open http://localhost:
 
 ## Android app
 
-Pushing a tag like `v0.2.0` makes GitHub Actions build the APK (.github/workflows/android.yml) and publish it as a release. The Android project is in `Chronicles-of-the-Spice-Trip/android`. Run the desktop build with `--touch` to try the phone controls with the mouse.
+Pushing a tag like `v0.2.0` makes GitHub Actions build the APK (.github/workflows/android.yml) and publish it as a release. Without a tag: **Actions → Android → Run workflow**, type the version (like `v0.4.0`) and run it; it builds the APK and publishes the release with that tag. The Android project is in `Chronicles-of-the-Spice-Trip/android`. Run the desktop build with `--touch` to try the phone controls with the mouse.
 
 To sign every APK with the same key (so new versions install over old ones), add
 the repository secrets `ANDROID_KEYSTORE_BASE64` and `ANDROID_KEYSTORE_PASSWORD`.
