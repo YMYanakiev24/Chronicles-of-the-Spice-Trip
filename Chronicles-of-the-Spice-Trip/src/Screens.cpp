@@ -2,6 +2,7 @@
 //  Screens.cpp — the main menu, champion select, settings and the intro.
 // ============================================================================
 #include "Game.h"
+#include "Look.h"
 #include "Input.h"
 #include "Touch.h"
 #include "Render.h"
@@ -229,6 +230,18 @@ void Game::settingsScreen() {
     };
     slider(y + 34, "Music", settings.musicVol);
     slider(y + 66, "Effects", settings.sfxVol);
+
+    // --- the look: how chunky the pixels, and the dark lighting ---
+    static const char* PIXELS[] = { "Pixels: Smooth", "Pixels: Soft", "Pixels: Retro" };
+    float gx = x + pw - 68 - 176;
+    if (ui::button({ gx, y + 24, 176, 36 }, PIXELS[settings.pixels], settings.pixels ? ui::Style::Good : ui::Style::Normal)) {
+        settings.pixels = (settings.pixels + 1) % 3; play("ui");
+        look::configure(settings.pixels, settings.darkLight);
+    }
+    if (ui::button({ gx, y + 68, 176, 36 }, settings.darkLight ? "Lighting: Dark" : "Lighting: Plain", settings.darkLight ? ui::Style::Good : ui::Style::Normal)) {
+        settings.darkLight = !settings.darkLight; play("ui");
+        look::configure(settings.pixels, settings.darkLight);
+    }
 
     // --- screen and keys: the desktop's business ---
     if (!touch::enabled()) {

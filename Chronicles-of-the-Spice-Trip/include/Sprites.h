@@ -54,6 +54,9 @@ struct Sprites {
     Anim grinder, grinderBig;                  // Filqcheto's grinders (one frame each)
     Anim castleLadder;                         // the ladder up to the castle door: shut, open (tools/ladder.py)
     Anim bossStairs;                           // the stairwell down from a beaten boss, and its glow (tools/stairs.py)
+    Anim spikeTrap;                            // the floor spikes: down, tips, rising, up, glint, falling (tools/spikes.py)
+    Anim flamer;                               // the fire-thrower's nozzle: cold, warming, firing (tools/flamejet.py)
+    Texture2D flameJet{};                      // its flame: 8 frames x 5 rows of 76 x 24 (tools/flamejet.py)
     EnemyAnims enemy[12];                     // indexed by EnemyKind (skull slot unused)
 
     void load();

@@ -124,6 +124,8 @@ struct Game {
     int  sellPrice(int weapon) const;   // its price, and the gold its upgrades cost
     void buyUpgrade(int upgrade);       // for the weapon in hand
     Camera2D camera() const;
+    float pixelSize() const;            // one pixel of the world's canvas, in screen pixels (look::begin)
+    Color darkness() const;             // the dungeon's light where no torch reaches
     // the toilets after Triceps (Toilet.cpp)
     void startToilet();
     void updateToilet(float dt);

@@ -87,8 +87,19 @@ other; then co-op can't work on that network.
 
 - **The dungeon.** Each floor is a grid of single-screen rooms, and the whole
   room is always on screen. Doors stay barred until a room is cleared. There are
-  spike traps, chests, and a start room with Vasil the Storyteller and the ladder up to
-  the castle, where the shops are (see below).
+  chests, traps and a start room with Vasil the Storyteller and the ladder up to
+  the castle, where the shops are (see below). Spike traps are iron plates with
+  steel spikes that punch up out of the floor (their tips rattle in the holes for
+  half a second first); fire-throwers are iron spouts on the brick that cough
+  flame, then roar out a jet of fire up to four tiles long.
+- **The look.** The world is drawn into a small canvas and blown up with hard
+  edges, so the painted heroes, the spells and the fire share the chunky pixels of
+  the tiles (Settings > Pixels: Soft, Retro, or Smooth for the old look). Then
+  it's lit: a cold dark where nothing burns, warm pools under the torches,
+  candles and braziers, a little light round each hero, and every fireball,
+  flame jet, bolt and boss warning glowing as it goes. The castle's torches and
+  hearths, and Beray's neon, light their rooms too (Settings > Lighting: Dark or
+  Plain).
 - **Boss fights.** The last room of every floor holds a boss (see below). Once it
   falls, a stairwell of black stone opens in the middle of its lair: runes glowing
   round the rim, braziers burning either side, steps going down into a red light.
@@ -424,6 +435,7 @@ Chronicles-of-the-Spice-Trip/
     src/Play.cpp        movement, combat, champions, enemies, loot
     src/PlayDraw.cpp    the room, actors, HUD and overlays
     src/Screens.cpp     menu, champion select, settings, intro
+    src/Look.cpp        the pixel canvas the world is drawn into, and its lighting
   src/Bosses.cpp      the six bosses: table, attack patterns, drawing
   src/Champions.cpp   the champion roster (art, walking figures, perks and specials)
   src/Rooms.cpp       floor generation, room layouts, collision, pathfinding
@@ -449,6 +461,8 @@ Chronicles-of-the-Spice-Trip/
   tools/swords.py     draws the swords Galin sells
   tools/ladder.py     draws the ladder up to the castle door
   tools/stairs.py     draws the stairwell down from a beaten boss
+  tools/spikes.py     draws the spike trap
+  tools/flamejet.py   draws the fire-thrower's spout and its jet of flame
   vendor/raylib/      raylib headers and library
   vendor/pl_mpeg/     pl_mpeg, the MPEG-1 decoder (MIT, one header)
   android/            the Android app (Gradle; raylib is fetched when it builds)
@@ -465,7 +479,7 @@ hides from The Sergeant in the toilets (smoke, the pee and its puddle, a stall,
 being found, a minute survived), completes a run, saves and continues, wins a
 Boss Rush, checks Vasil has each floor's tale, and tries every
 champion's special, Momiche's scare on a boss, Gakev's coins and casting with
-Enter. It writes a PASS/FAIL line for each check (254) to
+Enter. It writes a PASS/FAIL line for each check (267) to
 `<folder>/autopilot.log`, saves screenshots next to it, and exits with the
 number of failures:
 
@@ -475,6 +489,12 @@ build\x64\Release\ChroniclesOfTheSpiceTrip.exe --autopilot autopilot
 
 It uses its own save folder (`<folder>/save`, emptied first), so your saves are
 never touched. `--savedir <folder>` moves the normal saves too.
+
+With `SPICE_LOOK=1` set, `--autopilot` takes a gallery of screenshots instead
+(the start room, the traps firing and resting, a fight, a boss and its stairwell,
+the castle, the toilets) for checking how the game looks. `SPICE_LOOK_PIXELS=0|1|2`
+and `SPICE_LOOK_PLAIN=1` pick the look, `SPICE_LOOK_CHAMP=<n>` the champion, and
+`SPICE_WINDOW=2400x1080` (any build) opens the window at a phone's size.
 
 Co-op has a play-through of its own, for two copies of the game started together on one
 computer: one hosts and one joins over the network, they find each other, play a run (a fight,

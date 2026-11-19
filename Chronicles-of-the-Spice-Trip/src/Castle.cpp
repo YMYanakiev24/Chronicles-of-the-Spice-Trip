@@ -3,6 +3,7 @@
 //  Beray's outfits.
 // ============================================================================
 #include "Game.h"
+#include "Look.h"
 #include "Input.h"
 #include "Touch.h"
 #include "Render.h"
@@ -195,11 +196,37 @@ void Game::drawKeeper(int p) {
     if (c.width > 0 && castleArt[p].id) DrawTexturePro(castleArt[p], c, c, { 0, 0 }, 0, WHITE);
 }
 
+// The castle's own lights, where its art has them: torches, fires, Beray's neon.
+namespace {
+    struct PlaceLight { Vector2 at; float radius; Color c; float strength; bool flame; };
+    const Color TORCH = { 255, 160, 80, 255 }, HEARTH = { 255, 130, 56, 255 };
+    const std::vector<PlaceLight>& placeLights(int p) {
+        static const std::vector<PlaceLight> L[castle::PLACE_COUNT] = {
+            { { { 167, 262 }, 230, TORCH, 1.1f, true }, { { 693, 262 }, 230, TORCH, 1.1f, true }, { { 1049, 262 }, 230, TORCH, 1.1f, true },
+              { { 1240, 262 }, 230, TORCH, 1.1f, true }, { { 1286, 622 }, 200, TORCH, 1.0f, true }, { { 330, 300 }, 150, { 90, 255, 140, 255 }, 0.5f, false } },
+            { { { 650, 178 }, 230, TORCH, 1.1f, true }, { { 880, 178 }, 230, TORCH, 1.1f, true }, { { 232, 330 }, 260, { 80, 255, 120, 255 }, 1.1f, true },
+              { { 1255, 600 }, 110, { 200, 120, 255, 255 }, 0.5f, false } },
+            { { { 650, 178 }, 230, TORCH, 1.1f, true }, { { 880, 178 }, 230, TORCH, 1.1f, true }, { { 232, 348 }, 280, HEARTH, 1.3f, true } },
+            { { { 650, 178 }, 230, TORCH, 1.1f, true }, { { 880, 178 }, 230, TORCH, 1.1f, true }, { { 232, 349 }, 280, HEARTH, 1.3f, true } },
+            { { { 486, 205 }, 190, TORCH, 1.0f, true }, { { 698, 272 }, 190, TORCH, 1.0f, true }, { { 380, 410 }, 230, HEARTH, 1.1f, true },
+              { { 80, 210 }, 170, { 210, 90, 255, 255 }, 0.9f, false }, { { 22, 360 }, 150, { 210, 90, 255, 255 }, 0.8f, false },
+              { { 215, 150 }, 170, { 80, 230, 255, 255 }, 0.9f, false }, { { 205, 290 }, 170, { 80, 230, 255, 255 }, 0.8f, false },
+              { { 385, 160 }, 120, { 90, 240, 255, 255 }, 0.6f, false }, { { 610, 240 }, 200, { 170, 200, 255, 255 }, 0.6f, false } },
+        };
+        return L[p];
+    }
+}
+
 void Game::drawCastle() {
     const Hall& H = hall;
     const PlaceDef& P = place(H.place);
     ClearBackground(BLACK);
-    BeginMode2D(castleCamera());
+    look::begin(castleCamera(), pixelSize(), H.place == DRIP ? Color{ 120, 112, 150, 255 } : Color{ 150, 138, 166, 255 });
+    for (const PlaceLight& l : placeLights(H.place)) {
+        look::light(l.at, l.radius, l.c, l.strength * (l.flame ? look::flicker(clock, l.at.x) : 1.0f));
+        if (l.flame) look::glow({ l.at.x, l.at.y - 4 }, 16, l.c, 0.3f);
+    }
+    look::light({ H.pos.x, H.pos.y - 20 * P.figure }, 200, { 255, 228, 190, 255 }, 0.6f);
     Texture2D art = castleArt[H.place];
     if (art.id) DrawTexture(art, 0, 0, WHITE);
     else for (const Rectangle& f : P.floors) DrawRectangleRec(f, { 70, 64, 60, 255 });
@@ -216,7 +243,7 @@ void Game::drawCastle() {
         float k = fmodf(clock, 2.6f);
         if (k < 0.5f) drawStar({ 432, 448 }, 6 * sinf(k / 0.5f * PI), clock * 3, { 255, 250, 210, 255 });
     }
-    EndMode2D();
+    look::end();
 }
 
 // A "[E] talk" prompt over a spot in the place.

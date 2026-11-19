@@ -17,6 +17,8 @@
 #include "Input.h"
 #include "Platform.h"
 #include "Touch.h"
+#include <cstdio>
+#include <cstdlib>
 #include <cstring>
 #include <filesystem>
 #include <string>
@@ -52,6 +54,7 @@ static int run(int argc, char** argv) {
     platform::windowSize(windowW, windowH);
 #else
     int windowW = SCREEN_W, windowH = SCREEN_H;
+    if (const char* ws = getenv("SPICE_WINDOW")) sscanf(ws, "%dx%d", &windowW, &windowH);   // e.g. 2400x1080, to try a phone's screen
 #endif
     bool autopilot = !autopilotDir.empty();
     if (autopilot) {
