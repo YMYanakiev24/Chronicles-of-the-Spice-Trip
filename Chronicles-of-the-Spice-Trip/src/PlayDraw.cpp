@@ -2,6 +2,7 @@
 //  PlayDraw.cpp — the dungeon on screen: room, actors, HUD and overlays.
 // ============================================================================
 #include "Game.h"
+#include "Look.h"
 #include "Input.h"
 #include "Touch.h"
 #include "Render.h"
@@ -86,13 +87,13 @@ void Game::playFrame(float dt) {
         float amp = 14.0f * shake;
         cam.offset.x += frand(-amp, amp); cam.offset.y += frand(-amp, amp);
     }
-    BeginMode2D(cam);
+    look::begin(cam, pixelSize(), darkness());
     drawRoom();
     drawActors();
-    EndMode2D();
+    look::end();
 
     int sw = GetScreenWidth(), sh = GetScreenHeight();
-    if (gloom > 0.001f) DrawRectangle(0, 0, sw, sh, Fade({ 4, 2, 10, 255 }, gloom));
+    if (gloom > 0.001f && !look::lighting()) DrawRectangle(0, 0, sw, sh, Fade({ 4, 2, 10, 255 }, gloom));
     DrawRectangle(0, 0, sw, sh, Fade(THEMES[theme()].fog, theme() ? 0.07f : 0.04f));
     if (player.auraT > 0) DrawRectangle(0, 0, sw, sh, Fade({ 120, 180, 255, 255 }, 0.06f));
     if (skyFlash > 0) DrawRectangle(0, 0, sw, sh, Fade({ 205, 225, 255, 255 }, skyFlash * 0.2f));
@@ -136,7 +137,12 @@ void Game::drawRoom() {
     bool bossDark = r.isBoss && !r.cleared;
     float trapPh = fmodf(trapClock, 2.4f);
     bool spikesUp = trapPh < 1.2f;
-    int spikeFrame = trapPh < 1.2f ? 0 : trapPh < 1.35f ? 1 : trapPh < 2.25f ? 2 : 3;
+    int spikeFrame = trapPh < 1.2f ? 0 : trapPh < 1.35f ? 1 : trapPh < 2.25f ? 2 : 3;     // the old pack's spikes
+    // the spike trap: up (and hurting) for 1.2 s, then down; the tips rattle in their holes
+    // for half a second before they shoot up again
+    int trapFrame = trapPh < 0.05f ? 2 : trapPh < 1.2f ? (trapPh > 0.55f && trapPh < 0.65f ? 4 : 3)
+                  : trapPh < 1.27f ? 5 : trapPh < 1.34f ? 6 : trapPh < 1.9f ? 0
+                  : trapPh < 2.25f ? ((int)(trapPh * 18) & 1) : 1;
     int midX = ROOM_TW / 2, midY = ROOM_TH / 2;
 
     for (int ty = 0; ty < ROOM_TH; ++ty)
@@ -183,8 +189,10 @@ void Game::drawRoom() {
             if ((!border || isDoor) && !innerWall) {
                 drawTile(6 + h % 4, (h >> 4) % 3, px, py);                 // stone floor variants
                 if (isDoor && (!r.cleared || dungeon.doorLock(dir))) drawTile(8, 3, px, py);   // barred door
-                else if (!border && r.tiles[ty][tx] == RT_SPIKES)
-                    drawAnim(SPR.peaks, spikeFrame, { px + TILE / 2.0f, py + TILE / 2.0f }, 2.0f);
+                else if (!border && r.tiles[ty][tx] == RT_SPIKES) {
+                    if (SPR.spikeTrap.ok()) drawAnim(SPR.spikeTrap, trapFrame, { px + TILE / 2.0f, py + TILE / 2.0f - 8 }, 2.0f);
+                    else drawAnim(SPR.peaks, spikeFrame, { px + TILE / 2.0f, py + TILE / 2.0f }, 2.0f);
+                }
                 if (ty == 1 && tx == 1 && !r.isBoss) drawTile(4, 6, px, py);              // cobwebs
                 if (ty == 1 && tx == ROOM_TW - 2 && !r.isBoss) drawTile(5, 6, px, py);
             }
@@ -202,39 +210,47 @@ void Game::drawRoom() {
         EndBlendMode();
     }
 
-    // fire-throwers: a metal nozzle on the brick, sputtering, then a roaring jet
+    // fire-throwers: an iron spout on the brick, coughing flame, then a roaring jet
     for (int i = 0; i < r.flamerCount; ++i) {
         const Flamer& f = r.flamers[i];
         int state = flamerState(f, trapClock);
         Vector2 c = { f.tx * (float)TILE + TILE / 2.0f, f.ty * (float)TILE + TILE / 2.0f };
         Vector2 d = { (float)((f.dir == DIR_E) - (f.dir == DIR_W)), (float)((f.dir == DIR_S) - (f.dir == DIR_N)) };
-        DrawRectangle((int)c.x - 11, (int)c.y - 11, 22, 22, { 70, 66, 74, 255 });
-        DrawRectangleLines((int)c.x - 11, (int)c.y - 11, 22, 22, { 30, 26, 32, 255 });
+        float rot = atan2f(d.y, d.x) * RAD2DEG;
         Vector2 mouth = Vector2Add(c, Vector2Scale(d, 10));
-        DrawCircleV(mouth, 6, { 40, 34, 36, 255 });
-        DrawCircleV(mouth, 3.5f, state == 0 ? Color{ 90, 40, 30, 255 } : Color{ 255, 150, 50, 255 });
-        if (state == 1) {           // warning sparks
-            for (int k = 0; k < 3; ++k) {
-                float t = fmodf(clock * 3 + k * 0.33f, 1.0f);
-                Vector2 sp = Vector2Add(mouth, Vector2Scale(d, t * 18));
-                DrawCircleV({ sp.x + sinf(clock * 20 + k) * 3, sp.y + cosf(clock * 17 + k) * 3 }, 2.5f * (1 - t), Fade({ 255, 190, 80, 255 }, 1 - t));
+        float flick = look::flicker(clock, (float)i * 2.3f);
+        if (!SPR.flamer.ok() || !SPR.flameJet.id) {         // the art is missing: the old blobs of fire
+            DrawRectangle((int)c.x - 11, (int)c.y - 11, 22, 22, { 70, 66, 74, 255 });
+            DrawCircleV(mouth, 3.5f, state == 0 ? Color{ 90, 40, 30, 255 } : Color{ 255, 150, 50, 255 });
+            if (state == 2) {
+                int fx[FLAMER_RANGE], fy[FLAMER_RANGE];
+                float len = flameTiles(r, f, fx, fy) * (float)TILE;
+                for (float s2 = 0; s2 < len; s2 += 7)
+                    DrawCircleV(Vector2Add(mouth, Vector2Scale(d, s2)), 7 + 7 * s2 / fmaxf(len, 1), Fade({ 255, 130, 40, 255 }, 0.7f));
             }
+            continue;
         }
-        else if (state == 2) {      // the jet itself, flickering blobs along its tiles
-            int fx[FLAMER_RANGE], fy[FLAMER_RANGE];
-            int n = flameTiles(r, f, fx, fy);
-            float len = n * (float)TILE;
-            for (float s2 = 0; s2 < len; s2 += 7) {
-                float u = s2 / fmaxf(len, 1);
-                float wob = sinf(clock * 25 + s2 * 0.4f) * 3;
-                Vector2 p = Vector2Add(mouth, Vector2Scale(d, s2));
-                p = Vector2Add(p, { -d.y * wob, d.x * wob });
-                float rad = 7 + 7 * u + sinf(clock * 31 + s2) * 1.5f;
-                DrawCircleV(p, rad, Fade({ 230, 70, 20, 255 }, 0.55f * (1 - u * 0.5f)));
-                DrawCircleV(p, rad * 0.6f, Fade({ 255, 170, 50, 255 }, 0.8f * (1 - u * 0.6f)));
-                DrawCircleV(p, rad * 0.25f, Fade({ 255, 240, 180, 255 }, 0.9f * (1 - u)));
-            }
+        const float JW = 76, JH = 24;                       // a frame of the jet (drawn under the barrel it comes out of)
+        int frame = (int)(clock * 16 + i * 3) % 8;
+        if (state == 1) {                                   // coughing: flame and smoke out of the mouth
+            DrawTexturePro(SPR.flameJet, { frame * JW, 4 * JH, JW, JH }, { mouth.x, mouth.y, JW * 2, JH * 2 }, { 0, JH }, rot, WHITE);
+            look::light(Vector2Add(mouth, Vector2Scale(d, 10)), 54, { 255, 120, 40, 255 }, 0.7f * flick);
+            look::glow(Vector2Add(mouth, Vector2Scale(d, 6)), 12, { 255, 160, 70, 255 }, 0.35f);
         }
+        int fx[FLAMER_RANGE], fy[FLAMER_RANGE];
+        int n = state == 2 ? flameTiles(r, f, fx, fy) : 0;
+        if (n > 0) {                                        // the jet: it races out to its full reach, then roars
+            float ph = fmodf(trapClock + f.phase, FLAMER_CYCLE) - (FLAMER_CYCLE - FLAMER_BURN);
+            int reach = std::clamp((int)ceilf(n * ph / 0.14f), 1, n);
+            float fade = fminf(1, (FLAMER_BURN - ph) / 0.12f);
+            DrawTexturePro(SPR.flameJet, { frame * JW, (reach - 1) * JH, JW, JH }, { mouth.x, mouth.y, JW * 2, JH * 2 }, { 0, JH }, rot,
+                Fade(WHITE, 0.35f + 0.65f * fade));
+            Vector2 end = Vector2Add(mouth, Vector2Scale(d, reach * (float)TILE));
+            look::lightLine(Vector2Add(mouth, Vector2Scale(d, 8)), end, 30, 92, { 255, 128, 44, 255 }, 1.05f * flick * fade);
+            for (int k = 0; k < reach; ++k)
+                look::glow(Vector2Add(mouth, Vector2Scale(d, 14 + k * (float)TILE)), 26, { 255, 150, 60, 255 }, 0.22f * fade);
+        }
+        drawAnim(SPR.flamer, state, c, 2.0f, false, WHITE, rot);
     }
 
     if (arena.id) {             // the boss's painted arena, framed by the walls
@@ -243,18 +259,23 @@ void Game::drawRoom() {
         DrawRectangleLinesEx(inner, 3, Color{ 0, 0, 0, 150 });
     }
 
-    // wall torches (unlit in the boss lair), banners, candles
+    // wall torches (unlit in the boss lair), banners, candles; each torch throws a warm pool of light
+    const Color TORCH = { 255, 150, 72, 255 }, FLAME = { 255, 176, 84, 255 };
     if (SPR.torch.ok())
         for (float x : { 4 * (float)TILE + 16, (ROOM_TW - 5) * (float)TILE + 16 }) {
-            if (bossDark) drawTile(2, 9, x - 16, 14 - 16);
-            else drawAnim(SPR.torch, animFrame(SPR.torch, clock + x * 0.01f, 8, true), { x, 14 }, 2.0f);
+            if (bossDark) { drawTile(2, 9, x - 16, 14 - 16); continue; }
+            drawAnim(SPR.torch, animFrame(SPR.torch, clock + x * 0.01f, 8, true), { x, 14 }, 2.0f);
+            look::light({ x, 34 }, 150, TORCH, 1.1f * look::flicker(clock, x));
+            look::glow({ x, 10 }, 15, FLAME, 0.4f);
         }
     if (SPR.sideTorch.ok())
         for (int ty : { 2, ROOM_TH - 3 })
             for (float x : { 18.0f, ROOM_PX_W - 18 }) {
                 Vector2 at = { x, ty * (float)TILE + 16 };
-                if (bossDark) drawTile(2, 9, at.x - 16, at.y - 16);
-                else drawAnim(SPR.sideTorch, animFrame(SPR.sideTorch, clock + x * 0.01f, 8, true), at, 2.0f, x > ROOM_PX_W / 2);
+                if (bossDark) { drawTile(2, 9, at.x - 16, at.y - 16); continue; }
+                drawAnim(SPR.sideTorch, animFrame(SPR.sideTorch, clock + x * 0.01f, 8, true), at, 2.0f, x > ROOM_PX_W / 2);
+                look::light({ x < ROOM_PX_W / 2 ? x + 18 : x - 18, at.y }, 130, TORCH, 1.0f * look::flicker(clock, x + ty * 7));
+                look::glow({ x, at.y - 6 }, 13, FLAME, 0.35f);
             }
     if (r.isBoss && !arena.id)
         for (int i = 0; i < 4; ++i)
@@ -280,8 +301,15 @@ void Game::drawRoom() {
         }
         if (SPR.torch.ok())
             drawAnim(SPR.torch, animFrame(SPR.torch, clock + 0.37f, 8, true), { CASTLE_DOOR_X - 52, 14 }, 2.0f);
+        look::light({ CASTLE_DOOR_X - 40, 40 }, 140, TORCH, 1.1f * look::flicker(clock, 3));
+        look::glow({ CASTLE_DOOR_X - 52, 10 }, 15, FLAME, 0.4f);
+        look::light({ CASTLE_DOOR_X, 34 }, open ? 110.0f : 60.0f, { 255, 190, 110, 255 }, open ? 1.0f : 0.6f + 0.2f * glow);
         drawAnim(SPR.candle2, animFrame(SPR.candle2, clock + 0.5f, 7, true), { ROOM_PX_W - 3 * TILE, 2.5f * TILE }, 2.0f);
         drawAnim(SPR.candle2, animFrame(SPR.candle2, clock + 0.1f, 7, true), { ROOM_PX_W - 3 * TILE, ROOM_PX_H - 2.5f * TILE }, 2.0f);
+        for (float y : { 2.5f * TILE, ROOM_PX_H - 2.5f * TILE }) {
+            look::light({ ROOM_PX_W - 3 * TILE, y - 8 }, 80, { 255, 196, 120, 255 }, 0.8f * look::flicker(clock, y));
+            look::glow({ ROOM_PX_W - 3 * TILE, y - 14 }, 9, FLAME, 0.4f);
+        }
     }
 }
 
@@ -306,6 +334,8 @@ static void drawBrazier(Vector2 foot, float t, float seed) {
         if ((rr.x - l.x) * (tip.y - l.y) - (rr.y - l.y) * (tip.x - l.x) > 0) DrawTriangle(l, tip, rr, c);
         else DrawTriangle(l, rr, tip, c);
     };
+    look::light({ foot.x, foot.y - 24 }, 130, { 255, 140, 60, 255 }, 1.15f * look::flicker(t, seed));
+    look::glow({ foot.x, foot.y - 34 }, 22, { 255, 150, 60, 255 }, 0.35f);
     BeginBlendMode(BLEND_ADDITIVE);
     DrawCircleGradient((int)foot.x, (int)foot.y - 32, 36, Fade({ 255, 110, 40, 255 }, 0.20f + 0.06f * sinf(t * 9 + seed)), BLANK);
     for (int k = 0; k < 3; ++k) {
@@ -331,6 +361,8 @@ static void drawBrazier(Vector2 foot, float t, float seed) {
 void Game::drawBossStairs() {
     Vector2 c = ROOM_CENTER;
     float pulse = 0.5f + 0.5f * sinf(clock * 2.1f) * (0.7f + 0.3f * sinf(clock * 5.3f));
+    look::light({ c.x, c.y - 10 }, 150, { 220, 40, 40, 255 }, 1.0f + 0.35f * pulse);
+    look::glow({ c.x, c.y - 4 }, 40, { 200, 30, 36, 255 }, 0.18f + 0.12f * pulse);
     BeginBlendMode(BLEND_ADDITIVE);                 // the light coming up out of it, on the floor round about
     DrawCircleGradient((int)c.x, (int)c.y - 18, 92, Fade({ 170, 24, 30, 255 }, 0.20f + 0.12f * pulse), BLANK);
     EndBlendMode();
@@ -378,10 +410,12 @@ void Game::drawActors() {
 
     if (r.hasSilverKey && r.cleared && !dungeon.silverFound) {      // the treasure room's key
         Vector2 k = { SILVER_POS.x, SILVER_POS.y - 6 + sinf(clock * 3 + 1) * 3 };
+        look::light(k, 60, { 200, 220, 255, 255 }, 0.7f);
         drawShadow({ SILVER_POS.x, SILVER_POS.y + 8 }, 8);
         drawKey(k, 1.0f, true);
     }
     if (r.isTreasure) {             // the hoard: a big chest on a heap of gold
+        if (!r.chestOpened) look::light({ ROOM_CENTER.x, ROOM_CENTER.y + 8 }, 120, { 255, 210, 120, 255 }, 0.7f);
         if (!r.chestOpened)
             for (int i = 0; i < 16; ++i) {
                 float a = i * 2.4f, d = 26 + (i % 4) * 9;
@@ -394,6 +428,7 @@ void Game::drawActors() {
     }
     if (r.hasKey && r.cleared && !dungeon.keyFound) {      // the boss key, bobbing and glinting
         Vector2 k = { ROOM_CENTER.x, ROOM_CENTER.y - 6 + sinf(clock * 3) * 3 };
+        look::light(k, 64, { 255, 214, 120, 255 }, 0.8f);
         drawShadow({ ROOM_CENTER.x, ROOM_CENTER.y + 8 }, 8);
         drawKey(k, 1.0f);
     }
@@ -469,6 +504,7 @@ void Game::drawActors() {
         }
     }
     for (auto& c : coins) {
+        if (!c.pack) look::light(c.pos, 26, { 255, 214, 120, 255 }, 0.45f);
         if (c.pack) ui::drawContain(packTex, { 0, 0, (float)packTex.width, (float)packTex.height }, { c.pos.x - 11, c.pos.y - 11, 22, 22 });
         else drawAnim(SPR.coin, animFrame(SPR.coin, c.t, 12, true), c.pos, 1.4f);
     }
@@ -488,6 +524,7 @@ void Game::drawActors() {
     for (auto& p : enemyShots) drawProjectile(p, clock);
     for (auto& l : lasers) {                // the Gym Rat's C++: green lasers, bits racing along them
         float k = 1 - l.t / GYM_POSE_TIME, len = Vector2Distance(l.a, l.b);
+        look::lightLine(l.a, l.b, 40, 50, { 60, 255, 110, 255 }, 0.7f * k);
         Vector2 d = Vector2Scale(Vector2Subtract(l.b, l.a), 1 / fmaxf(len, 1));
         BeginBlendMode(BLEND_ADDITIVE);
         DrawLineEx(l.a, l.b, 8 * k, Fade({ 40, 255, 90, 255 }, 0.22f * k));
@@ -517,6 +554,9 @@ void Game::drawActors() {
 
 // The hero in the fields: their champion's figure (or pose), and what they have going.
 void Game::drawHero() {
+    // every hero carries a little light into the dark
+    if (climbT == 0) look::light({ player.pos.x, player.pos.y - 10 }, player.hp > 0 ? 175.0f : 110.0f, { 255, 228, 190, 255 }, player.hp > 0 ? 0.8f : 0.45f);
+    if (player.auraT > 0) look::light(player.pos, 90, { 130, 200, 255, 255 }, 0.6f);
     if (coop.active() && player.hp <= 0) {          // co-op: knocked out, lying where they fell
         const WalkSheet& w = figure(player.champion);
         drawShadow({ player.pos.x, player.pos.y + 6 }, 15);
@@ -600,6 +640,7 @@ void Game::drawVasil() {
         DrawTexturePro(tx, { 0, 0, flip ? -(float)tx.width : (float)tx.width, (float)tx.height }, { foot.x, foot.y, w, h }, { w / 2, h }, rot, WHITE);
     };
     bool telling = !dialogue.empty(), bowing = !telling && vasilBowT > 0;
+    if (telling) look::light({ v.x, v.y - 20 }, 110, { 255, 200, 120, 255 }, 0.9f);
     auto shadowAt = [](Vector2 foot, float r) { drawShadow({ foot.x, foot.y - r * 0.7f - 1 }, r); };   // under the feet
 
     // the sign behind him to the left

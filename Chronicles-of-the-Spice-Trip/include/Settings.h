@@ -25,6 +25,8 @@ struct Settings {
     bool  fullscreen = true;
     Keybinds keys;
     bool  vibrate = true;       // phones: buzz when you're hit
+    int   pixels = 1;           // the world's pixels: 0 smooth, 1 soft, 2 retro (look::Pixels)
+    bool  darkLight = true;     // the dark-fantasy lighting
 };
 
 // The phone controls. Positions are fractions of the screen, so a layout

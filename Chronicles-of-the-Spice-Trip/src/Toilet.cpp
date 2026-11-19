@@ -2,6 +2,7 @@
 //  Toilet.cpp — hiding from The Sergeant in the toilets (see Toilet.h).
 // ============================================================================
 #include "Game.h"
+#include "Look.h"
 #include "Input.h"
 #include "Touch.h"
 #include "Render.h"
@@ -360,7 +361,7 @@ static void drawFigure(const WalkSheet& w, Vector2 feet, Vector2 look, bool walk
 void Game::drawToilet() {
     Level& L = hunt;
     ClearBackground(BLACK);
-    BeginMode2D(toiletCamera());
+    look::begin(toiletCamera(), pixelSize(), WHITE, false);      // a school's strip lights: pixels, but no dark
     if (toiletMap.id) DrawTexturePro(toiletMap, { 0, 0, (float)toiletMap.width, (float)toiletMap.height }, { 0, 0, MAP_W, MAP_H }, { 0, 0 }, 0, WHITE);
     else for (const Rectangle& r : FLOORS) DrawRectangleRec(r, { 190, 220, 230, 255 });
 
@@ -416,7 +417,7 @@ void Game::drawToilet() {
         DrawCircleV(p.pos, 4 + 12 * k, Fade({ 150, 150, 162, 255 }, 0.5f * (1 - k)));
         DrawCircleV({ p.pos.x - 1, p.pos.y - 1 }, 3 + 10 * k, Fade({ 226, 226, 234, 255 }, 0.6f * (1 - k)));
     }
-    EndMode2D();
+    look::end();
 }
 
 void Game::drawToiletHud() {

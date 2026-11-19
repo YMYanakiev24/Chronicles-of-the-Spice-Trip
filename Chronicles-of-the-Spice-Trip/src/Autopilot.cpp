@@ -6,6 +6,7 @@
 #include "Autopilot.h"
 #include "Game.h"
 #include "Input.h"
+#include "Look.h"
 #include "Save.h"
 #include "Touch.h"
 #include "Ui.h"
@@ -87,6 +88,7 @@ void Autopilot::start(Game& g, const std::string& d, const std::string& coop, co
     g.testMode = true;
     if (coop == "host") buildCoopHost();
     else if (coop == "join") buildCoopJoin(address.empty() ? "127.0.0.1" : address);
+    else if (getenv("SPICE_LOOK")) buildLook();
     else build();
     if (const char* only = getenv("SPICE_AUTOPILOT_ONLY"))
         std::erase_if(steps, [&](const Step& s) { return s.name.find(only) == std::string::npos; });
@@ -199,7 +201,25 @@ void Autopilot::build() {
         if (t < 0.4f) return false;
         check("the settings screen opens", g.screen == Screen::Settings);
         shot(g, "settings");
-        return clickLabel("Back");
+        markF = 0;
+        return true;
+    });
+    add("settings look", 4, [this](Game& g, float t) {
+        // Pixels go Soft -> Retro -> Smooth -> Soft, the lighting Dark -> Plain -> Dark
+        static const char* PRESS[] = { "Pixels: Soft", "Pixels: Retro", "Pixels: Smooth", "Lighting: Dark", "Lighting: Plain" };
+        static const int PIXELS_AFTER[] = { 2, 0, 1, 1, 1 };
+        static const bool DARK_AFTER[] = { true, true, true, false, true };
+        int i = (int)markF;
+        if (t < 0.15f * (i + 1)) return false;
+        if (i > 0) {
+            bool ok = g.settings.pixels == PIXELS_AFTER[i - 1] && g.settings.darkLight == DARK_AFTER[i - 1] &&
+                look::pixels() == PIXELS_AFTER[i - 1] && look::lighting() == DARK_AFTER[i - 1];
+            if (!ok || i == 5) check("Settings cycles the pixels (Soft, Retro, Smooth) and the lighting (Dark, Plain)", ok);
+            if (!ok || i == 5) return clickLabel("Back");
+        }
+        clickLabel(PRESS[i]);
+        markF = i + 1.0f;
+        return false;
     });
     add("new run", 4, [this](Game& g, float t) {
         if (t < 0.3f) return false;
@@ -265,6 +285,36 @@ void Autopilot::build() {
         }
         in::tap(g.settings.keys.interact);      // each press shows the next line
         return false;
+    });
+
+    // ===== the look =====
+    add("the look", 4, [this](Game& g, float t) {
+        float px = g.pixelSize();
+        if (t == 0) markF = 0;
+        if (t < 0.2f) return false;
+        if (markF == 0) {
+            check("the world is drawn into a canvas of its own pixels (soft: one per dungeon pixel)",
+                look::canvasWidth() > 0 && fabsf(look::canvasWidth() * px - GetScreenWidth()) < px * 3 && fabsf(px - g.camera().zoom) < 0.01f);
+            check("and lit: the start room's torches, candles, the castle door and the hero each throw light", look::lightCount() >= 10);
+            check("the spike trap, the fire-thrower's spout and its flame are loaded",
+                SPR.spikeTrap.frames == 7 && SPR.spikeTrap.fh == 24 && SPR.flamer.frames == 3 && SPR.flameJet.width == 76 * 8 && SPR.flameJet.height == 24 * 5);
+            look::configure(look::PIXELS_RETRO, true); g.settings.pixels = look::PIXELS_RETRO;
+            markF = 1;
+            return false;
+        }
+        if (markF == 1) {
+            if (t < 0.4f) return false;
+            check("retro pixels are a whole tile texel each", fabsf(look::canvasWidth() * px - GetScreenWidth()) < px * 3 && fabsf(px - 2 * g.camera().zoom) < 0.01f);
+            look::configure(look::PIXELS_OFF, false); g.settings.pixels = look::PIXELS_OFF; g.settings.darkLight = false;
+            markF = 2;
+            return false;
+        }
+        if (t < 0.6f) return false;
+        check("smooth and plain draws straight to the screen, as before", look::canvasWidth() == 0 && look::lightCount() == 0);
+        g.settings.pixels = look::PIXELS_SOFT; g.settings.darkLight = true;
+        look::configure(g.settings.pixels, g.settings.darkLight);
+        markF = 0;
+        return true;
     });
 
     // ===== a combat room =====

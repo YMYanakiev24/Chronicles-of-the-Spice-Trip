@@ -2,6 +2,7 @@
 //  Game.cpp — lifetime, the frame loop, runs, rooms, floors and records.
 // ============================================================================
 #include "Game.h"
+#include "Look.h"
 #include "Input.h"
 #include "Touch.h"
 #include "Render.h"
@@ -109,6 +110,8 @@ void setFullscreen(bool on) {
 
 void Game::init(bool windowed) {
     settings = save::readSettings();
+    if (settings.pixels < look::PIXELS_OFF || settings.pixels > look::PIXELS_RETRO) settings.pixels = look::PIXELS_SOFT;
+    look::configure(settings.pixels, settings.darkLight);
     touch::setLayout(save::readTouchLayout());
     profile = save::readProfile();
     if (profile.champion < 0 || profile.champion >= CHAMPION_COUNT) profile.champion = 0;
@@ -173,6 +176,7 @@ void Game::init(bool windowed) {
 
 void Game::shutdown() {
     SPR.unload();
+    look::unload();
     bossArt.unload();
     for (Texture2D* tx : { &menuBg, &castleTex, &marinTex, &shopTex, &galinTex, &packTex,
                            &vasil.seated, &vasil.story[0], &vasil.story[1], &vasil.sign, &vasil.stool, &vasil.portrait, &vasil.crowd,

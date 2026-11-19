@@ -40,6 +40,7 @@ private:
     void build();
     void buildCoopHost();
     void buildCoopJoin(const std::string& address);
+    void buildLook();
     void check(const char* what, bool ok);
     void shot(Game& g, const char* name);
     void finish(Game& g);

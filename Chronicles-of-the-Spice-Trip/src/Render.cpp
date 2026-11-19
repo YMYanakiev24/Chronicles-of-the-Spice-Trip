@@ -3,6 +3,7 @@
 //  back to), sprite-sheet enemies and projectiles.
 // ============================================================================
 #include "Render.h"
+#include "Look.h"
 #include "Platform.h"
 #include "Common.h"
 #include "Sprites.h"
@@ -156,8 +157,30 @@ static void fillTriangle(Vector2 a, Vector2 b, Vector2 c, Color col) {
     if (cross > 0) DrawTriangle(a, c, b, col); else DrawTriangle(a, b, c, col);
 }
 
+// What a flying shot lights up round it (nothing, for the dull ones).
+static void shotLight(const Projectile& p) {
+    switch (p.kind) {
+    case ShotKind::Spell:
+        if (p.spell == SP_FIRE) { look::light(p.pos, 110, { 255, 140, 52, 255 }, 1.2f); look::glow(p.pos, 20, { 255, 150, 60, 255 }, 0.4f); }
+        else if (p.spell == SP_ICE) look::light(p.pos, 70, { 140, 210, 255, 255 }, 0.8f);
+        else if (p.spell == SP_BOLT) { look::light(p.pos, 90, { 170, 200, 255, 255 }, 1.0f); look::glow(p.pos, 14, { 200, 220, 255, 255 }, 0.4f); }
+        else look::light(p.pos, 70, p.glow, 0.8f);
+        break;
+    case ShotKind::Ember:        look::light(p.pos, 60, { 255, 120, 40, 255 }, 0.9f); look::glow(p.pos, 10, { 255, 140, 50, 255 }, 0.3f); break;
+    case ShotKind::Orb:          look::light(p.pos, 64, p.color, 0.8f); break;
+    case ShotKind::Heart:        look::light(p.pos, 56, { 255, 110, 170, 255 }, 0.6f); break;
+    case ShotKind::Grinder:      look::light(p.pos, 44, { 120, 230, 130, 255 }, 0.5f); break;
+    case ShotKind::MetaGrinder:  look::light(p.pos, 80, { 160, 110, 255, 255 }, 0.7f); break;
+    case ShotKind::GrinderStorm: look::light(p.pos, 130, { 150, 110, 240, 255 }, 0.8f); break;
+    case ShotKind::Boot:         look::light(p.pos, 40, { 120, 200, 255, 255 }, 0.4f); break;
+    case ShotKind::Coin:         look::light(p.pos, 26, { 255, 214, 120, 255 }, 0.4f); break;
+    default: break;
+    }
+}
+
 void drawProjectile(const Projectile& p, float t) {
     float ang = atan2f(p.vel.y, p.vel.x);
+    shotLight(p);
     switch (p.kind) {
     case ShotKind::Spell:
         if (p.spell == SP_FIRE) {
@@ -306,12 +329,14 @@ void drawHeart(Vector2 c, float size, Color col) {
 
 void drawBurn(const Enemy& e, float t) {
     float fade = fminf(1, e.burnT * 2), sc = e.r / 12;
+    look::light({ e.pos.x, e.pos.y - e.r * 0.6f }, 40 + e.r * 3, { 255, 130, 50, 255 }, 0.9f * fade * look::flicker(t, e.pos.x));
     for (int i = -1; i <= 1; ++i)           // flames on the body, the sprite's head pointing up
         drawAnim(SPR.flame, animFrame(SPR.flame, t + i * 0.13f, 14, true), { e.pos.x + i * e.r * 0.6f, e.pos.y - e.r * (i ? 0.4f : 1.0f) },
             sc * (i ? 0.75f : 1.05f), false, Fade(WHITE, fade), 90);
 }
 
 void drawSpellCharge(int spell, Vector2 hand, float k, float t) {
+    look::light(hand, 40 + 50 * k, spell == SP_FIRE ? Color{ 255, 140, 52, 255 } : spell == SP_ICE ? Color{ 150, 215, 255, 255 } : Color{ 170, 200, 255, 255 }, 0.5f + 0.6f * k);
     if (spell == SP_FIRE) {
         BeginBlendMode(BLEND_ADDITIVE);
         DrawCircleV(hand, 8 + 14 * k, Fade({ 255, 110, 40, 255 }, 0.3f));
@@ -352,6 +377,7 @@ static float patternAt(float seed, int i) {
 
 void drawCrack(const FloorCrack& c) {
     float g = fminf(1, c.t / 0.1f), fade = fminf(1, (CRACK_TIME - c.t) / 0.6f);
+    look::light(c.pos, c.size * 1.3f, c.glow, 0.55f * fade * g);
     DrawEllipse((int)c.pos.x, (int)c.pos.y, c.size * 0.9f * g, c.size * 0.55f * g, Fade(c.glow, 0.16f * fade));
     const int arms = 9;
     for (int i = 0; i < arms; ++i) {        // jagged lines running out from under the target
@@ -371,6 +397,7 @@ void drawCrack(const FloorCrack& c) {
 void drawArc(const Arc& a, float t) {
     float flicker = 0.45f + 0.55f * patternAt(a.seed, (int)(t * 45));
     float fade = (1 - a.t / a.life) * flicker;
+    look::light(Vector2Lerp(a.a, a.b, 0.5f), 40 + Vector2Distance(a.a, a.b) * 0.6f, { 150, 190, 255, 255 }, 1.1f * fade);
     BeginBlendMode(BLEND_ADDITIVE);
     DrawLineEx(a.a, a.b, a.width * 3.2f, Fade({ 110, 160, 255, 255 }, 0.4f * fade));
     DrawLineEx(a.a, a.b, a.width, Fade({ 235, 245, 255, 255 }, fade));
@@ -379,6 +406,7 @@ void drawArc(const Arc& a, float t) {
 
 void drawFlash(const Flash& f) {
     float k = f.t / f.life, left = 1 - k;
+    look::light(f.pos, Clamp(f.size * 1.6f, 40, 260), f.color, 1.2f * left);
     BeginBlendMode(BLEND_ADDITIVE);
     if (f.ring) {
         float r = f.size * sqrtf(k);
@@ -413,6 +441,7 @@ void drawStar(Vector2 c, float r, float turn, Color col) {
 
 void drawChestLight(Vector2 mouth, float k, float t) {
     Color gold = { 255, 214, 120, 255 };
+    look::light(mouth, 150, gold, 1.5f * k);
     BeginBlendMode(BLEND_ADDITIVE);
     DrawCircleGradient((int)mouth.x, (int)mouth.y, 58, Fade(gold, 0.55f * k), Fade(gold, 0));
     for (int i = 0; i < 7; ++i) {           // rays fanning up out of the chest

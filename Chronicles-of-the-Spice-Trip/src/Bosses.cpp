@@ -2,6 +2,7 @@
 //  Bosses.cpp — boss table, boss AI and boss drawing.
 //  The patterns follow the original Path boss fights, scaled to a room.
 // ============================================================================
+#include "Look.h"
 #include "Bosses.h"
 #include "Champions.h"
 #include "Render.h"
@@ -986,14 +987,16 @@ void drawBossBody(const Enemy& e, int index, const BossArt& art) {
 void drawBus(const Bus& bus, float t) {
     if (!bus.active) return;
     float top = bus.y - bus.h / 2;
-    if (!bus.driving) {   // the warning lane flashes
+    if (!bus.driving) {   // the warning lane flashes (and glows, so it shows in the dark)
         float a = 0.18f + 0.14f * sinf(t * 22);
+        look::lightLine({ TILE * 2.0f, bus.y }, { ROOM_PX_W - TILE * 2.0f, bus.y }, 60, 70, { 255, 90, 70, 255 }, 0.6f + a);
         DrawRectangle(TILE, (int)top, (int)(ROOM_PX_W - 2 * TILE), (int)bus.h, Fade({ 230, 60, 50, 255 }, a));
         DrawRectangleLines(TILE, (int)top, (int)(ROOM_PX_W - 2 * TILE), (int)bus.h, Fade({ 255, 120, 100, 255 }, 0.8f));
         DrawText("BUS No.9!", TILE + 10, (int)bus.y - 10, 20, Fade({ 255, 220, 200, 255 }, 0.9f));
         return;
     }
     float x = bus.x - bus.w / 2;
+    look::light({ x + bus.w + 30, bus.y }, 130, { 255, 250, 210, 255 }, 1.0f);                     // its headlights
     DrawRectangle((int)x + 6, (int)(top + bus.h - 6), (int)bus.w, 10, { 0, 0, 0, 90 });            // shadow
     DrawRectangle((int)x, (int)top, (int)bus.w, (int)bus.h - 6, { 232, 178, 48, 255 });             // body
     DrawRectangle((int)x, (int)top, (int)bus.w, 6, { 250, 214, 110, 255 });                         // roof
@@ -1013,12 +1016,14 @@ void drawArenaFloor(const BossFight& f, float t) {
         if (!s.active) continue;
         if (s.wait > 0) {                   // the mark: a ring closing in on where it lands
             float k = 1 - s.wait / SLAM_WAIT, r = fmaxf(3, SLAM_R * (1 - k));
+            look::light(s.at, SLAM_R * 1.4f, { 255, 90, 70, 255 }, 0.6f + 0.5f * k);
             DrawCircleV(s.at, SLAM_R, Fade({ 230, 70, 60, 255 }, 0.1f + 0.16f * k));
             DrawRing(s.at, SLAM_R - 2, SLAM_R, 0, 360, 48, Fade({ 255, 130, 110, 255 }, 0.8f));
             DrawRing(s.at, r - 2, r, 0, 360, 48, Fade({ 255, 200, 170, 255 }, 0.9f));
             continue;
         }
         float fade = fminf(1, s.burn * 2);  // the fire left behind
+        look::light(s.at, FIRE_R * 2.2f, { 255, 130, 50, 255 }, 1.1f * fade * look::flicker(t, s.at.x));
         DrawEllipse((int)s.at.x, (int)s.at.y, FIRE_R, FIRE_R * 0.7f, Fade({ 255, 110, 40, 255 }, 0.28f * fade));
         for (int i = 0; i < 7; ++i) {
             Vector2 d = fromAngle(i * 2 * PI / 7);
@@ -1028,6 +1033,7 @@ void drawArenaFloor(const BossFight& f, float t) {
     }
     if (f.meleeWind > 0) {                  // the Bad Plasmodium's reach, the ring closing as it swings
         float k = 1 - f.meleeWind / MELEE_WIND, r = fmaxf(3, MELEE_R * (1 - k));
+        look::light(f.meleeAt, MELEE_R * 1.3f, { 255, 90, 70, 255 }, 0.6f + 0.5f * k);
         DrawCircleV(f.meleeAt, MELEE_R, Fade({ 230, 70, 60, 255 }, 0.1f + 0.16f * k));
         DrawRing(f.meleeAt, MELEE_R - 2, MELEE_R, 0, 360, 64, Fade({ 255, 130, 110, 255 }, 0.8f));
         DrawRing(f.meleeAt, r - 2, r, 0, 360, 64, Fade({ 255, 200, 170, 255 }, 0.9f));
@@ -1035,6 +1041,7 @@ void drawArenaFloor(const BossFight& f, float t) {
     if (f.meleeBoom > 0) DrawCircleV(f.meleeAt, MELEE_R, Fade({ 200, 150, 255, 255 }, 0.6f * f.meleeBoom / MELEE_SHOW));
     if (f.beam.active && f.beam.charge > 0) {   // its aim, hardening as it locks
         bool locked = f.beam.charge < BEAM_LOCK;
+        look::lightLine(f.beam.from, f.beamEnd(), 50, 40, { 255, 90, 70, 255 }, locked ? 0.7f : 0.35f);
         DrawLineEx(f.beam.from, f.beamEnd(), locked ? 4.0f : 1.5f, Fade({ 255, 90, 70, 255 }, locked ? 0.9f : 0.4f + 0.3f * sinf(t * 24)));
     }
 }
@@ -1058,6 +1065,7 @@ void drawArenaAir(const BossFight& f, float t) {
     if (f.beam.active && f.beam.charge <= 0) {
         Vector2 end = f.beamEnd();
         float fade = fminf(1, f.beam.fire / 0.15f), w = BEAM_W * (0.8f + 0.2f * sinf(t * 60));
+        look::lightLine(f.beam.from, end, 45, 80, c, 1.2f * fade);
         BeginBlendMode(BLEND_ADDITIVE);
         DrawLineEx(f.beam.from, end, w * 1.5f, Fade(c, 0.4f * fade));
         DrawLineEx(f.beam.from, end, w, Fade(c, 0.8f * fade));
@@ -1072,6 +1080,7 @@ void drawArenaAir(const BossFight& f, float t) {
         }
     if (f.stage == BossFight::Stage::Desperate) {   // the core, swelling toward the big one
         float k = 1 - f.stageT / DESPERATE_TIME, pulse = sinf(t * (10 + 26 * k)) * 3, r = 10 + 20 * k + pulse;
+        look::light(f.coreAt, 90 + 120 * k, c, 1.0f + 0.5f * k);
         BeginBlendMode(BLEND_ADDITIVE);
         DrawCircleV(f.coreAt, r * 2.1f, Fade(c, 0.35f));
         DrawCircleV(f.coreAt, r * 1.4f, Fade({ 255, 200, 110, 255 }, 0.6f));
@@ -1081,6 +1090,7 @@ void drawArenaAir(const BossFight& f, float t) {
     }
     if (f.blast > 0) {                      // the big one going off, filling the room
         float k = 1 - f.blast / BLAST_SHOW;
+        look::light(f.blastFrom, 200 + 700 * k, c, 2.0f * (1 - k));
         BeginBlendMode(BLEND_ADDITIVE);
         DrawCircleV(f.blastFrom, 80 + 720 * k, Fade(c, 0.6f * (1 - k)));
         DrawCircleV(f.blastFrom, 40 + 500 * k, Fade(WHITE, 0.6f * (1 - k)));
@@ -1098,6 +1108,7 @@ void drawLabFloor(const BossFight& f, float t) {
         float a0 = f.staff.from, a1 = f.staff.from + f.staff.sweep;
         if (a1 < a0) std::swap(a0, a1);
         float pulse = 0.14f + 0.08f * sinf(t * 20);
+        look::light(f.staff.at, STAFF_LEN * 1.1f, { 255, 90, 70, 255 }, 0.7f);
         DrawCircleSector(f.staff.at, STAFF_LEN, a0 * RAD2DEG, a1 * RAD2DEG, 32, Fade({ 230, 70, 60, 255 }, pulse));
         DrawCircleSectorLines(f.staff.at, STAFF_LEN, a0 * RAD2DEG, a1 * RAD2DEG, 32, Fade({ 255, 130, 110, 255 }, 0.7f));
     }
@@ -1106,6 +1117,7 @@ void drawLabFloor(const BossFight& f, float t) {
         if (!g.active) continue;
         if (g.t < g.flight) {               // where it will land, and its shadow on the way
             float k = g.t / g.flight;
+            look::light(g.to, BLAST_R * 1.4f, c, 0.4f + 0.5f * k);
             DrawRing(g.to, BLAST_R - 2, BLAST_R, 0, 360, 48, Fade(c, 0.25f + 0.4f * k));
             DrawCircleV(g.to, 3, Fade(c, 0.8f));
             Vector2 s = g.at();
@@ -1117,12 +1129,14 @@ void drawLabFloor(const BossFight& f, float t) {
                 DrawRing(g.to, fmaxf(0, rr - 2), rr, 0, 360, 48, Fade(c, 0.5f * k));
             }
             float urgency = g.well < 0.6f ? 0.5f + 0.5f * sinf(t * 30) : 0;     // about to go off
+            look::light(g.to, BLAST_R * 1.4f, c, 0.6f + 0.4f * urgency);
             DrawRing(g.to, BLAST_R - 2, BLAST_R, 0, 360, 48, Fade({ 255, 150, 90, 255 }, 0.3f + 0.5f * urgency));
             DrawCircleV(g.to, 9, { 20, 24, 40, 230 });
             DrawCircleLinesV(g.to, 9, c);
         }
         else {                              // the blast
             float k = 1 - g.boom / BLAST_TIME;
+            look::light(g.to, BLAST_R * 2.2f, { 255, 200, 120, 255 }, 1.6f * (1 - k));
             DrawCircleV(g.to, BLAST_R * (0.4f + 0.6f * k), Fade({ 255, 200, 120, 255 }, 0.6f * (1 - k)));
             DrawCircleV(g.to, BLAST_R * 0.5f * (0.4f + 0.6f * k), Fade(WHITE, 0.7f * (1 - k)));
         }
@@ -1136,6 +1150,7 @@ void drawLabFloor(const BossFight& f, float t) {
         Vector2 a = cc.node[i], ab = Vector2Subtract(cc.node[i + 1], a);
         float len = fmaxf(1, Vector2Length(ab));
         Vector2 dir = Vector2Scale(ab, 1 / len), side = { -dir.y, dir.x };
+        look::lightLine(a, cc.node[i + 1], 40, live ? 70.0f : 40.0f, c, live ? 1.0f : 0.25f + 0.4f * charged);
         if (!live) {                        // a dashed wire, brighter as the nodes charge
             for (float s = 0; s < len; s += 12)
                 DrawLineEx(Vector2Add(a, Vector2Scale(dir, s)), Vector2Add(a, Vector2Scale(dir, fminf(len, s + 6))), 1.5f, Fade(c, 0.25f + 0.5f * charged));

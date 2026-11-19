@@ -2,6 +2,7 @@
 //  Play.cpp — the dungeon rules: movement, champions, combat, bosses, loot.
 // ============================================================================
 #include "Game.h"
+#include "Look.h"
 #include "Input.h"
 #include "Touch.h"
 #include "Render.h"
@@ -60,6 +61,26 @@ Camera2D Game::camera() const {
     cam.zoom = fminf(sw / (ROOM_PX_W * 1.12f), sh / (ROOM_PX_H * 1.18f));   // the whole room, centred
     cam.target = ROOM_CENTER;
     return cam;
+}
+
+// The world's pixels: one canvas pixel is one dungeon pixel (half a tile texel) on "soft",
+// a whole texel on "retro", at whatever size the room is shown; places with other cameras
+// get pixels of the same size on screen.
+float Game::pixelSize() const {
+    int sw = GetScreenWidth(), sh = GetScreenHeight();
+    float room = fminf(sw / (ROOM_PX_W * 1.12f), sh / (ROOM_PX_H * 1.18f));
+    return settings.pixels == look::PIXELS_RETRO ? room * 2 : settings.pixels == look::PIXELS_SOFT ? room : 1.0f;
+}
+
+// Cold blue-violet dark, touched by the floor's fog. A living boss's lair is darker still
+// (but a painted arena, dark in its own art already, less so).
+Color Game::darkness() const {
+    Color fog = THEMES[theme()].fog;
+    const Room& r = dungeon.cur();
+    bool painted = r.isBoss && bossArt.arena[currentBossIndex()].id;
+    float k = (painted ? 0.72f : 0.6f) - gloom * 0.4f;
+    auto mix = [&](float cool, unsigned char f) { return (unsigned char)fminf(255, 255 * k * (0.8f * cool + 0.2f * f / 255.0f)); };
+    return { mix(0.80f, fog.r), mix(0.78f, fog.g), mix(1.0f, fog.b), 255 };
 }
 
 Vector2 Game::mouseWorld() const {
