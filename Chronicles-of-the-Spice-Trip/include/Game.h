@@ -250,6 +250,15 @@ struct Game {
     float scareT = 0;                   // Momiche's scare: seconds everyone keeps running
     bool  heroMoving = false;           // walking this frame (the figure faces heroMoveDir)
     Vector2 heroMoveDir{ 0, 1 };
+    bool  heroStepping = false;         // ...and getting somewhere (not pressed against a wall)
+    float heroStride = 0;               // how far they've walked: the steps keep pace with it
+    float climbT = 0;                   // on the castle ladder: > 0 climbing up (to go), < 0 coming down
+    Vector2 climbFrom{};                // where the climb up began
+    void  updateClimb(float dt);
+    void  drawBossStairs();             // the way down from a beaten boss
+    int   shownFloor = 0;               // the floor last drawn: a new one fades in out of the dark
+    float arriveFade = 0;
+    bool  ladderDoorOpen() const;       // someone's going through the castle door
     int   floor = 1, kills = 0;
     float runTime = 0;
     bool  inFight = false;
@@ -362,8 +371,12 @@ inline constexpr const char* BAD_PLASMODIUM_CUTSCENE = "cutscenes/red-eyes.mpg";
 
 // Fixed spots in the start and shop rooms.
 // The door to the castle, in the top wall of every floor's first room, and where you come back out.
+// The castle: a ladder up the first room's top wall to a little door. You stand at its foot
+// (CASTLE_DOOR_FRONT), climb to the door (LADDER_TOP_Y) and through it.
 inline constexpr float   CASTLE_DOOR_X = 13 * TILE;
-inline constexpr Vector2 CASTLE_DOOR_FRONT = { CASTLE_DOOR_X, TILE * 1.0f + 26 };
+inline constexpr Vector2 CASTLE_DOOR_FRONT = { CASTLE_DOOR_X, 118 };
+inline constexpr float   LADDER_TOP_Y = 46;
+inline constexpr float   CLIMB_UP = 0.85f, CLIMB_DOWN = 0.6f;   // seconds on the ladder
 inline constexpr Vector2 VASIL_POS = { ROOM_PX_W / 2 - 110, ROOM_PX_H / 2 - 50 };   // the foot of his stool
 inline constexpr Vector2 ROOM_CENTER = { ROOM_PX_W / 2, ROOM_PX_H / 2 };
 inline constexpr Vector2 SILVER_POS = { ROOM_PX_W / 2 + 64, ROOM_PX_H / 2 };   // the silver key, beside the gold one

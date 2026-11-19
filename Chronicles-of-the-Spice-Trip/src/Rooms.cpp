@@ -330,6 +330,30 @@ bool roomWallSolid(const Room& r, int tx, int ty, bool doorsOpen) {
     return true;
 }
 
+// Is a body (its square) clear of every wall, standing here?
+static bool clearAt(Vector2 p, float radius, const Room& r, bool doorsOpen) {
+    int minTx = (int)floorf((p.x - radius) / TILE), maxTx = (int)floorf((p.x + radius) / TILE);
+    int minTy = (int)floorf((p.y - radius) / TILE), maxTy = (int)floorf((p.y + radius) / TILE);
+    for (int ty = minTy; ty <= maxTy; ++ty)
+        for (int tx = minTx; tx <= maxTx; ++tx)
+            if (roomWallSolid(r, tx, ty, doorsOpen)) return false;
+    return true;
+}
+
+// Pressing straight at a wall with an opening just to one side (a doorway, a gap between
+// blocks): which way, and how far, it would have to slip to get through (0: no way near).
+static float slipToward(Vector2 at, Vector2 push, float radius, const Room& r, bool doorsOpen) {
+    bool across = fabsf(push.x) > fabsf(push.y);    // pushing sideways: it slips up or down
+    float reach = radius * 0.85f;
+    for (float s = 1; s <= reach; s += 1)
+        for (float sign : { -1.0f, 1.0f }) {
+            Vector2 side = across ? Vector2{ 0, sign * s } : Vector2{ sign * s, 0 };
+            if (clearAt(Vector2Add(Vector2Add(at, side), push), radius, r, doorsOpen) && clearAt(Vector2Add(at, side), radius, r, doorsOpen))
+                return sign * s;
+        }
+    return 0;
+}
+
 Vector2 moveInRoom(Vector2 pos, Vector2 delta, float radius, const Room& r, bool doorsOpen) {
     Vector2 np = pos;
 
@@ -354,6 +378,23 @@ Vector2 moveInRoom(Vector2 pos, Vector2 delta, float radius, const Room& r, bool
                     if (delta.y > 0)      np.y = ty * TILE - radius - 0.01f;
                     else if (delta.y < 0) np.y = (ty + 1) * TILE + radius + 0.01f;
                 }
+    }
+    // Caught on a corner while heading (nearly) straight at it: slide round it instead of sticking,
+    // the way a doorway or a gap between pillars would let you if you were lined up with it.
+    bool stoppedX = fabsf(delta.x) > 0.01f && fabsf(np.x - (pos.x + delta.x)) > 0.001f;
+    bool stoppedY = fabsf(delta.y) > 0.01f && fabsf(np.y - (pos.y + delta.y)) > 0.001f;
+    if (stoppedX != stoppedY) {
+        bool across = stoppedX;
+        float push = across ? delta.x : delta.y, other = across ? delta.y : delta.x;
+        if (fabsf(other) < fabsf(push) * 0.4f) {
+            Vector2 dir = across ? Vector2{ copysignf(1.0f, push), 0 } : Vector2{ 0, copysignf(1.0f, push) };
+            float s = slipToward(np, Vector2Scale(dir, 1.5f), radius, r, doorsOpen);
+            if (s != 0) {
+                float step = copysignf(fminf(fabsf(push), fabsf(s)), s);
+                Vector2 slid = across ? Vector2{ np.x, np.y + step } : Vector2{ np.x + step, np.y };
+                if (clearAt(slid, radius, r, doorsOpen)) np = slid;
+            }
+        }
     }
     return np;
 }

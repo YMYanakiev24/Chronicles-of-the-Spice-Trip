@@ -75,6 +75,7 @@ namespace castle {
 
 // ------------------------------------------------------------------ coming and going
 void Game::enterCastle() {
+    climbT = 0;
     hall = Hall{};
     hall.active = true; hall.place = CORRIDOR; hall.pos = ENTRY; hall.face = { 1, 0 };
     dialogue.clear(); vasilGreetT = 0;
@@ -88,7 +89,11 @@ void Game::leaveCastle() {
     overlay = Overlay::None;
     castleDoorCd = 0.5f;                            // the E that brought you out doesn't take you straight back in
     player.pos = CASTLE_DOOR_FRONT; player.facing = { 0, 1 }; heroMoveDir = { 0, 1 };
-    if (coop.active() && !dungeon.cur().isStart)    // co-op: the party has moved on; come out beside them
+    if (dungeon.cur().isStart) {                    // out through the little door, and down the ladder
+        climbT = -CLIMB_DOWN;
+        player.pos = { CASTLE_DOOR_X, LADDER_TOP_Y };
+    }
+    else if (coop.active())                         // co-op: the party has moved on; come out beside them
         for (int h = 0; h < heroCount; ++h)
             if (h != curHero && heroes[h].present && !heroes[h].hall.active) {
                 player.pos = moveInRoom(heroes[h].player.pos, { 0, 18 }, PLAYER_R, dungeon.cur(), true);
@@ -141,10 +146,12 @@ void Game::updateCastle(float dt) {
     if (mv.x || mv.y) {
         mv = Vector2Normalize(mv);
         float speed = (in::down(K.run) ? RUN : WALK) * P.speed * champ().speedMul;
-        Vector2 d = Vector2Scale(mv, speed * dt);
+        Vector2 d = Vector2Scale(mv, speed * dt), was = H.pos;
         if (walkable(H.place, { H.pos.x + d.x, H.pos.y })) H.pos.x += d.x;
         if (walkable(H.place, { H.pos.x, H.pos.y + d.y })) H.pos.y += d.y;
-        H.face = mv; H.moving = true;
+        float moved = Vector2Distance(was, H.pos) / P.speed;   // (the rooms are drawn bigger: steps to match)
+        H.face = mv; H.moving = moved > WALK * 0.08f * dt;
+        H.stride += moved;
     }
 
     bool use = in::pressed(K.interact);
@@ -202,7 +209,7 @@ void Game::drawCastle() {
     const WalkSheet& w = figure(player.champion);
     float fw = 24 * 1.4f * P.figure, fh = 32 * 1.4f * P.figure;
     drawShadow({ H.pos.x, H.pos.y - 6 * P.figure / 2 }, 11 * P.figure);
-    if (w.ok()) w.draw(facingOf(H.face), w.frameAt(H.moving, clock), { H.pos.x - fw / 2, H.pos.y - fh, fw, fh });
+    if (w.ok()) w.draw(facingOf(H.face), w.frameAt(H.moving, H.stride * STEP_PACE), { H.pos.x - fw / 2, H.pos.y - fh, fw, fh });
     else ::drawHero({ H.pos.x, H.pos.y - fh / 2 }, H.face, 0, false, champ().cloak);
 
     if (H.place == DRIP) {                                  // a glint off Beray's chain now and then

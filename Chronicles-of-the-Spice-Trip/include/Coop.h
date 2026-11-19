@@ -33,7 +33,7 @@ struct Wheel {
 };
 
 inline constexpr int MAX_HEROES = 4;
-inline constexpr int COOP_VERSION = 1;  // joiners with another version are turned away
+inline constexpr int COOP_VERSION = 2;  // joiners with another version are turned away
 
 // One player's own part of the game.
 struct Hero {
@@ -52,6 +52,8 @@ struct Hero {
     float  slingT = 0;  bool slingFired = false;
     int    castingSpell = 0;  float castT = 0;
     bool   heroMoving = false;  Vector2 heroMoveDir{ 0, 1 };
+    bool   heroStepping = false; float heroStride = 0;
+    float  climbT = 0; Vector2 climbFrom{};
     float  shopMsgT = 0;  std::string shopMsg;
     // who they are
     int    outfit = -1;                 // the outfit they wear (-1: as this device's profile says)

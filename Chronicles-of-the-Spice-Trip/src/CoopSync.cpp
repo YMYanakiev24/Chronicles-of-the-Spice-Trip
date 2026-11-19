@@ -56,7 +56,7 @@ template <class S> static void io(S& s, Enemy& e) {         // likewise: the hos
     s.name(e.name); s.name(e.weakness);
     s(e.boss, e.alive, e.hitFlash, e.atkCd, e.wobble, e.knock, e.burnT, e.lunge, e.swinging, e.kind, e.animT, e.atkAnim,
       e.deathT, e.dying, e.flip, e.moving, e.stolen, e.elite, e.fleeT, e.charmT, e.dazeT, e.bossForm, e.scale, e.diveT,
-      e.diveDir, e.chaser, e.look, e.pose, e.lastHit);
+      e.diveDir, e.chaser, e.look, e.pose, e.lastHit, e.walking, e.stride);
 }
 
 template <class S> static void io(S& s, Projectile& p) {
@@ -90,7 +90,7 @@ template <class S> static void io(S& s, Hero& h) {
     s(w.casino, w.spinning, w.done, w.angle, w.speed, w.result, w.bet, w.pick);
     s.text(w.message);
     s(h.gymT, h.gymDir, h.cigT, h.stubT, h.grindStep, h.throwT, h.throwKind, h.thrown, h.punchT, h.punchLanded, h.punchDir,
-      h.slingT, h.slingFired, h.castingSpell, h.castT, h.heroMoving, h.heroMoveDir);
+      h.slingT, h.slingFired, h.castingSpell, h.castT, h.heroMoving, h.heroMoveDir, h.heroStepping, h.heroStride, h.climbT, h.climbFrom);
 }
 
 template <class S> static void io(S& s, BossFight& f) {

@@ -651,15 +651,16 @@ void Autopilot::build() {
     // ===== the castle: the corridor, then Marin's, Galin's, Todor's and Beray's =====
     // In through the castle door in the first room, out again by the corridor's side door.
     auto intoCastle = [this, add](const char* name) {
-        add(name, 4, [this](Game& g, float t) {
+        add(name, 5, [this](Game& g, float t) {
             if (t == 0) {
                 if (!g.dungeon.cur().isStart) goToRoom(g, [](const Room& r) { return r.isStart; });
                 g.player.pos = CASTLE_DOOR_FRONT;
+                markB = false;
                 return false;
             }
             if (t < 0.2f) return false;
-            in::tap(g.settings.keys.interact);
-            return true;
+            if (!markB) { in::tap(g.settings.keys.interact); markB = true; return false; }
+            return g.hall.active;                       // up the ladder and in
         });
     };
     auto useExit = [this, add](const char* name, Vector2 at) {          // stand there and press E
@@ -697,14 +698,21 @@ void Autopilot::build() {
             return false;
         }
         if (t < 0.2f) return false;
-        if (markF == 0) { shot(g, "castle-door"); markF = 1; return false; }   // the door, then through it
+        if (markF == 0) { shot(g, "castle-door"); markF = 1; in::tap(g.settings.keys.interact); return false; }   // the ladder, then up it
+        if (markF == 1) {
+            if (g.climbT <= 0) return false;
+            check("E at the foot of the ladder climbs it, back to you", g.climbT > 0 && !g.hall.active);
+            markF = 2;
+            return false;
+        }
+        if (markF == 2 && g.climbT > 0 && g.climbT < CLIMB_UP * 0.3f) { shot(g, "castle-ladder-top"); markF = 3; }
+        if (!g.hall.active) return false;
         markF = 0;
-        in::tap(g.settings.keys.interact);
         return true;
     });
     add("castle corridor", 4, [this](Game& g, float t) {
         if (t < 0.6f) return false;
-        check("E at the door goes into the castle corridor", g.hall.active && g.hall.place == castle::CORRIDOR);
+        check("the door at the top of the ladder opens into the castle corridor", g.hall.active && g.hall.place == castle::CORRIDOR);
         bool art = g.berayTex.id != 0;
         for (auto& tx : g.castleArt) art = art && tx.id;
         check("the corridor and the four rooms have their art, and Beray his", art);
@@ -740,10 +748,83 @@ void Autopilot::build() {
         return true;
     });
     useExit("out of the castle", { 78, 488 });
-    add("back in the dungeon", 3, [this](Game& g, float t) {
-        if (t < 0.3f) return false;
-        check("the corridor's side door leads back to the first room, at the castle door",
-            !g.hall.active && g.dungeon.cur().isStart && Vector2Distance(g.player.pos, CASTLE_DOOR_FRONT) < 4);
+    add("back in the dungeon", 4, [this](Game& g, float t) {
+        if (t < 0.15f) return false;
+        if (t < 0.3f) { markB = g.climbT < 0 && g.player.pos.y < CASTLE_DOOR_FRONT.y - 20; return false; }   // coming down the ladder
+        if (g.climbT != 0) return false;
+        check("the corridor's side door leads back to the first room, down the ladder to its foot",
+            markB && !g.hall.active && g.dungeon.cur().isStart && Vector2Distance(g.player.pos, CASTLE_DOOR_FRONT) < 4);
+        return true;
+    });
+    // ===== how they move: steps in pace with the ground, round corners, monsters at arm's length =====
+    add("steps keep pace", 3, [this](Game& g, float t) {
+        const Keybinds& K = g.settings.keys;
+        if (t == 0) { g.player.pos = { ROOM_CENTER.x - 220, ROOM_CENTER.y + 80 }; markF = g.heroStride; markB = false; in::hold(K.right, true); return false; }
+        if (t < 0.5f) return false;
+        if (!markB) { markX = g.heroStride - markF; markF = g.heroStride; in::hold(K.run, true); markB = true; return false; }
+        if (t < 1.0f) return false;
+        in::hold(K.right, false); in::hold(K.run, false); markB = false;
+        float walked = markX, ran = g.heroStride - markF;
+        check(TextFormat("a run takes quicker steps than a walk, in pace with the ground (%.0f / %.0f)", ran, walked),
+            walked > WALK * 0.4f && ran > walked * 1.4f);
+        return true;
+    });
+    add("into a wall", 2, [this](Game& g, float t) {
+        const Keybinds& K = g.settings.keys;
+        if (t == 0) { g.player.pos = { TILE + PLAYER_R + 2.0f, ROOM_CENTER.y + 80 }; in::hold(K.left, true); return false; }
+        if (t < 0.4f) return false;
+        check("pushing at a wall, they stand (no walking on the spot)", g.heroMoving && !g.heroStepping);
+        in::hold(K.left, false);
+        return true;
+    });
+    add("round a doorway's edge", 4, [this](Game& g, float t) {
+        const Keybinds& K = g.settings.keys;
+        static int fromX, fromY;
+        if (t == 0) {
+            Room& r = g.dungeon.cur();
+            g.dungeon.keyFound = g.dungeon.silverFound = true;
+            float dcx = (ROOM_TW / 2) * TILE + TILE * 0.5f, dcy = (ROOM_TH / 2) * TILE + TILE * 0.5f;
+            fromX = g.dungeon.cx; fromY = g.dungeon.cy;
+            // a step to one side of the doorway, heading straight for the wall beside it
+            if (r.doors & DIR_N)      { g.player.pos = { dcx + 12, TILE * 3.0f }; markP = { 0, -1 }; }
+            else if (r.doors & DIR_S) { g.player.pos = { dcx + 12, ROOM_PX_H - TILE * 3.0f }; markP = { 0, 1 }; }
+            else if (r.doors & DIR_W) { g.player.pos = { TILE * 3.0f, dcy + 12 }; markP = { -1, 0 }; }
+            else                      { g.player.pos = { ROOM_PX_W - TILE * 3.0f, dcy + 12 }; markP = { 1, 0 }; }
+            return false;
+        }
+        int key = markP.y < 0 ? K.up : markP.y > 0 ? K.down : markP.x < 0 ? K.left : K.right;
+        in::hold(key, true);
+        if ((g.dungeon.cx == fromX && g.dungeon.cy == fromY) && t < 3.0f) return false;
+        in::hold(key, false);
+        check("off-centre at a doorway, they slip round its edge and through (no snagging)", g.dungeon.cx != fromX || g.dungeon.cy != fromY);
+        goToRoom(g, [](const Room& r) { return r.isStart; });
+        return true;
+    });
+    add("monsters at arm's length", 5, [this](Game& g, float t) {
+        keepAlive = true;
+        if (t == 0) {
+            goToRoom(g, isCombatRoom);
+            g.enemies.clear();
+            g.player.pos = ROOM_CENTER;
+            g.spawnMonster(0, 1.0f);                    // a skeleton, across the room
+            g.enemies.back().pos = { ROOM_CENTER.x + 120, ROOM_CENTER.y };
+            g.enemies.back().flankSide = 0;
+            markF = 0; markX = 0; markY = 0;
+            return false;
+        }
+        if (g.enemies.empty()) return true;
+        const Enemy& e = g.enemies.front();
+        if (t > 2.5f) { markX += 1; if (e.walking) markY += 1; markF = fmaxf(markF, Vector2Distance(e.pos, g.player.pos)); }
+        if (t < 3.5f) return false;
+        float reach = e.r + PLAYER_R;
+        check(TextFormat("a monster that reaches you stands at arm's length (%.1f, its reach %.0f)", markF, reach + 4),
+            markF >= reach - 0.5f && markF < reach + 4);
+        check(TextFormat("...and stops walking there instead of shoving into you (walking %.0f of %.0f frames)", markY, markX),
+            markY <= markX * 0.1f);
+        check("...and bites", g.player.hp < g.player.maxHp || e.atkCd > 0);
+        g.enemies.clear();
+        keepAlive = false;
+        goToRoom(g, [](const Room& r) { return r.isStart; });
         return true;
     });
     add("vape speed", 3, [this](Game& g, float t) {
@@ -912,7 +993,7 @@ void Autopilot::build() {
     useExit("out of beray's", { 250, 750 });
     useExit("out of the castle again", { 78, 488 });
     add("left the castle", 3, [this](Game& g, float t) {
-        if (t < 0.3f) return false;
+        if (t < 0.3f || g.climbT != 0) return false;   // (down the ladder first)
         check("and out of the castle again", !g.hall.active);
         g.enemies.clear();
         return true;
@@ -1296,7 +1377,9 @@ void Autopilot::build() {
         return true;
     });
     add("iron balls", 3, [this](Game& g, float) {
-        if (countShots(g, ShotKind::Ball) < 3) return false;
+        // (they can be gone the frame they fly, if you stand at the staff's end: its sum shows they flew)
+        bool batted = g.fight.formula && TextIsEqual(g.fight.formula, "F1 d1 = F2 d2");
+        if (countShots(g, ShotKind::Ball) < 3 && !batted) return false;
         check("the staff's far end bats three iron balls", true);
         return true;
     });

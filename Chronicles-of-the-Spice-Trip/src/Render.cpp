@@ -92,10 +92,11 @@ static float enemyScale(const Enemy& e) { return kindScale(e) * (e.elite ? 1.5f 
 // A Mimic: a chest with legs, its lid snapping open and shut as it comes for you.
 static void drawMimic(const Enemy& e) {
     if (!e.dying) drawShadow(e.pos, e.r);
-    bool open = e.atkAnim > 0 || fmodf(e.animT * (e.moving ? 5.0f : 2.0f), 1.0f) < 0.5f;
+    float pace = e.walking ? e.stride / fmaxf(e.speed, 1.0f) : e.animT;   // hopping along, it snaps in step
+    bool open = e.atkAnim > 0 || fmodf(pace * (e.walking ? 5.0f : 2.0f), 1.0f) < 0.5f;
     const Anim& a = open ? SPR.chestOpen : SPR.chest;
     Color tint = e.dying ? Fade(WHITE, fmaxf(0, 1 - e.deathT / 0.6f)) : e.hitFlash > 0 ? Color{ 255, 150, 150, 255 } : WHITE;
-    Vector2 at = { e.pos.x, e.pos.y - 10 - (e.moving ? fabsf(sinf(e.animT * 12)) * 4 : 0) };
+    Vector2 at = { e.pos.x, e.pos.y - 10 - (e.walking ? fabsf(sinf(pace * 12)) * 4 : 0) };
     if (a.ok()) drawAnim(a, open ? a.frames - 1 : 0, at, 2.2f, e.flip, tint);
     else DrawRectangle((int)e.pos.x - 12, (int)e.pos.y - 18, 24, 18, { 120, 78, 40, 255 });
     if (open && !e.dying)                                   // teeth along the lip
@@ -128,7 +129,7 @@ void drawEnemy(const Enemy& e) {
             if (e.dying) { a = &A.death; t = e.deathT; fps = 14; loop = false; }
             else if (e.hitFlash > 0) { a = &A.hurt; t = 0.12f - e.hitFlash; fps = 40; loop = false; }
             else if (e.atkAnim > 0) { fps = attackFps(e.kind); a = &A.attack; t = A.attack.length(fps) - e.atkAnim; loop = false; }
-            else if (e.moving) { a = &A.move; fps = 12; }
+            else if (e.walking) { a = &A.move; fps = 12; t = e.stride / fmaxf(e.speed, 1.0f); }   // in step with the ground it covers
             int frame = animFrame(*a, t, fps, loop);
             drawAnim(*a, frame, at, sc, e.flip);
             if (e.hitFlash > 0) { BeginBlendMode(BLEND_ADDITIVE); drawAnim(*a, frame, at, sc, e.flip); EndBlendMode(); }   // struck: pure white

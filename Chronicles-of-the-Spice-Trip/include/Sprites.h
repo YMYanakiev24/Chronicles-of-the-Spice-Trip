@@ -7,6 +7,7 @@
 #pragma once
 
 #include "raylib.h"
+#include <vector>
 
 struct Anim {
     Texture2D tex{};
@@ -17,6 +18,10 @@ struct Anim {
 
 // Frame index for an animation that started `time` seconds ago.
 int animFrame(const Anim& a, float time, float fps, bool loop);
+
+// Where a moving sprite lands on screen, rounded to whole pixels: pixel art scaled by an odd
+// amount otherwise shimmers as it slides across the screen (drawAnim and walk sheets use it).
+Rectangle snapToPixels(Rectangle r);
 
 // Draw one frame centred at `center` (scaled), optionally mirrored.
 void drawAnim(const Anim& a, int frame, Vector2 center, float scale, bool flipX = false,
@@ -47,6 +52,8 @@ struct Sprites {
     Anim filThrow;                             // Filqcheto: wind-up, throw, arms wide for the storm (100 x 80, facing right)
     Anim krisaPunch;                           // Krisa: the jab, the punch landing (100 x 80, facing right)
     Anim grinder, grinderBig;                  // Filqcheto's grinders (one frame each)
+    Anim castleLadder;                         // the ladder up to the castle door: shut, open (tools/ladder.py)
+    Anim bossStairs;                           // the stairwell down from a beaten boss, and its glow (tools/stairs.py)
     EnemyAnims enemy[12];                     // indexed by EnemyKind (skull slot unused)
 
     void load();
@@ -69,10 +76,16 @@ Facing facingOf(Vector2 dir);
 struct WalkSheet {
     Texture2D tex{};
     int frames = 0, fw = 0, fh = 0;
+    // Each frame as drawn: the figure's feet planted on one line and its height kept steady,
+    // whatever the artist's frames did (some float, shrink or pulse as they step).
+    struct Fit { float scale = 1, foot = 0; };
+    std::vector<Fit> fit;                       // [row * frames + frame]
+    float footLine = 0;                         // where the feet go, in frame pixels
     bool ok() const { return tex.id != 0; }
     void load(const char* file, const char* dir = "walk/");   // dir: under assets/
     void unload();
-    // The frame index for standing (0), or stepping through the walk cycle at 8 frames a second.
+    // The frame index for standing (0), or stepping through the walk cycle: `time` is how long
+    // they've been walking at a walk's pace (8 frames a second): pace it by the ground covered.
     int  frameAt(bool walking, float time) const;
     // Draws one frame stretched over `dst`; `flash` adds a white flash (struck), `rotation`
     // (degrees) turns it about the middle of `dst`.
