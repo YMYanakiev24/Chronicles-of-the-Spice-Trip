@@ -102,6 +102,11 @@ struct Enemy {
     Vector2 look{ 0, 1 };              // Triceps: the way she faces as she walks
     int     pose = -1;                 // Triceps: the attack pose she strikes (-1: walking)
     int     lastHit = -1;              // co-op: the hero who hit it last (the kill is theirs)
+    // how it walks, as drawn: getting somewhere (not shoved, not pressed against you), its steps
+    // keeping pace with the ground it covers, and the way it's heading turning, not snapping
+    bool    walking = false;
+    float   stride = 0;
+    Vector2 heading{};
 };
 
 struct Particle {

@@ -87,9 +87,18 @@ other; then co-op can't work on that network.
 
 - **The dungeon.** Each floor is a grid of single-screen rooms, and the whole
   room is always on screen. Doors stay barred until a room is cleared. There are
-  spike traps, chests, and a start room with Vasil the Storyteller and the door to
+  spike traps, chests, and a start room with Vasil the Storyteller and the ladder up to
   the castle, where the shops are (see below).
-- **Boss fights.** The last room of every floor holds a boss (see below).
+- **Boss fights.** The last room of every floor holds a boss (see below). Once it
+  falls, a stairwell of black stone opens in the middle of its lair: runes glowing
+  round the rim, braziers burning either side, steps going down into a red light.
+  Walk onto it to go down; the next floor comes up out of the dark.
+- **Movement.** Steps keep pace with the ground covered (a run steps quicker,
+  pushing at a wall stands still), and figures are drawn on whole screen pixels so
+  they don't shimmer as they move. Head at a doorway slightly off-centre and you
+  slip round its edge instead of catching on it. Monsters turn rather than snap,
+  face the way they walk, stop at arm's length to bite instead of shoving into you,
+  and ease apart in a crowd instead of shaking.
 - **Champions.** Sixteen champions, each with a passive perk and a special on **Q**:
   Arcane Surge, Aura of Calmness, Coin Dash, Mug-Shield, Melon Roll, Drink,
   Bear Jump, Coin Slingshot, Release the Koi, Blink, Scare, Creatine & C++,
@@ -124,9 +133,9 @@ other; then co-op can't work on that network.
 
 ### The castle and its shops
 
-The first room of every floor has a wooden door in its top wall (the minimap
-marks the room with it). Walk up into it, or press **E** in front of it, and you
-are in the **Castle Corridor** (`assets/castle/corridor.png`). Its four doors lead
+The first room of every floor has a wooden ladder up its top wall to a little
+door (the minimap marks the room with a ladder). Press **E** at its foot, or walk up
+onto it, and you climb up and through the door into the **Castle Corridor** (`assets/castle/corridor.png`). Its four doors lead
 to four rooms, each with whoever keeps the shop behind their counter: walk up to
 the counter and press **E**. A room's Hallway door on the left, or the carpet at
 the bottom, takes you back to the corridor, and the corridor's side door takes
@@ -438,6 +447,8 @@ Chronicles-of-the-Spice-Trip/
                       assets/castle/ the castle's rooms, assets/outfits/ the outfits
   tools/outfits.py    makes the champions' figures in Beray's outfits
   tools/swords.py     draws the swords Galin sells
+  tools/ladder.py     draws the ladder up to the castle door
+  tools/stairs.py     draws the stairwell down from a beaten boss
   vendor/raylib/      raylib headers and library
   vendor/pl_mpeg/     pl_mpeg, the MPEG-1 decoder (MIT, one header)
   android/            the Android app (Gradle; raylib is fetched when it builds)

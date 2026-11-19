@@ -4,6 +4,8 @@
 #include "Sprites.h"
 #include "Render.h"
 #include "Common.h"
+#include "rlgl.h"
+#include <algorithm>
 #include <cmath>
 #include <string>
 
@@ -63,6 +65,8 @@ void Sprites::load() {
     krisaPunch = loadStrip("krisa_punch.png", 100);
     grinder = loadStrip("grinder.png", 65);
     grinderBig = loadStrip("grinder_big.png", 125);
+    castleLadder = loadStrip("castle_ladder.png", 36);
+    bossStairs = loadStrip("boss_stairs.png", 60);
     vapes = loadStrip("vapes.png", 32);
     spellIcons = loadStrip("spell_icons.png", 32);
     enemy[EK_SKELETON] = loadEnemy("skel1");
@@ -82,7 +86,7 @@ void Sprites::unload() {
     auto un = [](Texture2D& t) { if (t.id) UnloadTexture(t); t = Texture2D{}; };
     un(tileset);
     for (Anim* a : { &peaks, &chest, &chestOpen, &torch, &sideTorch, &candle, &candle2,
-                     &flaskRed, &flaskBlue, &flag, &coin, &skull, &flame, &key, &keySilver, &rock, &arrow, &vapes, &spellIcons, &galinSmoke, &daniilSling, &filThrow, &krisaPunch, &grinder, &grinderBig })
+                     &flaskRed, &flaskBlue, &flag, &coin, &skull, &flame, &key, &keySilver, &rock, &arrow, &vapes, &spellIcons, &galinSmoke, &daniilSling, &filThrow, &krisaPunch, &grinder, &grinderBig, &castleLadder, &bossStairs })
         un(a->tex);
     for (auto& e : enemy)
         for (Anim* a : { &e.idle, &e.move, &e.attack, &e.hurt, &e.death }) un(a->tex);
@@ -95,10 +99,25 @@ int animFrame(const Anim& a, float time, float fps, bool loop) {
     return f >= a.frames ? a.frames - 1 : f;
 }
 
+Rectangle snapToPixels(Rectangle r) {
+    // the world-to-screen scale and shift in effect (the camera's, or none for the HUD)
+    Matrix m = rlGetMatrixModelview();
+    float sx = m.m0, sy = m.m5;
+    if (fabsf(sx) < 1e-4f || fabsf(sy) < 1e-4f || fabsf(m.m1) > 1e-4f || fabsf(m.m4) > 1e-4f) return r;   // turned: leave it
+    float x0 = roundf(r.x * sx + m.m12), y0 = roundf(r.y * sy + m.m13);
+    float w = roundf(r.width * sx), h = roundf(r.height * sy);
+    return { (x0 - m.m12) / sx, (y0 - m.m13) / sy, w / sx, h / sy };
+}
+
 void drawAnim(const Anim& a, int frame, Vector2 center, float scale, bool flipX, Color tint, float rotation) {
     if (!a.ok()) return;
     Rectangle src = { (float)(frame * a.fw), 0, flipX ? -(float)a.fw : (float)a.fw, (float)a.fh };
     float w = a.fw * scale, h = a.fh * scale;
+    if (rotation == 0) {                            // on whole pixels, so it doesn't shimmer as it moves
+        Rectangle d = snapToPixels({ center.x - w / 2, center.y - h / 2, w, h });
+        DrawTexturePro(a.tex, src, d, { 0, 0 }, 0, tint);
+        return;
+    }
     DrawTexturePro(a.tex, src, { center.x, center.y, w, h }, { w / 2, h / 2 }, rotation, tint);
 }
 
@@ -121,15 +140,52 @@ Facing facingOf(Vector2 dir) {
 void WalkSheet::load(const char* file, const char* dir) {
     std::string p = findAsset((std::string(dir) + file).c_str());
     if (p.empty()) return;
-    tex = LoadTexture(p.c_str());
-    fh = tex.height / 3;
+    Image img = LoadImage(p.c_str());
+    if (!img.data) return;
+    ImageFormat(&img, PIXELFORMAT_UNCOMPRESSED_R8G8B8A8);
+    fh = img.height / 3;
     fw = fh * 3 / 4;
-    frames = fw > 0 ? tex.width / fw : 0;
+    frames = fw > 0 ? img.width / fw : 0;
     if (frames < 2) {
         TraceLog(LOG_WARNING, "%s is not a walk sheet (three rows of 3:4 frames)", p.c_str());
-        unload();
+        UnloadImage(img);
+        *this = WalkSheet{};
         return;
     }
+    // Measure every frame's figure: where its feet are and how tall it stands.
+    const Color* px = (const Color*)img.data;
+    struct Box { int top = -1, bottom = -1; };
+    std::vector<Box> box(3 * frames);
+    for (int row = 0; row < 3; ++row)
+        for (int f = 0; f < frames; ++f) {
+            Box& b = box[row * frames + f];
+            for (int y = 0; y < fh; ++y)
+                for (int x = 0; x < fw; ++x)
+                    if (px[(row * fh + y) * img.width + f * fw + x].a > 40) {
+                        if (b.top < 0) b.top = y;
+                        b.bottom = y + 1;
+                        break;
+                    }
+        }
+    // Feet on one line (the front view's, standing), every side as tall as the front, and no
+    // step dipping more than a touch below standing height.
+    const Box& ref = box[0];
+    footLine = ref.bottom > 0 ? (float)ref.bottom : (float)fh;
+    float refH = ref.bottom > ref.top && ref.top >= 0 ? (float)(ref.bottom - ref.top) : (float)fh;
+    fit.assign(3 * frames, Fit{ 1, footLine });
+    for (int row = 0; row < 3; ++row) {
+        const Box& stand = box[row * frames];
+        float standH = stand.top >= 0 ? (float)(stand.bottom - stand.top) : refH;
+        float rowScale = std::clamp(refH / standH, 0.9f, 1.12f);
+        for (int f = 0; f < frames; ++f) {
+            const Box& b = box[row * frames + f];
+            if (b.top < 0) continue;
+            float h = (float)(b.bottom - b.top);
+            fit[row * frames + f] = { rowScale * std::max(1.0f, 0.975f * standH / h), (float)b.bottom };
+        }
+    }
+    tex = LoadTextureFromImage(img);
+    UnloadImage(img);
     // The drawn figures are tiny pixel art: keep them crisp. A sheet cut from a big
     // painting (Momiche's) is drawn far smaller than it is, so give it mipmaps.
     if (fh > 64) { GenTextureMipmaps(&tex); SetTextureFilter(tex, TEXTURE_FILTER_TRILINEAR); }
@@ -143,13 +199,27 @@ void WalkSheet::unload() {
 
 int WalkSheet::frameAt(bool walking, float time) const {
     if (!walking || frames < 2) return 0;
-    return 1 + (int)(time * 8) % (frames - 1);
+    return 1 + (int)(fmaxf(0, time) * 8) % (frames - 1);
 }
 
 void WalkSheet::draw(Facing facing, int frame, Rectangle dst, Color tint, bool flash, float rotation) const {
     if (!ok()) return;
     int row = facing == FACE_DOWN ? 0 : facing == FACE_UP ? 1 : 2;
+    frame = std::clamp(frame, 0, frames - 1);
     Rectangle src = { (float)(frame * fw), (float)(row * fh), facing == FACE_LEFT ? -(float)fw : (float)fw, (float)fh };
+    if (rotation == 0) {                            // standing up: feet planted, steady height, whole pixels
+        Fit k = (size_t)(row * frames + frame) < fit.size() ? fit[row * frames + frame] : Fit{ 1, footLine };
+        float sy = dst.height / fh, footY = dst.y + footLine * sy;
+        Rectangle d = { dst.x + dst.width * (1 - k.scale) / 2, footY - k.foot * sy * k.scale, dst.width * k.scale, dst.height * k.scale };
+        d = snapToPixels(d);
+        DrawTexturePro(tex, src, d, { 0, 0 }, 0, tint);
+        if (flash) {
+            BeginBlendMode(BLEND_ADDITIVE);
+            DrawTexturePro(tex, src, d, { 0, 0 }, 0, WHITE);
+            EndBlendMode();
+        }
+        return;
+    }
     Vector2 origin = { dst.width / 2, dst.height / 2 };
     dst.x += origin.x; dst.y += origin.y;          // DrawTexturePro places the origin at dst.x, y
     DrawTexturePro(tex, src, dst, origin, rotation, tint);

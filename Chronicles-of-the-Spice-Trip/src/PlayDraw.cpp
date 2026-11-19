@@ -8,6 +8,7 @@
 #include "Ui.h"
 #include <algorithm>
 #include <cmath>
+#include <string>
 
 // --------------------------------------------------------------- the screen
 void Game::playScreen() {
@@ -95,6 +96,11 @@ void Game::playFrame(float dt) {
     DrawRectangle(0, 0, sw, sh, Fade(THEMES[theme()].fog, theme() ? 0.07f : 0.04f));
     if (player.auraT > 0) DrawRectangle(0, 0, sw, sh, Fade({ 120, 180, 255, 255 }, 0.06f));
     if (skyFlash > 0) DrawRectangle(0, 0, sw, sh, Fade({ 205, 225, 255, 255 }, skyFlash * 0.2f));
+    if (floor != shownFloor) { arriveFade = shownFloor > 0 && floor > shownFloor ? 1.0f : 0.6f; shownFloor = floor; }
+    if (arriveFade > 0) {                           // down the stairs: the new floor comes up out of the dark
+        DrawRectangle(0, 0, sw, sh, Fade(BLACK, fminf(1, arriveFade * 1.4f)));
+        arriveFade = fmaxf(0, arriveFade - GetFrameTime());
+    }
     drawHud();
 
     switch (overlay) {
@@ -254,39 +260,121 @@ void Game::drawRoom() {
         for (int i = 0; i < 4; ++i)
             drawAnim(SPR.flag, animFrame(SPR.flag, clock + i * 0.3f, 6, true), { (2 + i * 5 + (i > 1 ? 2 : 0)) * (float)TILE + 16, 14 }, 2.0f);
     if (r.isStart && mode == Mode::Run) {
-        // the castle door in the top wall: an arched double door, studded, under a gold plaque
-        float dx = CASTLE_DOOR_X, w = 52, top = 2, bot = TILE + 4;
-        DrawRectangle((int)(dx - w / 2 - 4), (int)top - 2, (int)w + 8, (int)(bot - top) + 4, { 34, 30, 40, 255 });
-        DrawCircleSector({ dx, top + 12 }, w / 2 + 4, 180, 360, 16, { 34, 30, 40, 255 });
-        DrawRectangle((int)(dx - w / 2), (int)top + 10, (int)w, (int)(bot - top) - 10, { 96, 58, 32, 255 });
-        DrawCircleSector({ dx, top + 12 }, w / 2, 180, 360, 16, { 96, 58, 32, 255 });
-        for (int k = -2; k <= 2; ++k)                        // planks
-            DrawLine((int)(dx + k * w / 5.0f), (int)top + 2, (int)(dx + k * w / 5.0f), (int)bot, { 70, 40, 22, 255 });
-        DrawLine((int)dx, (int)top - 12, (int)dx, (int)bot, { 40, 24, 14, 255 });
-        for (float by : { top + 8.0f, bot - 8.0f })          // iron bands and studs
-            DrawRectangle((int)(dx - w / 2), (int)by, (int)w, 3, { 50, 48, 56, 255 });
-        DrawCircle((int)dx - 5, (int)(top + bot) / 2 + 4, 2.5f, { 230, 190, 90, 255 });
-        DrawCircle((int)dx + 5, (int)(top + bot) / 2 + 4, 2.5f, { 230, 190, 90, 255 });
-        float glow = 0.5f + 0.5f * sinf(clock * 2);
-        DrawRectangle((int)(dx - w / 2), (int)bot, (int)w, 4, Fade({ 255, 200, 110, 255 }, 0.25f + 0.25f * glow));   // light under the door
+        // the castle: a ladder up the top wall to a little door, a torch beside it, light under the door
+        bool open = ladderDoorOpen();
+        float glow = 0.5f + 0.5f * sinf(clock * 2.3f) * sinf(clock * 3.7f + 1);
+        BeginBlendMode(BLEND_ADDITIVE);
+        DrawCircleGradient((int)CASTLE_DOOR_X, 30, open ? 64.0f : 40.0f, Fade({ 255, 170, 90, 255 }, (open ? 0.45f : 0.16f) + 0.08f * glow), BLANK);
+        EndBlendMode();
+        if (SPR.castleLadder.ok()) drawAnimOnFoot(SPR.castleLadder, open ? 1 : 0, { CASTLE_DOOR_X, 108 }, 72, 124);
+        else {
+            DrawRectangle((int)CASTLE_DOOR_X - 18, -8, 36, 40, { 96, 58, 32, 255 });
+            for (float y = 36; y < 106; y += 10) DrawRectangle((int)CASTLE_DOOR_X - 12, (int)y, 24, 3, { 137, 90, 69, 255 });
+            DrawRectangle((int)CASTLE_DOOR_X - 14, 32, 4, 74, { 137, 90, 69, 255 });
+            DrawRectangle((int)CASTLE_DOOR_X + 10, 32, 4, 74, { 137, 90, 69, 255 });
+        }
+        if (!open) {                                       // light under the shut door
+            BeginBlendMode(BLEND_ADDITIVE);
+            DrawRectangle((int)CASTLE_DOOR_X - 14, 29, 28, 2, Fade({ 255, 200, 110, 255 }, 0.35f + 0.3f * glow));
+            EndBlendMode();
+        }
+        if (SPR.torch.ok())
+            drawAnim(SPR.torch, animFrame(SPR.torch, clock + 0.37f, 8, true), { CASTLE_DOOR_X - 52, 14 }, 2.0f);
         drawAnim(SPR.candle2, animFrame(SPR.candle2, clock + 0.5f, 7, true), { ROOM_PX_W - 3 * TILE, 2.5f * TILE }, 2.0f);
         drawAnim(SPR.candle2, animFrame(SPR.candle2, clock + 0.1f, 7, true), { ROOM_PX_W - 3 * TILE, ROOM_PX_H - 2.5f * TILE }, 2.0f);
     }
+}
+
+// An iron brazier on three legs, burning.
+static void drawBrazier(Vector2 foot, float t, float seed) {
+    const Color out = { 14, 10, 18, 255 }, iron = { 46, 42, 54, 255 }, ironL = { 96, 90, 108, 255 };
+    drawShadow({ foot.x, foot.y + 2 }, 11);
+    for (float lx : { -9.0f, 0.0f, 9.0f }) {
+        DrawLineEx({ foot.x + lx, foot.y }, { foot.x + lx * 0.4f, foot.y - 16 }, 4, out);
+        DrawLineEx({ foot.x + lx, foot.y }, { foot.x + lx * 0.4f, foot.y - 16 }, 2, iron);
+    }
+    DrawRectangle((int)foot.x - 13, (int)foot.y - 24, 26, 9, out);          // the bowl
+    DrawRectangle((int)foot.x - 12, (int)foot.y - 23, 24, 7, iron);
+    DrawRectangle((int)foot.x - 12, (int)foot.y - 23, 24, 2, ironL);
+    for (int k = -1; k <= 1; ++k) DrawRectangle((int)foot.x + k * 8 - 1, (int)foot.y - 20, 2, 2, ironL);   // rivets
+    DrawRectangle((int)foot.x - 10, (int)foot.y - 26, 20, 3, { 40, 18, 16, 255 });                       // coals
+    for (int k = 0; k < 5; ++k) DrawRectangle((int)foot.x - 9 + k * 4, (int)foot.y - 26, 2, 2, { 255, 120, 40, 255 });
+    // the fire: tongues of flame licking up, flickering, sparks flying off
+    auto tongue = [](Vector2 base, float r, float h, float sway, Color c) {
+        Vector2 tip = { base.x + sway, base.y - h }, l = { base.x - r, base.y }, rr = { base.x + r, base.y };
+        DrawCircleV(base, r, c);
+        if ((rr.x - l.x) * (tip.y - l.y) - (rr.y - l.y) * (tip.x - l.x) > 0) DrawTriangle(l, tip, rr, c);
+        else DrawTriangle(l, rr, tip, c);
+    };
+    BeginBlendMode(BLEND_ADDITIVE);
+    DrawCircleGradient((int)foot.x, (int)foot.y - 32, 36, Fade({ 255, 110, 40, 255 }, 0.20f + 0.06f * sinf(t * 9 + seed)), BLANK);
+    for (int k = 0; k < 3; ++k) {
+        float off = (k - 1) * 6.0f, tall = k == 1 ? 1.0f : 0.62f;
+        float flick = 0.8f + 0.25f * sinf(t * 11 + seed + k * 2.1f) + 0.1f * sinf(t * 23 + k);
+        float sway = sinf(t * 5 + seed + k) * 2.5f;
+        Vector2 base = { foot.x + off, foot.y - 28 };
+        tongue(base, 5.5f * tall + 1.5f, 24 * tall * flick, sway, Fade({ 220, 50, 20, 255 }, 0.75f));
+        tongue({ base.x, base.y + 1 }, 4.0f * tall + 1, 17 * tall * flick, sway * 0.8f, Fade({ 255, 150, 50, 255 }, 0.85f));
+        tongue({ base.x, base.y + 2 }, 2.2f * tall + 0.6f, 9 * tall * flick, sway * 0.5f, Fade({ 255, 236, 170, 255 }, 0.9f));
+    }
+    for (int k = 0; k < 4; ++k) {                       // sparks
+        float ph = fmodf(t * (0.9f + 0.2f * k) + seed * 0.3f + k * 0.31f, 1.0f);
+        Vector2 sp = { foot.x + sinf(k * 3.1f + seed) * 8 + sinf(t * 3 + k) * 4 * ph, foot.y - 34 - ph * 30 };
+        DrawRectangleV(sp, { 2, 2 }, Fade({ 255, 190, 90, 255 }, 0.9f * (1 - ph)));
+    }
+    EndBlendMode();
+}
+
+// The way down from a beaten boss: a well of black stone cut in the floor, runes round its rim
+// glowing like coals, steps falling away into a red light, embers and smoke rising out of it,
+// and a brazier burning either side.
+void Game::drawBossStairs() {
+    Vector2 c = ROOM_CENTER;
+    float pulse = 0.5f + 0.5f * sinf(clock * 2.1f) * (0.7f + 0.3f * sinf(clock * 5.3f));
+    BeginBlendMode(BLEND_ADDITIVE);                 // the light coming up out of it, on the floor round about
+    DrawCircleGradient((int)c.x, (int)c.y - 18, 92, Fade({ 170, 24, 30, 255 }, 0.20f + 0.12f * pulse), BLANK);
+    EndBlendMode();
+    // smoke curling over the rim, slow
+    for (int i = 0; i < 4; ++i) {
+        float ph = fmodf(clock * 0.06f + i * 0.25f, 1.0f);
+        float x = c.x - 70 + ph * 140, y = c.y + 26 - i * 14 + sinf(clock * 0.7f + i) * 4;
+        DrawEllipse((int)x, (int)y, 34, 9, Fade({ 26, 12, 30, 255 }, 0.22f * sinf(ph * PI)));
+    }
+    if (SPR.bossStairs.ok()) {
+        drawAnim(SPR.bossStairs, 0, c, 2.0f);
+        BeginBlendMode(BLEND_ADDITIVE);             // the runes and the light below, breathing
+        drawAnim(SPR.bossStairs, 1, c, 2.0f, false, Fade(WHITE, 0.55f + 0.45f * pulse));
+        EndBlendMode();
+    }
+    else {
+        DrawRectangle((int)c.x - 40, (int)c.y - 34, 80, 68, { 14, 10, 18, 255 });
+        for (int i = 0; i < 5; ++i)
+            DrawRectangle((int)c.x - 34 + i * 3, (int)c.y + 22 - i * 10, 68 - i * 6, 8,
+                { (unsigned char)(60 - i * 10), (unsigned char)(50 - i * 9), (unsigned char)(70 - i * 12), 255 });
+        DrawRectangle((int)c.x - 20, (int)c.y - 30, 40, 10, { 150, 26, 32, 255 });
+    }
+    // embers drifting up out of the dark
+    BeginBlendMode(BLEND_ADDITIVE);
+    for (int i = 0; i < 22; ++i) {
+        float speed = 0.28f + 0.07f * (i % 5);
+        float ph = fmodf(clock * speed + i * 0.137f, 1.0f);
+        float x0 = c.x - 22 + fmodf(i * 23.7f, 44.0f);
+        Vector2 p = { x0 + sinf(clock * 1.8f + i * 1.7f) * 7 * ph, c.y - 22 - ph * 86 };
+        float a = sinf(ph * PI);
+        Color col = i % 3 == 0 ? Color{ 255, 210, 120, 255 } : Color{ 255, 90, 50, 255 };
+        DrawRectangleV({ p.x - 1, p.y - 1 }, { 2.0f + (i % 2), 2.0f + (i % 2) }, Fade(col, 0.85f * a));
+    }
+    EndBlendMode();
+    drawBrazier({ c.x - 84, c.y + 30 }, clock, 0.0f);
+    drawBrazier({ c.x + 84, c.y + 30 }, clock, 1.7f);
 }
 
 // --------------------------------------------------------------- the actors
 void Game::drawActors() {
     Room& r = dungeon.cur();
 
-    // the staircase down, once the boss falls
-    if (mode == Mode::Run && r.isBoss && r.cleared) {
-        float sx = ROOM_CENTER.x, sy = ROOM_CENTER.y;
-        DrawRectangle((int)sx - 30, (int)sy - 24, 60, 48, { 8, 8, 12, 255 });
-        for (int i = 0; i < 4; ++i)
-            DrawRectangle((int)sx - 26 + i * 3, (int)sy - 18 + i * 11, 52 - i * 6, 9,
-                { (unsigned char)(78 - i * 14), (unsigned char)(74 - i * 14), (unsigned char)(96 - i * 16), 255 });
-        DrawRectangleLinesEx({ sx - 30, sy - 24, 60, 48 }, 2, { 150, 140, 90, 255 });
-    }
+    // the stairwell down, once the boss falls
+    if (mode == Mode::Run && r.isBoss && r.cleared) drawBossStairs();
 
     if (r.hasSilverKey && r.cleared && !dungeon.silverFound) {      // the treasure room's key
         Vector2 k = { SILVER_POS.x, SILVER_POS.y - 6 + sinf(clock * 3 + 1) * 3 };
@@ -441,6 +529,15 @@ void Game::drawHero() {
         }
         return;
     }
+    if (climbT != 0) {                              // on the castle ladder: their back to you, stepping up the rungs
+        const WalkSheet& w = figure(player.champion);
+        float into = climbT > 0 ? climbT / (CLIMB_UP * 0.22f) : (CLIMB_DOWN + climbT) / (CLIMB_DOWN * 0.22f);
+        Color tint = Fade(WHITE, fminf(1, into));      // through the door at the top, they fade
+        const float fw = 24 * 1.4f, fh = 32 * 1.4f;
+        if (w.ok()) w.draw(FACE_UP, w.frameAt(true, heroStride * STEP_PACE), { player.pos.x - fw / 2, player.pos.y - 10 - fh / 2, fw, fh }, tint);
+        else ::drawHero(player.pos, { 0, -1 }, 0, false, Fade(champ().cloak, fminf(1, into)));
+        return;
+    }
     float lift = player.jumpT > 0 ? sinf((1 - player.jumpT / 0.6f) * PI) * 22 : 0;
     if (player.auraT > 0) {
         float pulse = 34 + sinf(clock * 6) * 3;
@@ -482,7 +579,7 @@ void Game::drawHero() {
     else if (player.roll > 0 && figure(player.champion).ok())
         drawRolling(figure(player.champion), player.pos, player.rollDir, player.facing, 1 - player.roll / ROLL_TIME, player.hitFlash > 0);
     // walking as their own figure, facing the way they walk (or aim, standing still)
-    else drawChampion(figure(player.champion), player.pos, heroMoving ? heroMoveDir : player.facing, heroMoving, clock,
+    else drawChampion(figure(player.champion), player.pos, heroMoving ? heroMoveDir : player.facing, heroStepping, heroStride * STEP_PACE,
         player.facing, player.meleeAnim, player.hitFlash > 0, champ().cloak,
         { weaponTex[player.weapon], WEAPONS[player.weapon].slant, bladeReach() * 0.95f }, lift);
     if (player.shieldT > 0) {
@@ -580,14 +677,14 @@ void Game::drawHud() {
         prompt(cam, { chestPos.x, chestPos.y - 34 }, E, "open");
     if (r.isTreasure && !r.chestOpened && Vector2Distance(player.pos, ROOM_CENTER) < 48)
         prompt(cam, { ROOM_CENTER.x, ROOM_CENTER.y - 54 }, E, "open the hoard");
-    if (r.isStart && mode == Mode::Run && overlay == Overlay::None && dialogue.empty()
-        && fabsf(player.pos.x - CASTLE_DOOR_X) < 30 && player.pos.y < CASTLE_DOOR_FRONT.y + 10)
-        prompt(cam, { CASTLE_DOOR_X, TILE * 1.0f + 6 }, E, "Castle Corridor");
+    if (r.isStart && mode == Mode::Run && overlay == Overlay::None && dialogue.empty() && climbT == 0
+        && fabsf(player.pos.x - CASTLE_DOOR_X) < 28 && player.pos.y < CASTLE_DOOR_FRONT.y + 16)
+        prompt(cam, { CASTLE_DOOR_X, 34 }, E, "Climb to the castle");
     if (r.isStart && mode == Mode::Run && dialogue.empty() && Vector2Distance(player.pos, VASIL_POS) < 56)
         prompt(cam, { VASIL_POS.x, VASIL_POS.y - 62 }, E, "hear the tale");
     if (mode == Mode::Run && r.isBoss && r.cleared && Vector2Distance(player.pos, ROOM_CENTER) < 70)
-        ui::textCentered("Descend", GetWorldToScreen2D({ ROOM_CENTER.x, ROOM_CENTER.y - 46 }, cam).x,
-            GetWorldToScreen2D({ ROOM_CENTER.x, ROOM_CENTER.y - 46 }, cam).y, 20, ui::ACCENT);
+        ui::textCentered("Descend", GetWorldToScreen2D({ ROOM_CENTER.x, ROOM_CENTER.y - 70 }, cam).x,
+            GetWorldToScreen2D({ ROOM_CENTER.x, ROOM_CENTER.y - 70 }, cam).y, 20, { 255, 120, 90, 255 });
 
     // --- vitals (top-left) ---
     Rectangle box = { 16, 16, 340, 100 };
@@ -617,7 +714,9 @@ void Game::drawHud() {
     if (mode == Mode::Run && dungeon.silverFound && hoardWaits) drawKey({ box.x + 90, box.y + box.height + 22 }, 0.8f, true);
     const char* where = mode == Mode::Run ? TextFormat("Floor %d   %s", floor, ui::clock(runTime))
                                           : TextFormat("Boss Rush %d/%d   %s", rushStage + 1, BOSS_COUNT, ui::clock(rushTime));
-    ui::text(where, box.x + 100, box.y + box.height + 16, 10, ui::MUTED);
+    float whereW = (float)ui::measure(where, 10);       // (on a dark backing: it sits over the room's corner)
+    DrawRectangleRounded({ box.x + 94, box.y + box.height + 12, whereW + 12, 18 }, 0.4f, 4, Fade(BLACK, 0.45f));
+    ui::text(where, box.x + 100, box.y + box.height + 16, 10, ui::TEXT);
 
     // the weapon in hand and the packs in your pocket
     float wy = box.y + box.height + 44;
@@ -804,7 +903,10 @@ void Game::drawMinimap() {
             int rx = ox + (x - minX) * (cell + gap), ry = oy + (y - minY) * (cell + gap);
             DrawRectangle(rx, ry, cell, cell, c);
             if (rm.isBoss) DrawRectangle(rx + 5, ry + 5, cell - 10, cell - 10, { 30, 10, 10, 255 });
-            if (rm.isStart) { DrawRectangle(rx + 5, ry + 3, 6, 6, { 120, 70, 40, 255 }); DrawRectangle(rx + 7, ry + 5, 2, 4, { 236, 196, 110, 255 }); }   // the castle door
+            if (rm.isStart) {                          // the castle ladder
+                DrawRectangle(rx + 5, ry + 2, 2, 9, { 176, 112, 80, 255 }); DrawRectangle(rx + 10, ry + 2, 2, 9, { 176, 112, 80, 255 });
+                for (int k = 0; k < 3; ++k) DrawRectangle(rx + 7, ry + 3 + k * 3, 3, 1, { 236, 196, 110, 255 });
+            }
             if (cur) DrawRectangleLinesEx({ (float)rx - 2, (float)ry - 2, cell + 4.0f, cell + 4.0f }, 2, RAYWHITE);
         }
 }
@@ -1182,17 +1284,18 @@ void Game::drawSummary() {
     drawName(player.champion, x, y, 30, ui::ACCENT);
     ui::text(TextFormat("%s%s", DIFFICULTIES[difficulty].name, hardcore ? "  -  hardcore" : ""), x, y + 40, 10, ui::MUTED);
     if (!summaryWon && stats.killer[0]) ui::text(TextFormat("Killed by %s on floor %d", stats.killer, floor), x, y + 58, 20, ui::BAD);
-    const char* rows[][2] = {
-        { "Floor reached", TextFormat("%d", floor) }, { "Time", ui::clock(runTime) }, { "Level", TextFormat("%d", player.level) },
-        { "Kills", TextFormat("%d", kills) }, { "Gold earned", TextFormat("%d", stats.goldEarned) }, { "Gold lost", TextFormat("%d", stats.goldLost) },
-        { "Damage dealt", TextFormat("%d", stats.damageDealt) }, { "Damage taken", TextFormat("%d", stats.damageTaken) },
-        { "Deaths", TextFormat("%d", stats.deaths) },
+    // (kept as strings: TextFormat has only a few buffers, and nine of them at once overwrote each other)
+    const std::pair<const char*, std::string> rows[] = {
+        { "Floor reached", std::to_string(floor) }, { "Time", ui::clock(runTime) }, { "Level", std::to_string(player.level) },
+        { "Kills", std::to_string(kills) }, { "Gold earned", std::to_string(stats.goldEarned) }, { "Gold lost", std::to_string(stats.goldLost) },
+        { "Damage dealt", std::to_string(stats.damageDealt) }, { "Damage taken", std::to_string(stats.damageTaken) },
+        { "Deaths", std::to_string(stats.deaths) },
     };
     float ry = y + 100;
     for (int i = 0; i < (int)(sizeof rows / sizeof rows[0]); ++i) {
         float cx = x + (i % 2) * (pw / 2 - 10), cy = ry + (i / 2) * 30;
-        ui::text(rows[i][0], cx, cy, 20, ui::MUTED);
-        ui::textRight(rows[i][1], cx + pw / 2 - 60, cy, 20, ui::TEXT);
+        ui::text(rows[i].first, cx, cy, 20, ui::MUTED);
+        ui::textRight(rows[i].second.c_str(), cx + pw / 2 - 60, cy, 20, ui::TEXT);
     }
     float bw = 220, by = p.y + ph - 74;
     if (ui::button({ p.x + pw / 2 - bw - 10, by, bw, 50 }, "New Run", ui::Style::Primary)) { play("ui"); toMenu(); screen = Screen::Setup; return; }

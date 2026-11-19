@@ -133,11 +133,44 @@ float Game::updateWorldTimers(float dt) {
 }
 
 // The hero in the fields: their timers, the hotbar, moving, traps, keys, chests, doors and attacks.
+// On the castle ladder: up it and through the door (then the castle), or down it from the castle.
+void Game::updateClimb(float dt) {
+    player.invuln = fmaxf(player.invuln, 0.1f);
+    player.roll = 0; player.dashT = 0; player.rollAtkT = 0;
+    Vector2 was = player.pos;
+    if (climbT > 0) {
+        climbT = fmaxf(0, climbT - dt);
+        float k = 1 - climbT / CLIMB_UP;
+        float onto = fminf(1, k / 0.2f);                // the first step: lined up with the ladder
+        player.pos = { Lerp(climbFrom.x, CASTLE_DOOR_X, onto), Lerp(climbFrom.y, LADDER_TOP_Y, k) };
+    }
+    else {
+        climbT = fminf(0, climbT + dt);
+        player.pos = { CASTLE_DOOR_X, Lerp(CASTLE_DOOR_FRONT.y, LADDER_TOP_Y, -climbT / CLIMB_DOWN) };
+    }
+    heroMoving = true; heroMoveDir = { 0, -1 }; player.facing = { 0, -1 };   // (their back to you, hand over hand)
+    heroStepping = climbT != 0;
+    heroStride += Vector2Distance(was, player.pos) * 1.4f;
+    if (climbT == 0) {
+        if (player.pos.y < CASTLE_DOOR_FRONT.y - 10) enterCastle();          // through the door at the top
+        else { heroMoving = false; heroMoveDir = { 0, 1 }; player.facing = { 0, 1 }; }   // down at the foot
+    }
+}
+
+bool Game::ladderDoorOpen() const {
+    auto opening = [](float c) { return (c > 0 && c < CLIMB_UP * 0.35f) || (c < 0 && c < -CLIMB_DOWN * 0.7f); };
+    if (opening(climbT)) return true;
+    for (int h = 0; h < heroCount; ++h)
+        if (h != curHero && heroes[h].present && opening(heroes[h].climbT)) return true;
+    return false;
+}
+
 void Game::updateHero(float dt) {
     Room& room = dungeon.cur();
     const ChampionDef& c = champ();
     Keybinds& K = settings.keys;
     bool talking = !dialogue.empty();
+    if (climbT != 0) { updateClimb(dt); return; }   // on the castle ladder: nothing else till they're off it
 
     // --- timers ---
     for (float* timer : { &player.castCd, &player.meleeCd, &player.rollCd, &player.invuln, &player.hitFlash,
@@ -263,10 +296,13 @@ void Game::updateHero(float dt) {
         else player.hp = fminf(player.maxHp, player.hp + 10);
     }
 
-    // --- the castle door in the first room: E, or walk up into it ---
-    if (room.isStart && mode == Mode::Run && !talking && castleDoorCd <= 0 && fabsf(player.pos.x - CASTLE_DOOR_X) < 30 && player.pos.y < CASTLE_DOOR_FRONT.y + 10
-        && (in::pressed(K.interact) || (mv.y < -0.5f && player.pos.y < TILE + PLAYER_R + 6))) {
-        enterCastle();
+    // --- the castle ladder in the first room: E at its foot, or walk up onto it ---
+    if (room.isStart && mode == Mode::Run && !talking && castleDoorCd <= 0 && fabsf(player.pos.x - CASTLE_DOOR_X) < 28
+        && player.pos.y < CASTLE_DOOR_FRONT.y + 16
+        && (in::pressed(K.interact) || (mv.y < -0.5f && fabsf(player.pos.x - CASTLE_DOOR_X) < 14 && player.pos.y < CASTLE_DOOR_FRONT.y + 2))) {
+        climbT = CLIMB_UP; climbFrom = player.pos;
+        dialogue.clear();
+        play("lid");
         return;
     }
 
@@ -553,7 +589,13 @@ void Game::movePlayer(float dt, Vector2 mv) {
             * (player.has(VP_MANGO) ? 1.1f : 1.0f) * (player.jumpT > 0 ? 1.5f : 1.0f);
         delta = Vector2Scale(mv, speed * dt);
     }
+    Vector2 was = player.pos;
     player.pos = moveInRoom(player.pos, delta, PLAYER_R, room, doorsOpen);
+    // the steps keep pace with the ground covered: a run steps quicker, and pushing at a wall stands
+    bool walking = (mv.x || mv.y) && player.roll <= 0 && player.dashT <= 0 && player.rollAtkT <= 0;
+    float moved = Vector2Distance(was, player.pos);
+    if (dt > 0) heroStepping = walking && moved > WALK * 0.08f * dt;
+    if (heroStepping) heroStride += moved;
 
     if (player.jumpT > 0) {                        // Bear Jump: land with a slam
         player.jumpT -= dt;
@@ -1198,6 +1240,7 @@ void Game::updateEnemies(float dt, float slow) {
         bool stayAway = true;                   // (nobody to go for: nobody to hit)
         bool& untouchable = nobody ? stayAway : untouchables[target];
         float edt = dt * slow;
+        bool wasWalking = e.walking;
         e.hitFlash = fmaxf(0, e.hitFlash - dt);
         if (e.burnT > 0) {
             e.burnT = fmaxf(0, e.burnT - dt);
@@ -1215,6 +1258,7 @@ void Game::updateEnemies(float dt, float slow) {
         e.atkAnim = fmaxf(0, e.atkAnim - edt);
         Vector2 to = Vector2Subtract(player.pos, e.pos);
         float d = Vector2Length(to);
+        Vector2 stepFrom = e.pos;                   // (what it walks this frame, not what shoves it)
         e.charmT = fmaxf(0, e.charmT - dt);
         e.dazeT = fmaxf(0, e.dazeT - dt);
         // Vanessa's kiss (it stands gazing at her) or Krisa's punch (it stands seeing stars): no moving, no attacking
@@ -1250,8 +1294,11 @@ void Game::updateEnemies(float dt, float slow) {
             }
         }
         else if (e.bossForm < 0) {  // boss bodies are moved by the BossFight
-            if (fabsf(to.x) > 2) e.flip = to.x < 0;
-            e.moving = d > 1 && e.atkAnim <= 0 && Vector2LengthSqr(e.knock) < 400;     // plant feet while swinging or reeling
+            // close enough to strike: it stops there, rather than shoving into you (it walks on
+            // once you're a step further off, so it doesn't twitch at the edge)
+            float reach = e.r + PLAYER_R + (wasWalking ? 2.0f : 3.5f);   // (inside its bite: it never stands just out of reach)
+            bool atYou = d < reach && !nobody;
+            e.moving = !atYou && d > 1 && e.atkAnim <= 0 && Vector2LengthSqr(e.knock) < 400;     // plant feet while swinging or reeling
             e.lunge = fmaxf(0, e.lunge - edt);
             e.lungeCd = fmaxf(0, e.lungeCd - edt);
             if (e.kind == EK_SOLDIER && d < SOLDIER_RANGE && d > 0.01f && lineClear(room, e.pos, player.pos, e.r + 4)) {
@@ -1285,9 +1332,28 @@ void Game::updateEnemies(float dt, float slow) {
                 if (leaps && sees && d < (e.kind == EK_DEMON ? 190 : 130) && d > 40 && e.lungeCd <= 0) { e.lunge = 0.35f; e.lungeCd = 2.5f; }
                 if (e.kind == EK_DEMON && e.lunge > 0 && frand(0, 1) < edt * 70)     // a streak of embers behind it
                     parts.push_back({ { e.pos.x + frand(-6, 6), e.pos.y - frand(0, 16) }, { frand(-12, 12), frand(-24, 6) }, 0.35f, 0.35f, frand(1.5f, 3.2f), { 200, 40, 50, 255 }, 0, true });
+                // turn towards it over a moment instead of snapping (no zigzag along walls); a lunge goes straight
+                if (e.lunge > 0 || Vector2LengthSqr(e.heading) < 0.01f) e.heading = dir;
+                else {
+                    Vector2 h = Vector2Lerp(e.heading, dir, fminf(1.0f, 12.0f * edt));
+                    e.heading = Vector2LengthSqr(h) > 1e-4f ? Vector2Normalize(h) : dir;
+                }
                 float spd = e.speed * (e.lunge > 0 ? 2.6f : 1.0f);
-                e.pos = moveInRoom(e.pos, Vector2Scale(dir, spd * edt), e.r, room, doorsOpen);
+                e.pos = moveInRoom(e.pos, Vector2Scale(e.heading, spd * edt), e.r, room, doorsOpen);
             }
+        }
+
+        // walking, as drawn: covering ground at a fair pace (a shove or a wall doesn't count), facing
+        // the way it walks; standing, it faces its hero (and doesn't flip over a step either side of them)
+        if (e.bossForm < 0 && edt > 0) {
+            Vector2 stepped = Vector2Subtract(e.pos, stepFrom);
+            float moved = Vector2Length(stepped);
+            e.walking = moved > e.speed * 0.2f * edt;
+            if (e.walking) {
+                e.stride += fminf(moved, e.speed * 1.6f * edt);   // a lunge steps quicker, but not in a blur
+                if (fabsf(stepped.x) > moved * 0.3f) e.flip = stepped.x < 0;
+            }
+            else if (!charmed && fabsf(to.x) > 8) e.flip = e.bossForm < 0 && scared ? to.x > 0 : to.x < 0;
         }
 
         // Never left inside a wall or out past the edge: a shove that went too far puts it back on the nearest floor.
@@ -1326,7 +1392,8 @@ void Game::updateEnemies(float dt, float slow) {
             float sd = Vector2Length(sep), need = e.r + o.r;
             if (sd >= need) continue;
             Vector2 n = sd > 0.01f ? Vector2Scale(sep, 1.0f / sd) : Vector2{ 0, 1 };
-            e.pos = moveInRoom(e.pos, Vector2Scale(n, (need - sd) * 0.5f), e.r, room, doorsOpen);
+            // eased apart over a few frames: shoved the whole way at once, a crowd shakes
+            e.pos = moveInRoom(e.pos, Vector2Scale(n, (need - sd) * 0.3f), e.r, room, doorsOpen);
         }
 
         // A swing takes a moment: what it does comes partway through the animation

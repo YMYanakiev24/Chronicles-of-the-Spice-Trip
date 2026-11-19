@@ -53,6 +53,7 @@ namespace castle {
         int   place = CORRIDOR;
         Vector2 pos{}, face{ 1, 0 };
         bool  moving = false;
+        float stride = 0;           // how far they've walked, at a walk's scale (their steps keep pace)
         float shown = 0;            // seconds in this place (the name fades in)
     };
 

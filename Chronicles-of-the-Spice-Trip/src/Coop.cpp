@@ -23,6 +23,7 @@ void Game::saveHeroTo(Hero& h) const {
     h.punchT = punchT; h.punchLanded = punchLanded; h.punchDir = punchDir;
     h.slingT = slingT; h.slingFired = slingFired; h.castingSpell = castingSpell; h.castT = castT;
     h.heroMoving = heroMoving; h.heroMoveDir = heroMoveDir; h.shopMsgT = shopMsgT; h.shopMsg = shopMsg;
+    h.heroStepping = heroStepping; h.heroStride = heroStride; h.climbT = climbT; h.climbFrom = climbFrom;
     h.outfit = heroOutfit; h.name = heroName; h.downT = heroDownT;
 }
 
@@ -34,6 +35,7 @@ void Game::loadHeroFrom(const Hero& h) {
     punchT = h.punchT; punchLanded = h.punchLanded; punchDir = h.punchDir;
     slingT = h.slingT; slingFired = h.slingFired; castingSpell = h.castingSpell; castT = h.castT;
     heroMoving = h.heroMoving; heroMoveDir = h.heroMoveDir; shopMsgT = h.shopMsgT; shopMsg = h.shopMsg;
+    heroStepping = h.heroStepping; heroStride = h.heroStride; climbT = h.climbT; climbFrom = h.climbFrom;
     heroOutfit = h.outfit; heroName = h.name; heroDownT = h.downT;
 }
 

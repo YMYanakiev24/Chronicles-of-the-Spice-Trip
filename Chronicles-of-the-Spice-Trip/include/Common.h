@@ -14,6 +14,8 @@ inline constexpr int   TILE = 32;
 // --- Player kinematics ------------------------------------------------------
 inline constexpr float WALK = 130.0f;
 inline constexpr float RUN = 210.0f;
+// A walking figure's steps against the ground it covers: 10 frames a second at a walk (16 running).
+inline constexpr float STEP_PACE = 1.25f / WALK;
 inline constexpr float ROLL_SPEED = 360.0f;
 inline constexpr float ROLL_TIME = 0.28f;      // seconds a dodge-roll lasts
 inline constexpr float PLAYER_R = 11.0f;

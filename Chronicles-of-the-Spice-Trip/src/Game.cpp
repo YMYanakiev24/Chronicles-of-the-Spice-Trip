@@ -279,7 +279,7 @@ Player freshPlayer(int champion, int level) {
 }
 
 void Game::startRun() {
-    hall = castle::Hall{};
+    hall = castle::Hall{}; climbT = 0;
     mode = Mode::Run;
     player = freshPlayer(profile.champion, 1);
     player.pos = ROOM_CENTER;
@@ -394,7 +394,7 @@ void Game::enterRoom() {
     int me = curHero;
     for (int h = 0; h < heroCount; ++h) {          // whatever they were in the middle of stops at the door
         if (coop.active()) { if (h != curHero && (!heroes[h].present || heroes[h].hall.active)) continue; useHero(h); }
-        gymT = 0; slingT = 0; throwT = 0; punchT = 0; castT = 0;
+        gymT = 0; slingT = 0; throwT = 0; punchT = 0; castT = 0; climbT = 0;
         if (overlay == Overlay::Shop || overlay == Overlay::Galin || overlay == Overlay::Casino || overlay == Overlay::Drip) overlay = Overlay::None;
     }
     useHero(me);

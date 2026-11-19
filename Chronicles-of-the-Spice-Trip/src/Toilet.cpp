@@ -119,6 +119,7 @@ namespace toilet {
             Vector2 step = Vector2Scale(d, fminf(speed * dt, len) / len);
             L.sPos = Vector2Add(L.sPos, step);
             L.sFace = Vector2Normalize(d);
+            L.sStride += Vector2Length(step);
         }
         L.sMoving = true;
         return false;
@@ -214,10 +215,12 @@ void Game::updateToilet(float dt) {
         }
         else if (L.peeT <= 0 && (mv.x || mv.y)) {            // no walking while you pee
             float speed = (in::down(K.run) ? RUN : WALK) * champ().speedMul;
-            Vector2 d = Vector2Scale(mv, speed * dt);
+            Vector2 d = Vector2Scale(mv, speed * dt), was = L.pos;
             if (walkable({ L.pos.x + d.x, L.pos.y })) L.pos.x += d.x;
             if (walkable({ L.pos.x, L.pos.y + d.y })) L.pos.y += d.y;
-            L.face = mv; L.moving = true;
+            float moved = Vector2Distance(was, L.pos);
+            L.face = mv; L.moving = moved > WALK * 0.08f * dt;
+            L.stride += moved;
         }
     }
     if (in::pressed(K.special) && L.peeT <= 0 && L.peeCd <= 0) {
@@ -368,7 +371,7 @@ void Game::drawToilet() {
 
     // you and her, nearer the bottom in front
     auto drawYou = [&]() {
-        drawFigure(figure(player.champion), L.pos, L.face, L.moving, clock);
+        drawFigure(figure(player.champion), L.pos, L.face, L.moving, L.stride * STEP_PACE);
         if (L.hiddenIn < 0 && L.peeT > 0) {                  // the stream
             Vector2 a = { L.pos.x + L.face.x * 6, L.pos.y - FIGURE_H * 0.36f }, b = Vector2Add(L.pos, Vector2Scale(L.face, 14));
             for (int k = 0; k < 10; ++k) {
@@ -392,7 +395,7 @@ void Game::drawToilet() {
                 drawStar({ L.sPos.x + cosf(clock * 5 + k * 2.1f) * 16 - 18, L.sPos.y - 24 + sinf(clock * 5 + k * 2.1f) * 5 }, 4, clock * 4, { 255, 230, 90, 255 });
             return;
         }
-        drawFigure(sergeantWalk, L.sPos, L.sFace, L.sMoving, clock * (L.state == Hunt::Chase ? 1.4f : 1.0f));
+        drawFigure(sergeantWalk, L.sPos, L.sFace, L.sMoving, L.sStride * STEP_PACE);
     };
     if (L.hiddenIn >= 0) {                                  // behind the door of your stall
         drawYou();

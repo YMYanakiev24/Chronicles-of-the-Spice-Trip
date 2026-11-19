@@ -65,6 +65,7 @@ namespace toilet {
         // The Sergeant
         Vector2 sPos{}, sFace{ 0, 1 };
         bool  sMoving = false;
+        float stride = 0, sStride = 0;  // how far you and the Sergeant have walked (the steps keep pace)
         Hunt  state = Hunt::Patrol;
         Vector2 target{};
         int   waypoint = 0, checkStall = -1;
